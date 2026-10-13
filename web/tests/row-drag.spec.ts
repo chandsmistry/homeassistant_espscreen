@@ -28,7 +28,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
   useInventoryStore().inventory = { screens: [{ id: "living", name: "Living", virtual: true, shape: { width: 480, height: 480 }, screensaver: {
-    show: true, media: "", more: [], camera: "", order: ["media", "camera", "clock"], off: [], weather: "auto", items: [], ready: true,
+    show: true, media: "", more: [], camera: "", order: ["media", "camera", "photos", "clock"], off: [], weather: "auto", items: [], ready: true,
     pictures: true, standby: true } }], entities: [], builtin: [], header: { max_items: 6, builtin: [] } } as unknown as Inventory;
   useScreenStore().selected = "living";
 });

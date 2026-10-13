@@ -2596,6 +2596,7 @@
         "kinds": {
           "media": "Odtwarzana muzyka",
           "camera": "Kamera",
+          "photos": "Zdjęcia",
           "clock": "Zegar"
         },
         "summary": {
@@ -2618,7 +2619,6 @@
         "keys_hint": "Odtwarzanie, pauza i głośność działają na wygaszaczu. Dotknięcie w innym miejscu budzi ekran.",
         "choose_camera": "Wybierz kamerę",
         "camera_hint": "Jej obraz co 15 sekund",
-        "photos": "Zdjęcia z /media/screensaver",
         "photos_hint": "Obrazy z folderu /media/screensaver w Home Assistant, w losowej kolejności. Działa też udział sieciowy dodany w Ustawienia, System, Pamięć. Mniejsze pliki zmieniają się szybciej.",
         "photo_seconds": "Pokazuj każde zdjęcie przez",
         "photo_mb": "Największy używany plik",

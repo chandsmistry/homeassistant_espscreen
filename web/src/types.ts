@@ -104,7 +104,7 @@ export type UpdateInfo = {
 // The screensaver (app 0.4.48): a player, a camera and the order the screen tries them in, the clock a step of its own.
 // `ready`: the screen's firmware takes one; `pictures`: its board draws pictures, else the clock alone; `standby`: it
 // goes into standby at all.
-export type SaverKind = "media" | "camera" | "clock";
+export type SaverKind = "media" | "camera" | "photos" | "clock";
 // `weather` (app 0.4.52): the temperature under the clock, "auto" for Home Assistant's first weather entity, "" for none.
 // `more` (app 0.4.54): the players the music step tries after `media`, in their order.
 export type ScreensaverChoice = { show: boolean; media: string; camera: string; order: SaverKind[]; off: SaverKind[]; weather?: string; more?: string[]; items?: HeaderItem[]; photo_seconds?: number; photo_mb?: number };

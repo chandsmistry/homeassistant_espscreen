@@ -100,18 +100,35 @@ class PhotosTest(unittest.TestCase):
 
 class ChoiceTest(unittest.TestCase):
     def test_photo_settings_are_kept_and_checked(self):
-        choice = screen_saver.validate({'show': True, 'camera': photos.PHOTOS, 'photo_seconds': 45, 'photo_mb': 4})
+        choice = screen_saver.validate({'show': True, 'photo_seconds': 45, 'photo_mb': 4})
         self.assertEqual((choice['photo_seconds'], choice['photo_mb']), (45, 4))
         for bad in ({'photo_seconds': 5}, {'photo_seconds': 'x'}, {'photo_mb': 0}, {'photo_mb': 99}, {'photo_mb': True}):
             with self.assertRaises(ValueError):
                 screen_saver.validate(bad)
 
-    def test_the_photos_camera_is_picked_when_there_are_photos(self):
-        choice = screen_saver.validate({'show': True, 'camera': photos.PHOTOS, 'order': ['camera', 'media', 'clock']})
+    def test_photos_is_a_step_after_the_camera_and_an_old_order_still_reads(self):
+        self.assertEqual(screen_saver.validate({'show': True})['order'], ['media', 'camera', 'photos', 'clock'])
+        old = screen_saver.validate({'order': ['clock', 'media', 'camera']})['order']
+        self.assertEqual(old, ['clock', 'media', 'camera', 'photos'])
+        self.assertEqual(screen_saver.validate({'order': ['camera', 'photos', 'media', 'clock']})['order'],
+                         ['camera', 'photos', 'media', 'clock'])
+        with self.assertRaises(ValueError):
+            screen_saver.validate({'order': ['media', 'photos', 'clock']})
+
+    def test_photos_step_shows_as_the_camera_the_screen_knows(self):
+        choice = screen_saver.validate({'show': True, 'order': ['photos', 'clock']}) if False else \
+            screen_saver.validate({'show': True, 'order': ['photos', 'media', 'camera', 'clock']})
         here = {photos.PHOTOS: {'state': 'idle', 'attributes': {'friendly_name': 'Photos'}}}
         gone = {photos.PHOTOS: {'state': 'unavailable', 'attributes': {}}}
-        self.assertEqual(screen_saver.pick(choice, here, True), 'camera')
+        self.assertEqual(screen_saver.pick(choice, here, True), 'photos')
         self.assertEqual(screen_saver.pick(choice, gone, True), 'clock')
+        self.assertEqual(screen_saver.pick(choice, here, False), 'clock')  # a board without pictures
+        message = screen_saver.message(choice, here, True, lambda text, n: text, lambda attrs: {})
+        self.assertEqual(message, {'op': 'saver', 'k': 'camera', 'e': photos.PHOTOS, 'n': 'Photos'})
+        self.assertIn(photos.PHOTOS, screen_saver.entities(choice))
+        off = screen_saver.validate({'show': True, 'off': ['photos']})
+        self.assertNotIn(photos.PHOTOS, screen_saver.entities(off))
+        self.assertEqual(screen_saver.pick({**choice, 'off': ['photos']}, here, True), 'clock')
 
 
 if __name__ == '__main__':

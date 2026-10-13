@@ -17,7 +17,7 @@ beforeEach(() => { insp = useInspectorStore(); });
 const t = (key: string, named: Record<string, unknown> = {}) => i18n.global.t(key, named);
 const entity = (id: string): HeaderItem => ({ type: "entity", entity: id, content: "state", icon: "auto", show: "always" });
 function open(patch: Partial<ScreensaverChoice> = {}) {
-  const screensaver = { show: true, media: "", camera: "", order: ["media", "camera", "clock"], off: [], weather: "auto", more: [], items: [],
+  const screensaver = { show: true, media: "", camera: "", order: ["media", "camera", "photos", "clock"], off: [], weather: "auto", more: [], items: [],
     ready: true, pictures: true, ...patch } as ScreensaverChoice;
   useInventoryStore().inventory = { screens: [{ id: "hall", name: "Hall", online: true, layout: { title: "Hall", tiles: [] }, screensaver } as unknown as Screen],
     entities: ["media_player.kitchen", "media_player.study", "media_player.hall", "media_player.attic", "media_player.porch", "camera.door", "weather.home"]
@@ -35,12 +35,12 @@ describe("the screensaver's steps", () => {
     saver.toggleStep("camera");
     expect(saver.isOn("camera")).toBe(true);
     saver.moveStep("clock", -1);
-    expect(saver.savedOrder).toEqual(["media", "clock", "camera"]);
+    expect(saver.savedOrder).toEqual(["media", "camera", "clock", "photos"]);
     // Past either end the order stays as it is.
     saver.moveStep("media", -1);
-    expect(saver.savedOrder).toEqual(["media", "clock", "camera"]);
+    expect(saver.savedOrder).toEqual(["media", "camera", "clock", "photos"]);
     expect(api.count("PUT screens/:id/screensaver")).toBe(3);
-    expect(saver.stepsShown(null)).toEqual(["media", "clock", "camera"]);
+    expect(saver.stepsShown(null)).toEqual(["media", "camera", "clock", "photos"]);
     useScreenStore().currentScreen!.screensaver!.pictures = false;
     expect(saver.stepsShown(null)).toEqual(["clock"]);
   });

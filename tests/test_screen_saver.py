@@ -33,13 +33,13 @@ PLAYER, CAMERA = 'media_player.living_room', 'camera.front_door'
 PLAYING = {'state': 'playing', 'attributes': {'friendly_name': 'Living room', 'media_title': 'Song', 'media_artist': 'Band',
                                               'media_duration': 200, 'entity_picture': '/api/media_player_proxy/x?cache=1'}}
 DOOR = {'state': 'idle', 'attributes': {'friendly_name': 'Front door'}}
-CHOICE = {'show': True, 'media': PLAYER, 'camera': CAMERA, 'order': ['media', 'camera', 'clock'], 'off': [], 'weather': 'auto', 'more': [], 'items': []}
+CHOICE = {'show': True, 'media': PLAYER, 'camera': CAMERA, 'order': ['media', 'camera', 'photos', 'clock'], 'off': [], 'weather': 'auto', 'more': [], 'items': []}
 
 
 class Choice(unittest.TestCase):
     def test_a_choice_is_checked_and_filled_in(self):
         self.assertEqual(screen_saver.validate({}), screen_saver.DEFAULT)
-        self.assertEqual(screen_saver.validate({'show': True})['order'], ['media', 'camera', 'clock'])
+        self.assertEqual(screen_saver.validate({'show': True})['order'], ['media', 'camera', 'photos', 'clock'])
         for wrong in ({'show': 'yes'}, {'media': 'camera.front'}, {'camera': 'media_player.x'}, {'media': 'Media Player'},
                       {'order': ['media', 'clock']}, {'order': ['media', 'media', 'clock']}, {'off': ['tv']}, {'colour': 1}, None):
             with self.assertRaises(ValueError, msg=wrong):
@@ -72,7 +72,7 @@ class Choice(unittest.TestCase):
         choice = {**CHOICE, 'more': [tv]}
         self.assertEqual(screen_saver.validate(choice)['more'], [tv])
         self.assertEqual(screen_saver.players(choice), [PLAYER, tv])
-        self.assertEqual(screen_saver.entities(choice), {PLAYER, tv, CAMERA})
+        self.assertEqual(screen_saver.entities(choice), {PLAYER, tv, CAMERA, screen_saver.photos.PHOTOS})
         both = {PLAYER: PLAYING, tv: poster, CAMERA: DOOR}
         self.assertEqual(screen_saver.player(choice, both), PLAYER)
         # The speaker plays the television's sound: it plays, without a cover, so the television's poster shows.
@@ -488,7 +488,7 @@ class TheApp(unittest.IsolatedAsyncioTestCase):
             screen = m.screen('text.d1_tiles')
             self.assertLess(m.firmware_version('text.d1_tiles', screen), SCREENSAVER_MIN_FIRMWARE)
             m.savers.set('d1', CHOICE)
-            self.assertEqual(m.saver_entities('text.d1_tiles'), {PLAYER, CAMERA})
+            self.assertEqual(m.saver_entities('text.d1_tiles'), {PLAYER, CAMERA, screen_saver.photos.PHOTOS})
             self.assertEqual(m.saver_message(screen)['k'], 'media')
 
 

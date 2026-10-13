@@ -1,8 +1,9 @@
 ## Unreleased
 
-- **Photos screensaver.** The Camera step of the screensaver can show the pictures in `/media/screensaver` (a local
-  folder or a network share added in Home Assistant), shuffled, each for 15 seconds to 5 minutes, with a limit on the
-  size of a file so a change is quick. The add-on reads `/media` read only; no firmware change.
+- **Photos screensaver.** Photos is a step of its own in the screensaver, beside Music, Camera and Clock. It shows the
+  pictures in `/media/screensaver` (a local folder or a network share added in Home Assistant), shuffled, each for
+  15 seconds to 5 minutes, with a limit on the size of a file so a change is quick. The add-on reads `/media` read
+  only; no firmware change.
 - **MistryneT branding (fork).** The starting screen and the top bar's home key show the MistryneT mark and name, the
   add-on has its own icon and logo, and the firmware update screen is redrawn: lockup, "Firmware update", "Keep power
   connected", a thin progress bar (amber while it runs, green when done, red on failure) and the percent.

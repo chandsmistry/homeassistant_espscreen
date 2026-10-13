@@ -2596,6 +2596,7 @@
         "kinds": {
           "media": "Laufende Musik",
           "camera": "Kamera",
+          "photos": "Fotos",
           "clock": "Uhr"
         },
         "summary": {
@@ -2618,7 +2619,6 @@
         "keys_hint": "Wiedergabe, Pause und Lautstärke funktionieren auf dem Bildschirmschoner. Ein Tippen woanders weckt den Bildschirm.",
         "choose_camera": "Kamera wählen",
         "camera_hint": "Ihr Bild, alle 15 Sekunden",
-        "photos": "Fotos aus /media/screensaver",
         "photos_hint": "Die Bilder im Home-Assistant-Ordner /media/screensaver, gemischt. Eine Netzwerkfreigabe unter Einstellungen, System, Speicher geht auch. Kleinere Dateien wechseln schneller.",
         "photo_seconds": "Jedes Foto zeigen für",
         "photo_mb": "Größte verwendete Datei",

@@ -18,10 +18,9 @@ import { itemList, useTopbarStore } from "./topbar";
 import { useUiStore } from "./ui";
 
 export const SAVER_MIN_FIRMWARE = "0.29.0";
-export const SAVER_ICONS: Record<SaverKind, string> = { media: "F075A", camera: "F07AE", clock: "F0150" };
+export const SAVER_ICONS: Record<SaverKind, string> = { media: "F075A", camera: "F07AE", photos: "F02F9", clock: "F0150" };
 export const MAX_PLAYERS = 4;
-// The Photos folder (add-on photos.py): a camera of its own, the pictures in /media/screensaver, shown one after the other.
-export const PHOTOS_ENTITY = "image.screensaver_photos";
+// The Photos step (add-on photos.py): the pictures in /media/screensaver, shown one after the other.
 export const PHOTO_SECONDS = [15, 30, 60, 120, 300];
 export const PHOTO_MB = [2, 4, 8, 16, 32];
 // The clock's row of entities: the top bar's entity items, shown by their state, their icon or both, in the drawer the top
@@ -59,7 +58,7 @@ export const useScreensaverStore = defineStore("screensaver", () => {
   }
 
   // The steps in the order the screen tries them. A board without pictures shows the clock alone.
-  const savedOrder = computed<SaverKind[]>(() => saver.value?.order || ["media", "camera", "clock"]);
+  const savedOrder = computed<SaverKind[]>(() => saver.value?.order || ["media", "camera", "photos", "clock"]);
   function stepsShown(live: SaverKind[] | null) {
     const list = live || savedOrder.value;
     return saver.value?.pictures ? list : list.filter((kind) => kind === "clock");
@@ -76,7 +75,6 @@ export const useScreensaverStore = defineStore("screensaver", () => {
   const addPlayer = (id: string) => players.value.length < MAX_PLAYERS && !players.value.includes(id) && setPlayers([...players.value, id]);
   const removePlayer = (id: string) => setPlayers(players.value.filter((p) => p !== id));
 
-  const isPhotos = computed(() => saver.value?.camera === PHOTOS_ENTITY);
   const photoSeconds = computed(() => saver.value?.photo_seconds ?? 30);
   const photoMb = computed(() => saver.value?.photo_mb ?? 8);
   const secondsChoices = computed(() => PHOTO_SECONDS.map((n) => [n, `${n} s`] as const));
@@ -92,7 +90,6 @@ export const useScreensaverStore = defineStore("screensaver", () => {
   }
   const cameraChoices = computed(() => [
     ["", t(key("choose_camera"))] as const,
-    [PHOTOS_ENTITY, t(key("photos"))] as const,
     ...entitiesOf("camera").map((e) => [e.id, e.area ? `${e.name} · ${e.area}` : e.name] as const),
   ]);
   // The temperature under the clock (app 0.4.52): Home Assistant's own by default, one of your choice, or none.
@@ -129,9 +126,9 @@ export const useScreensaverStore = defineStore("screensaver", () => {
       if (!players.value.length) return { text: t(key("summary.media_none")), missing: true };
       return { text: players.value.map((id) => entities.entityName(id)).join(", ") };
     }
+    if (kind === "photos") return { text: t(key("summary.photos")) };
     if (kind === "camera") {
       if (!saver.value?.camera) return { text: t(key("summary.camera_none")), missing: true };
-      if (saver.value.camera === PHOTOS_ENTITY) return { text: t(key("summary.photos")) };
       return { text: entities.entityName(saver.value.camera) };
     }
     const weather = saver.value?.weather ?? "auto";
@@ -163,7 +160,7 @@ export const useScreensaverStore = defineStore("screensaver", () => {
   const clockCrumb = () => ({ text: saverLabel("clock"), open: () => insp.openSaverStep("clock") });
 
   return {
-    saver, saverReady, standbyOn, savedOrder, players, cameraChoices, isPhotos, photoSeconds, photoMb, secondsChoices, mbChoices, weatherChoices, saverItems, weatherSource, glassRatio, clockPreview,
+    saver, saverReady, standbyOn, savedOrder, players, cameraChoices, photoSeconds, photoMb, secondsChoices, mbChoices, weatherChoices, saverItems, weatherSource, glassRatio, clockPreview,
     // What the card and the drawers read as they draw (stores/lookup.ts).
     ...lookups({ isOn, stepsShown, entityPlace, entitiesOf, summary, clockCrumb }),
     changeSaver, toggleStep, moveStep, setPlayers, addPlayer, removePlayer, setSaverItems,

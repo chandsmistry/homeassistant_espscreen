@@ -2596,6 +2596,7 @@
         "kinds": {
           "media": "Música a tocar",
           "camera": "Câmara",
+          "photos": "Fotos",
           "clock": "Relógio"
         },
         "summary": {
@@ -2618,7 +2619,6 @@
         "keys_hint": "Reproduzir, pausa e volume funcionam na proteção de ecrã. Um toque noutro sítio acorda o ecrã.",
         "choose_camera": "Escolhe uma câmara",
         "camera_hint": "A sua imagem, a cada 15 segundos",
-        "photos": "Fotos de /media/screensaver",
         "photos_hint": "As imagens da pasta /media/screensaver do Home Assistant, por ordem aleatória. Uma partilha de rede adicionada em Definições, Sistema, Armazenamento também funciona. Os ficheiros pequenos mudam mais depressa.",
         "photo_seconds": "Mostrar cada foto durante",
         "photo_mb": "Maior ficheiro usado",

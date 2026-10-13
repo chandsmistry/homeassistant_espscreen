@@ -3091,12 +3091,13 @@ class Manager:
 
     def photo_settings(self):
         """How the Photos folder shows (screen_saver `photo_seconds`, `photo_mb`): the first screensaver that uses it."""
-        choice = next((c for c in self.savers.choices.values() if c.get('camera') == photos.PHOTOS), screen_saver.DEFAULT)
+        choice = next((c for c in self.savers.choices.values() if c.get('show') and 'photos' not in c.get('off', ())),
+                      screen_saver.DEFAULT)
         return {'seconds': choice.get('photo_seconds', screen_saver.PHOTO_SECONDS[2]), 'mb': choice.get('photo_mb', screen_saver.PHOTO_MB[2])}
 
     def saver_states(self):
         """Home Assistant's states with the Photos folder as a camera of its own, where a screensaver uses it."""
-        if not any(choice.get('camera') == photos.PHOTOS for choice in self.savers.choices.values()):
+        if not any(choice.get('show') and 'photos' not in choice.get('off', ()) for choice in self.savers.choices.values()):
             return self.ha.states
         return {**self.ha.states, photos.PHOTOS: self.photos.state()}
 

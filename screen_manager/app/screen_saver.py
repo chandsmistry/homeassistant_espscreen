@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timezone
 
 import core
+import photos
 
 LOG = logging.getLogger(__name__)
 
@@ -35,7 +36,10 @@ PAUSED_SECONDS = 600
 # the screensaver itself, and its play key must still be there for the finger that pressed it. After that a player that
 # plays goes first again.
 HELD_SECONDS = 120
-KINDS = ('media', 'camera', 'clock')
+KINDS = ('media', 'camera', 'photos', 'clock')
+# The steps before the Photos step existed (MistryneT fork): a saved or sent order of these three gets `photos` after the
+# camera, so a choice kept earlier, or sent by an older editor, still reads.
+LEGACY_KINDS = ('media', 'camera', 'clock')
 PICTURE_KINDS = frozenset(('media', 'camera'))
 # `weather` (app 0.4.52): whose temperature the clock shows under the time. 'auto' takes Home Assistant's first weather
 # entity that reports one, '' shows none, and a weather entity of your choice is that one.
@@ -98,6 +102,8 @@ def validate(value):
         result['items'] = valid_items(value['items'])
     if 'order' in value:
         order = value['order']
+        if isinstance(order, list) and sorted(order) == sorted(LEGACY_KINDS):
+            order = [*order[:order.index('camera') + 1], 'photos', *order[order.index('camera') + 1:]]
         if not isinstance(order, list) or sorted(order) != sorted(KINDS):
             raise ValueError('screensaver order')
         result['order'] = list(order)
@@ -194,6 +200,8 @@ def player(choice, states, keys=False, now=None, held='', broken=()):
 def entities(choice, states=None):
     """The entities a choice follows; with the states, also the weather entity its clock reads."""
     found = set(players(choice)) | ({choice['camera']} if choice.get('camera') else set())
+    if choice.get('show') and 'photos' not in (choice.get('off') or ()):
+        found.add(photos.PHOTOS)
     weather = weather_entity(choice, states) if states is not None and choice.get('show') else ''
     shown = {item['entity'] for item in choice.get('items') or ()} if choice.get('show') else set()
     return found | ({weather} if weather else set()) | shown
@@ -206,6 +214,8 @@ def available(kind, choice, states, pictures, keys=False, now=None, held='', bro
         return True
     if not pictures:
         return False
+    if kind == 'photos':
+        return (states.get(photos.PHOTOS) or {}).get('state', '') not in GONE
     if kind == 'media':
         return bool(player(choice, states, keys, now, held, broken))
     return bool(choice.get(kind)) and (states.get(choice[kind]) or {}).get('state', '') not in GONE
@@ -228,6 +238,9 @@ def message(choice, states, pictures, short, media_extras, ground=None, keys=Fal
     wire item for one of the clock's entity items (header_bar.entity_item), or None for a screen that takes none,
     `broken` the players whose cover could not be fetched (player)."""
     kind = pick(choice, states, pictures, keys, now, held, broken)
+    if kind == 'photos':
+        # The screen knows a camera: the Photos folder is one, named Photos (firmware needs nothing new).
+        return {'op': 'saver', 'k': 'camera', 'e': photos.PHOTOS, 'n': 'Photos'}
     result = {'op': 'saver', 'k': kind}
     if kind == 'clock':
         # The outside temperature under the time (app 0.4.52, firmware 0.31.0+); older firmware reads past it.

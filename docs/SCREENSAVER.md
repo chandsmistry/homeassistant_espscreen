@@ -92,22 +92,25 @@ screensaver either.
 
 ## Photos from a folder (MistryneT fork)
 
-The Camera step can show the pictures in the Home Assistant folder `/media/screensaver` instead of a camera: choose
-**Photos from /media/screensaver** in the camera list. The photos come in a shuffled round, each for the time you set
-(15 seconds to 5 minutes, 30 by default), and a new round starts in another order when every photo has been shown.
-Folders inside the folder are read too, three levels deep, up to 2000 pictures (JPEG, PNG, WebP, BMP).
+**Photos** is a step of its own beside Music playing, Camera and Clock, with a switch and a place in the order (it
+comes after Camera until you move it). It shows the pictures in the Home Assistant folder `/media/screensaver`,
+shuffled, each for the time you set under the step (15 seconds to 5 minutes, 30 by default); a new round starts in
+another order when every photo has been shown. Folders inside the folder are read too, three levels deep, up to 2000
+pictures (JPEG, PNG, WebP, BMP).
 
 A network share works the same: add it under Settings, System, Storage in Home Assistant, as a Media share, and it
-appears under `/media`. Put the photos in a folder called `screensaver` in it, or mount the share with that name.
+appears under `/media`. Put the photos in a folder called `screensaver` in it, or give the share that name.
 
 **Faster changes.** **Largest file used** (2 to 32 MB, 8 by default) skips a file above it, so a change never waits for
 a huge picture. A photo is read at a reduced size by the decoder, cut to 1920 pixels on its long side and kept as a
-small JPEG, and the next photo is prepared while the current one is on the glass. With no pictures in the folder, or
-no card of the folder at all, the step is unavailable and the screensaver goes on to the next step, the clock last.
+small JPEG, and the next photo is prepared while the current one is on the glass. With no pictures in the folder, or no
+folder at all, the step is unavailable and the screensaver goes on to the next step.
 
-How it works: `screen_manager/app/photos.py` is a pseudo camera, `image.screensaver_photos`. The camera feed asks it for
-its snapshot the way it asks Home Assistant for a camera, and the screen needs nothing new: it gets the usual camera
-message and loads the usual screensaver picture. The add-on maps `/media` read only (`screen_manager/config.yaml`).
+How it works: `screen_manager/app/photos.py` is a pseudo camera, `image.screensaver_photos`. The Photos step tells the
+screen to show that camera (`{"op": "saver", "k": "camera", "e": "image.screensaver_photos"}`), the camera feed asks it
+for its snapshot the way it asks Home Assistant for a camera, and the screen needs nothing new: it loads the usual
+screensaver picture. A saved order of three steps (before Photos) reads with Photos after the camera. The add-on maps
+`/media` read only (`screen_manager/config.yaml`).
 
 ## How it works
 

@@ -3,6 +3,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import UiSelect from "../src/components/ui/UiSelect.vue";
 import SaverInspector from "../src/components/SaverInspector.vue";
 import ScreensaverCard from "../src/components/ScreensaverCard.vue";
 import type { Inventory, ScreensaverView } from "../src/types";
@@ -19,7 +20,7 @@ let ui: ReturnType<typeof useUiStore>;
 beforeEach(() => { ui = useUiStore(); });
 
 const saver = (patch: Partial<ScreensaverView> = {}): ScreensaverView => ({
-  show: true, media: "media_player.tv", more: ["media_player.speaker"], camera: "", order: ["media", "camera", "clock"], off: ["camera"],
+  show: true, media: "media_player.tv", more: ["media_player.speaker"], camera: "", order: ["media", "camera", "photos", "clock"], off: ["camera"],
   weather: "auto", items: [], ready: true, pictures: true, standby: true, ...patch,
 });
 
@@ -44,8 +45,8 @@ const rows = (wrapper: ReturnType<typeof mount>) => wrapper.findAll(".saver-row"
 describe("the screensaver card", () => {
   it("lists the steps in their order, each with one line of what it shows", () => {
     const wrapper = mount(ScreensaverCard);
-    expect(wrapper.findAll(".saver-row").map((row) => row.attributes("data-kind"))).toEqual(["media", "camera", "clock"]);
-    expect(rows(wrapper)).toEqual(["Music playing: Apple TV, Speaker", "Camera: Off", "Clock: Outside temperature"]);
+    expect(wrapper.findAll(".saver-row").map((row) => row.attributes("data-kind"))).toEqual(["media", "camera", "photos", "clock"]);
+    expect(rows(wrapper)).toEqual(["Music playing: Apple TV, Speaker", "Camera: Off", "Photos: Photos from /media/screensaver", "Clock: Outside temperature"]);
     // No field in the card: the choices live in the drawer, so nothing can push the rows past a narrow card.
     expect(wrapper.find(".ui-select").exists()).toBe(false);
   });
@@ -72,7 +73,7 @@ describe("the screensaver card", () => {
     const wrapper = mount(ScreensaverCard, { attachTo: document.body });
     const clock = wrapper.find('.saver-row[data-kind="clock"]');
     await clock.trigger("keydown", { key: "ArrowUp" });
-    expect(useScreenStore().currentScreen!.screensaver!.order).toEqual(["media", "clock", "camera"]);
+    expect(useScreenStore().currentScreen!.screensaver!.order).toEqual(["media", "camera", "clock", "photos"]);
   });
 
   it("shows the clock alone on a screen without pictures", () => {
@@ -93,12 +94,22 @@ describe("a step in the drawer", () => {
 
   it("turns its step off and moves it a place later", async () => {
     const wrapper = mount(SaverInspector, { props: { step: "media" } });
-    expect(wrapper.text()).toContain("1 of 3");
+    expect(wrapper.text()).toContain("1 of 4");
     await wrapper.find('.switch-row [role="switch"]').trigger("click");
     await flushPromises();
     expect(useScreenStore().currentScreen!.screensaver!.off).toContain("media");
     await wrapper.find('button[aria-label="Try later"]').trigger("click");
-    expect(useScreenStore().currentScreen!.screensaver!.order).toEqual(["camera", "media", "clock"]);
+    expect(useScreenStore().currentScreen!.screensaver!.order).toEqual(["camera", "media", "photos", "clock"]);
+  });
+
+  it("sets how long a photo stays and the largest file the Photos step uses", async () => {
+    const wrapper = mount(SaverInspector, { props: { step: "photos" } });
+    const values = () => wrapper.findAllComponents(UiSelect).map((select) => (select.props() as { modelValue: number }).modelValue);
+    expect(values()).toEqual([30, 8]);
+    useScreensaverStore().changeSaver({ photo_seconds: 60, photo_mb: 4 });
+    await flushPromises();
+    expect(useScreenStore().currentScreen!.screensaver).toMatchObject({ photo_seconds: 60, photo_mb: 4 });
+    expect(values()).toEqual([60, 4]);
   });
 
   it("shows the clock in the glass's own shape, without a temperature when none is chosen", async () => {

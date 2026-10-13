@@ -76,13 +76,14 @@ watch(() => screensaver.weatherSource, (id) => id && entities.loadLibraryStates(
     <Section v-else-if="step === 'camera'" :title="saverLabel('camera')">
       <UiSelect id="saver-camera" :model-value="screensaver.saver.camera" :options="screensaver.cameraChoices" @update:model-value="(value: string) => screensaver.changeSaver({ camera: value })" />
       <small class="help">{{ T("camera_hint") }}</small>
-      <template v-if="screensaver.isPhotos">
-        <label for="saver-photo-seconds">{{ T("photo_seconds") }}</label>
-        <UiSelect id="saver-photo-seconds" :model-value="screensaver.photoSeconds" :options="screensaver.secondsChoices" @update:model-value="(value: number) => screensaver.changeSaver({ photo_seconds: value })" />
-        <label for="saver-photo-mb">{{ T("photo_mb") }}</label>
-        <UiSelect id="saver-photo-mb" :model-value="screensaver.photoMb" :options="screensaver.mbChoices" @update:model-value="(value: number) => screensaver.changeSaver({ photo_mb: value })" />
-        <small class="help">{{ T("photos_hint") }}</small>
-      </template>
+    </Section>
+
+    <Section v-else-if="step === 'photos'" :title="saverLabel('photos')">
+      <label for="saver-photo-seconds">{{ T("photo_seconds") }}</label>
+      <UiSelect id="saver-photo-seconds" :model-value="screensaver.photoSeconds" :options="screensaver.secondsChoices" @update:model-value="(value: number) => screensaver.changeSaver({ photo_seconds: value })" />
+      <label for="saver-photo-mb">{{ T("photo_mb") }}</label>
+      <UiSelect id="saver-photo-mb" :model-value="screensaver.photoMb" :options="screensaver.mbChoices" @update:model-value="(value: number) => screensaver.changeSaver({ photo_mb: value })" />
+      <small class="help">{{ T("photos_hint") }}</small>
     </Section>
 
     <template v-else>

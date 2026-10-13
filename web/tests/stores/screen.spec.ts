@@ -12,7 +12,7 @@ import { failure, fakeApi } from "../helpers/fake-api";
 import { useInventoryStore } from "../../src/stores/inventory";
 
 const t = (key: string, named: Record<string, unknown> = {}) => i18n.global.t(key, named);
-const saver = (patch: Partial<ScreensaverChoice> = {}) => ({ show: true, media: "", camera: "", order: ["media", "camera", "clock"], off: [],
+const saver = (patch: Partial<ScreensaverChoice> = {}) => ({ show: true, media: "", camera: "", order: ["media", "camera", "photos", "clock"], off: [],
   weather: "auto", more: [], items: [], ready: true, pictures: true, ...patch }) as ScreensaverChoice;
 const screen = (id: string, patch: Partial<Screen> = {}) => ({ id, name: id, online: true, firmware: "0.53.0", layout: { title: id, tiles: [] },
   screensaver: saver(), ...patch }) as unknown as Screen;
