@@ -9122,30 +9122,42 @@ inline void ota_draw() {
     lv_obj_add_flag(ota_panel, LV_OBJ_FLAG_CLICKABLE);  // nothing under it takes a tap meanwhile
     lv_obj_set_style_bg_color(ota_panel, theme::color(theme::PAGE), 0);
     lv_obj_set_style_bg_opa(ota_panel, LV_OPA_COVER, 0);
-    lv_obj_set_flex_flow(ota_panel, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(ota_panel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(ota_panel, ui::px(20), 0);
-    boot_brand_create(ota_panel);
-    auto line = [](const lv_font_t *font, theme::Paint paint, const char *text) {
+    // No flex on this LVGL build: one column placed by hand, centred on the glass.
+    const int screen_w = lv_display_get_horizontal_resolution(nullptr), screen_h = lv_display_get_vertical_resolution(nullptr);
+    const int gap = ui::px(20), bar_w = ui::px(320), bar_h = ui::px(6);
+    const lv_font_t *small = label_font ? label_font : watch_font;
+    const int title_h = line_of(watch_font), sub_h = line_of(small);
+    auto *brand = boot_brand_create(ota_panel);
+    const int brand_h = brand ? lv_obj_get_height(brand) : 0;
+    const int total = brand_h + (brand ? gap : 0) + title_h + gap / 2 + sub_h + gap + bar_h + gap + sub_h;
+    int y = std::max(0, (screen_h - total) / 2);
+    auto line = [&](const lv_font_t *font, theme::Paint paint, const char *text, int height) {
       auto *label = lv_label_create(ota_panel);
       lv_obj_add_style(label, theme::style(paint), 0);
       if (font) lv_obj_set_style_text_font(label, font, 0);
       lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-      lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-      lv_obj_set_width(label, lv_pct(86));
+      lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+      lv_obj_set_size(label, screen_w * 86 / 100, height);
       lv_label_set_text(label, text);
+      lv_obj_align(label, LV_ALIGN_TOP_MID, 0, y);
+      y += height;
       return label;
     };
-    line(watch_font, theme::Paint::ink, tr(txt::status_update_title));
-    line(label_font ? label_font : watch_font, theme::Paint::muted, tr(txt::status_update_keep_power));
+    if (brand) { lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, y); y += brand_h + gap; }
+    line(watch_font, theme::Paint::ink, tr(txt::status_update_title), title_h);
+    y += gap / 2;
+    line(small, theme::Paint::muted, tr(txt::status_update_keep_power), sub_h);
+    y += gap;
     ota_bar = lv_bar_create(ota_panel);
     lv_obj_remove_style_all(ota_bar);
-    lv_obj_set_size(ota_bar, ui::px(320), ui::px(6));
+    lv_obj_set_size(ota_bar, bar_w, bar_h);
+    lv_obj_align(ota_bar, LV_ALIGN_TOP_MID, 0, y);
+    y += bar_h + gap;
     lv_bar_set_range(ota_bar, 0, 100);
     lv_obj_set_style_bg_color(ota_bar, theme::color(theme::TRACK), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(ota_bar, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(ota_bar, LV_OPA_COVER, LV_PART_INDICATOR);
-    ota_label = line(label_font ? label_font : watch_font, theme::Paint::ink, "");
+    ota_label = line(small, theme::Paint::ink, "", sub_h);
   }
   lv_obj_move_foreground(ota_panel);
   const bool failed = p.phase == ota_status::Phase::failed, done = p.phase == ota_status::Phase::done;
