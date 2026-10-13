@@ -13,6 +13,11 @@ from layout_migrations import migrate_legacy
 
 
 class PageLayoutTests(unittest.TestCase):
+    def test_the_power_distribution_cards_are_built_in_cards(self):
+        import page_layout
+        for name in ('pd_header', 'pd_dp3', 'pd_ultra', 'pd_ac', 'pd_max'):
+            self.assertEqual(page_layout._entity({'kind': 'builtin', 'name': name}, {}, None), 'screen.' + name)
+
     def migrate(self, value, grid=None):
         counter = itertools.count(1)
         return migrate_legacy(value, grid or Grid(), lambda: f"{next(counter):016x}")

@@ -205,7 +205,7 @@ def _entity(content, page_indexes, home):
         return entity
     if content["kind"] == "builtin":
         _object(content, {"kind", "name"}, {"kind", "name"})
-        if content["name"] not in ("clock", "nightstand", "settings", "map", "energy"):
+        if content["name"] not in ("clock", "nightstand", "settings", "map", "energy", "pd_header", "pd_dp3", "pd_ultra", "pd_ac", "pd_max"):
             raise LayoutError(t('addon.errors.layout.unsupported'))
         return "screen." + content["name"]
     if content["kind"] == "navigation":
