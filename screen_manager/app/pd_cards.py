@@ -9,11 +9,14 @@ PdBatteryManagementCard._device. CSS pixels are drawn at SCALE times their size;
 """
 from __future__ import annotations
 
+import asyncio
 import io
+import logging
 import json
 import re
 from pathlib import Path
 
+LOG = logging.getLogger(__name__)
 HEADER = 'sensor.pd_header_json'
 BATTERIES = 'sensor.pd_battery_status_json'
 ACTIVE_COLOR = 'sensor.pd_active_color'
@@ -451,3 +454,40 @@ def render(name, states, theme='light', scale=SCALE):
     """PNG bytes for `header`, or a battery key (`dp3`, `ultra`, `ac`, `max`)."""
     canvas = header(states, theme) if name == 'header' else device(states, name, theme)
     return canvas.png(scale)
+
+
+WATCH = {HEADER, BATTERIES, ACTIVE_COLOR, BURST, 'input_select.pd_control_mode', *ELIGIBILITY.values()}
+FOLDER = '/config/www/pd_cards'
+NAMES = ('header', 'dp3', 'ultra', 'ac', 'max')
+
+
+def write_all(states, folder=FOLDER, theme='light', scale=2):
+    """Draw every card and write the pictures whose bytes changed; returns the names written."""
+    root = Path(folder)
+    root.mkdir(parents=True, exist_ok=True)
+    written = []
+    for name in NAMES:
+        data = render(name, states, theme, scale)
+        target = root / f'{name}.png'
+        if target.exists() and target.read_bytes() == data:
+            continue
+        tmp = target.with_suffix('.tmp')
+        tmp.write_bytes(data)
+        tmp.replace(target)
+        written.append(name)
+    return written
+
+
+async def keep_drawn(server, folder=FOLDER):
+    """Redraw after the PD sensors change (a second of quiet first), for as long as the add-on runs."""
+    loop = asyncio.get_running_loop()
+    while True:
+        await server.pd_changed.wait()
+        await asyncio.sleep(1)
+        server.pd_changed.clear()
+        if HEADER not in server.states and BATTERIES not in server.states:
+            continue
+        try:
+            await loop.run_in_executor(None, write_all, dict(server.states), folder)
+        except Exception:
+            LOG.exception('PD cards could not be drawn')

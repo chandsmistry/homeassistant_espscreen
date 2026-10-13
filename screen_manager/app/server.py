@@ -39,6 +39,7 @@ from updates import Updater
 import core
 import entity_settings
 import plugins
+import pd_cards
 
 from aiohttp import ClientError, ClientSession, ClientTimeout, WSMsgType, web
 from core import alarm_extras, lock_extras, ALERT_EVENT, board_of, BROADCAST_EVENTS, BROADCAST_SHOW, BUILTIN, CAMERA_DOMAINS, entity_id, SETTINGS_BESIDE_BLOCK, TILE_EVENTS, TILE_RESULT_EVENT, layout_snapshot, match_screen, HEADER_MIN_FIRMWARE, NAME_TILE_SETTINGS, TRANSPORT_MIN_FIRMWARE, alert_action, alert_camera, alert_choice, alert_data, choice_service, ALERT_CHOICE_ACTION, ALERT_CHOICE_MIN_FIRMWARE, parse_firmware, alert_reference, alert_screen_choice, alert_screen_names, alert_service, alert_targets, backgrounds, builtin_name, controls_catalogue, device_prefixes, discover, discover_screens, encode, entity_slug, extras, media_cover, media_extras, forecast_kinds, header_items, inbox_prefix, message_action, min_firmware, name_clash, packets, revision, screen_items, state_message, validate_header, validate_layout, validate_settings
@@ -190,6 +191,7 @@ class HomeAssistant:
         self.registry, self.devices, self.areas = [], [], []
         self.online = False
         self.changed = asyncio.Event()
+        self.pd_changed = asyncio.Event()
         self.state_events = preview_events.Changes()
         # Entity ids the manager cares about; None wakes it for every state change.
         self.relevant = None
@@ -296,6 +298,8 @@ class HomeAssistant:
                         self.states[eid] = body['new_state']
                     else:
                         self.states.pop(eid, None)
+                    if eid in pd_cards.WATCH:
+                        self.pd_changed.set()
                     # Unsaved/virtual previews also follow entities not used by a physical screen.
                     self.state_events.notify(eid)
                     if self.relevant is None or eid in self.relevant:
@@ -4514,6 +4518,7 @@ def create_app(manager, development=False):
                        'revision': 'addon.errors.feedback.invalid', 'action': 'addon.errors.invalid_input'}
     async def feedback_start(app):
         manager.feedback.start()
+        app['pd_cards'] = asyncio.ensure_future(pd_cards.keep_drawn(manager.ha)) if Path('/config').is_dir() else None
     app.on_startup.append(feedback_start)
     async def feedback_action(request):
         """The owner's choice on the feedback card: answer, later, never, cancel, retry or delete. The page names the
@@ -4554,6 +4559,8 @@ def create_app(manager, development=False):
             if task and not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError): await task
+        if app.get('pd_cards'):
+            app['pd_cards'].cancel()
         await manager.feedback.close()
     app.on_cleanup.append(shutdown)
     app.router.add_get('/api/screens/{inbox}/inspect', inspector)

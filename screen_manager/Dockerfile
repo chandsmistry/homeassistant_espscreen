@@ -14,6 +14,9 @@ RUN (pip freeze | grep -i '^cryptography==' || true) > /tmp/esphome-keeps.txt \
  && pip install --no-cache-dir -c /tmp/esphome-keeps.txt 'aiohttp>=3.12,<4' PyYAML \
       aiortc==1.15.0 av==17.1.0 aioice==0.10.2 pylibsrtp==1.0.0 pyee==14.0.0 pyOpenSSL==26.4.0 google-crc32c==1.9.0 \
  && rm /tmp/esphome-keeps.txt
+# The PD console cards (pd_cards.py) draw Noto's colour emoji and a few symbols the way a browser does.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-color-emoji fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
 COPY app /app
 # Every text of the app, the editor and the screens, one file per language (app 0.2.90).
 COPY translations /app/translations
