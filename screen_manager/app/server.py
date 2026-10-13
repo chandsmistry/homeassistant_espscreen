@@ -20,6 +20,7 @@ import live_feed
 import claude_skill
 import screen_hang
 import screen_labels
+import photos
 import screen_saver
 import feedback
 from firmware import Firmware
@@ -941,7 +942,9 @@ class Manager:
         self.card_histories, self.card_history_fetches = {}, {}
         # Camera images (firmware 0.2.57+): the feed behind the camera port, and the cameras of recent alerts
         # (entity -> monotonic time) that a screen may open full screen without a tile.
-        self.camera = camera_feed.CameraFeed(lambda entity: self.ha.camera_image(entity),
+        self.photos = photos.Photos()
+        self.camera = camera_feed.CameraFeed(lambda entity: self.photos.image(self.photo_settings()) if entity == photos.PHOTOS
+                                             else self.ha.camera_image(entity),
                                              fetch_cover=lambda entity: self.ha.media_image(self.followed(entity)),
                                              picture=lambda entity: self.ha.media_picture(self.followed(entity)))
         self.alert_cameras = {}
@@ -3086,6 +3089,17 @@ class Manager:
         device = (self.screen(inbox) or {}).get('device_id')
         return screen_saver.entities(self.savers.get(device), self.ha.states) if device else set()
 
+    def photo_settings(self):
+        """How the Photos folder shows (screen_saver `photo_seconds`, `photo_mb`): the first screensaver that uses it."""
+        choice = next((c for c in self.savers.choices.values() if c.get('camera') == photos.PHOTOS), screen_saver.DEFAULT)
+        return {'seconds': choice.get('photo_seconds', screen_saver.PHOTO_SECONDS[2]), 'mb': choice.get('photo_mb', screen_saver.PHOTO_MB[2])}
+
+    def saver_states(self):
+        """Home Assistant's states with the Photos folder as a camera of its own, where a screensaver uses it."""
+        if not any(choice.get('camera') == photos.PHOTOS for choice in self.savers.choices.values()):
+            return self.ha.states
+        return {**self.ha.states, photos.PHOTOS: self.photos.state()}
+
     def saver_message(self, screen):
         """What this screen's screensaver shows now (screen_saver.message), for a board that draws pictures or not."""
         choice = self.savers.get(screen.get('device_id')) if screen.get('device_id') else dict(screen_saver.DEFAULT)
@@ -3097,7 +3111,7 @@ class Manager:
         row = screen_saver.ITEMS_FEATURE in (getattr(sender, 'features', None) or ())
         # A player whose cover could not be fetched gives way to the next step (GitHub #229).
         broken = {entity for entity in screen_saver.players(choice) if self.camera.cover_broken(entity)}
-        return screen_saver.message(choice, self.ha.states, pictures, short, media_extras, self.player_ground, keys,
+        return screen_saver.message(choice, self.saver_states(), pictures, short, media_extras, self.player_ground, keys,
                                     held=self.saver_shown.get(screen.get('id'), ''), bar=self.saver_item if row else None,
                                     broken=broken)
 

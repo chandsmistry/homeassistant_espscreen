@@ -22,6 +22,7 @@ schema: {}
 
 map:
   - homeassistant_config:rw
+  - media:ro   # the Photos screensaver reads /media/screensaver
 uart: true
 usb: true
 # Reproducible compiler/download caches (firmware.py build_env); retain screens.json and user configuration.

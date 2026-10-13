@@ -2601,6 +2601,7 @@
         "summary": {
           "media_none": "Még nincs lejátszó",
           "camera_none": "Még nincs kamera",
+          "photos": "Fotók a /media/screensaver mappából",
           "temperature": "Kinti hőmérséklet",
           "time_date": "Idő és dátum",
           "off": "Ki"
@@ -2617,6 +2618,10 @@
         "keys_hint": "A lejátszás, a szünet és a hangerő működik a képernyővédőn. Máshol egy koppintás felébreszti a képernyőt.",
         "choose_camera": "Válassz kamerát",
         "camera_hint": "A képe, 15 másodpercenként",
+        "photos": "Fotók a /media/screensaver mappából",
+        "photos_hint": "A Home Assistant /media/screensaver mappájának képei, keverve. Egy hálózati megosztás (Beállítások, Rendszer, Tárhely) is jó. A kisebb fájlok gyorsabban váltanak.",
+        "photo_seconds": "Egy fotó látszik",
+        "photo_mb": "Legnagyobb használt fájl",
         "glass": "A képernyőn",
         "temperature": "Hőmérséklet",
         "weather_auto": "Automatikus",

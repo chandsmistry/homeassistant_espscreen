@@ -2240,6 +2240,7 @@
         "summary": {
           "media_none": "Nog geen speler",
           "camera_none": "Nog geen camera",
+          "photos": "Foto's uit /media/screensaver",
           "temperature": "Buitentemperatuur",
           "time_date": "Tijd en datum",
           "off": "Uit"
@@ -2256,6 +2257,10 @@
         "keys_hint": "Afspelen, pauze en het volume werken op de screensaver. Een tik ergens anders maakt het scherm wakker.",
         "choose_camera": "Kies een camera",
         "camera_hint": "Het beeld, elke 15 seconden",
+        "photos": "Foto's uit /media/screensaver",
+        "photos_hint": "De afbeeldingen in de Home Assistant-map /media/screensaver, door elkaar. Een netwerkshare onder Instellingen, Systeem, Opslag werkt ook. Kleinere bestanden wisselen sneller.",
+        "photo_seconds": "Elke foto tonen gedurende",
+        "photo_mb": "Grootste gebruikte bestand",
         "glass": "Op het scherm",
         "temperature": "Temperatuur",
         "weather_auto": "Automatisch",

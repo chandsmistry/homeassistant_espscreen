@@ -43,8 +43,13 @@ PICTURE_KINDS = frozenset(('media', 'camera'))
 # that plays with a cover: a speaker's own music first, say, and the poster of what the television under it plays next.
 # `items` (app 0.4.81): entities the clock shows beside the temperature, in one centred row: the top bar's entity items,
 # each with its state or its icon alone (content `state` or `icon`, with the icon `auto`, `none` or a named one).
+# `photo_seconds`, `photo_mb` (MistryneT fork): when the camera step is the Photos folder (photos.PHOTOS), how long one
+# photo stays, and the largest file that is used (a bigger one is skipped, so a change never waits for a huge file).
 DEFAULT = {'show': False, 'media': '', 'camera': '', 'order': list(KINDS), 'off': [], 'weather': 'auto', 'more': [],
            'items': []}
+# Kept only when a choice sets them (an older choice and its saved file stay as they were); read with their defaults.
+PHOTO_SECONDS = (15, 3600, 30)
+PHOTO_MB = (1, 50, 8)
 ITEMS_MAX = 4
 MORE_PLAYERS = 3
 ENTITY = re.compile(r'[a-z0-9_]+\.[a-z0-9_]+')
@@ -57,7 +62,7 @@ GONE = frozenset(('', 'unavailable', 'unknown'))
 
 def validate(value):
     """A clean copy of a screensaver choice, or ValueError. Every field is optional; the default fills the rest."""
-    if not isinstance(value, dict) or set(value) - set(DEFAULT):
+    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb'}:
         raise ValueError('screensaver fields')
     result = {**DEFAULT, 'order': list(DEFAULT['order']), 'off': [], 'more': [], 'items': []}
     if 'show' in value:
@@ -70,6 +75,12 @@ def validate(value):
                                                         or entity.split('.')[0] not in DOMAINS[kind])):
             raise ValueError(f'screensaver {kind}')
         result[kind] = entity
+    for name, (low, high, _) in (('photo_seconds', PHOTO_SECONDS), ('photo_mb', PHOTO_MB)):
+        if name in value:
+            number = value[name]
+            if isinstance(number, bool) or not isinstance(number, int) or not low <= number <= high:
+                raise ValueError(f'screensaver {name}')
+            result[name] = number
     if 'more' in value:
         more = value['more']
         if not isinstance(more, list) or len(more) > MORE_PLAYERS or len(set(more)) != len(more) or any(

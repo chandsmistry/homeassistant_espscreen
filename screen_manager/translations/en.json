@@ -2240,6 +2240,7 @@
         "summary": {
           "media_none": "No player yet",
           "camera_none": "No camera yet",
+          "photos": "Photos from /media/screensaver",
           "temperature": "Outside temperature",
           "time_date": "Time and date",
           "off": "Off"
@@ -2256,6 +2257,10 @@
         "keys_hint": "Play, pause and the volume work on the screensaver. A tap anywhere else wakes the screen.",
         "choose_camera": "Choose a camera",
         "camera_hint": "Its picture, every 15 seconds",
+        "photos": "Photos from /media/screensaver",
+        "photos_hint": "The pictures in the Home Assistant folder /media/screensaver, shuffled. A network share added under Settings, System, Storage works too. Smaller files change faster.",
+        "photo_seconds": "Show each photo for",
+        "photo_mb": "Largest file used",
         "glass": "On the screen",
         "temperature": "Temperature",
         "weather_auto": "Automatic",

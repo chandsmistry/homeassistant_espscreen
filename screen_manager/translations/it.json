@@ -2601,6 +2601,7 @@
         "summary": {
           "media_none": "Ancora nessun lettore",
           "camera_none": "Ancora nessuna telecamera",
+          "photos": "Foto da /media/screensaver",
           "temperature": "Temperatura esterna",
           "time_date": "Ora e data",
           "off": "Spento"
@@ -2617,6 +2618,10 @@
         "keys_hint": "Riproduci, pausa e volume funzionano sul salvaschermo. Un tocco altrove riattiva lo schermo.",
         "choose_camera": "Scegli una telecamera",
         "camera_hint": "La sua immagine, ogni 15 secondi",
+        "photos": "Foto da /media/screensaver",
+        "photos_hint": "Le immagini della cartella /media/screensaver di Home Assistant, in ordine casuale. Va bene anche una condivisione di rete aggiunta in Impostazioni, Sistema, Archiviazione. I file piccoli cambiano più in fretta.",
+        "photo_seconds": "Mostra ogni foto per",
+        "photo_mb": "File più grande usato",
         "glass": "Sullo schermo",
         "temperature": "Temperatura",
         "weather_auto": "Automatica",

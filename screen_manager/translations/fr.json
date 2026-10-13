@@ -2601,6 +2601,7 @@
         "summary": {
           "media_none": "Aucun lecteur pour l'instant",
           "camera_none": "Aucune caméra pour l'instant",
+          "photos": "Photos de /media/screensaver",
           "temperature": "Température extérieure",
           "time_date": "Heure et date",
           "off": "Désactivé"
@@ -2617,6 +2618,10 @@
         "keys_hint": "Lecture, pause et volume fonctionnent sur l'économiseur d'écran. Un appui ailleurs réveille l'écran.",
         "choose_camera": "Choisir une caméra",
         "camera_hint": "Son image, toutes les 15 secondes",
+        "photos": "Photos de /media/screensaver",
+        "photos_hint": "Les images du dossier /media/screensaver de Home Assistant, dans un ordre aléatoire. Un partage réseau ajouté dans Paramètres, Système, Stockage fonctionne aussi. Les petits fichiers changent plus vite.",
+        "photo_seconds": "Afficher chaque photo pendant",
+        "photo_mb": "Plus gros fichier utilisé",
         "glass": "À l'écran",
         "temperature": "Température",
         "weather_auto": "Automatique",

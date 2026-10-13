@@ -2601,6 +2601,7 @@
         "summary": {
           "media_none": "Aún sin reproductor",
           "camera_none": "Aún sin cámara",
+          "photos": "Fotos de /media/screensaver",
           "temperature": "Temperatura exterior",
           "time_date": "Hora y fecha",
           "off": "Apagado"
@@ -2617,6 +2618,10 @@
         "keys_hint": "Reproducir, pausa y volumen funcionan en el salvapantallas. Un toque en otro sitio despierta la pantalla.",
         "choose_camera": "Elige una cámara",
         "camera_hint": "Su imagen, cada 15 segundos",
+        "photos": "Fotos de /media/screensaver",
+        "photos_hint": "Las imágenes de la carpeta /media/screensaver de Home Assistant, en orden aleatorio. También sirve una unidad de red añadida en Ajustes, Sistema, Almacenamiento. Los archivos pequeños cambian más rápido.",
+        "photo_seconds": "Mostrar cada foto durante",
+        "photo_mb": "Archivo más grande usado",
         "glass": "En la pantalla",
         "temperature": "Temperatura",
         "weather_auto": "Automática",
