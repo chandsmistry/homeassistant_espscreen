@@ -965,7 +965,7 @@ font:
     id: brand_wordmark
     size: ${FONT_BRAND_SIZE}
     bpp: 4
-    glyphs: ['t','e','s','r','a']
+    glyphs: ['M','i','s','t','r','y','n','e','T']
 
   # Material Design Icons (MDI) — included at fonts/materialdesignicons-webfont.ttf (Apache 2.0)
   # Source: https://github.com/Templarian/MaterialDesign-Webfont

@@ -8697,9 +8697,9 @@ inline lv_obj_t *boot_brand_create(lv_obj_t *parent) {
     lv_obj_add_style(name, theme::style(theme::Paint::ink), 0);
     lv_obj_set_style_text_font(name, brand_font, 0);
     lv_obj_set_style_text_letter_space(name, space, 0);
-    lv_label_set_text(name, "tessera");
+    lv_label_set_text(name, "MistryneT");
     lv_point_t size;
-    lv_text_get_size(&size, "tessera", brand_font, space, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    lv_text_get_size(&size, "MistryneT", brand_font, space, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
     const int gap = mark ? mark / 3 : 0;
     // Centred on the mark, as the website's header lines them up.
     const int line = lv_font_get_line_height(brand_font);
