@@ -6,7 +6,7 @@
   <a href="https://tessera-maxgramser.on-forge.com"><img src="docs/images/tessera-mark.svg" width="112" alt="The Tessera logo: four rounded tiles in yellow, blue, purple and green, like a small mosaic"></a>
 </p>
 
-<h1 align="center">Tessera</h1>
+<h1 align="center">Tessera (MistryneT fork)</h1>
 
 <p align="center"><b>Touch screens for Home Assistant. A screen for every room, one simple editor.</b></p>
 
