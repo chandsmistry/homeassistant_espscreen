@@ -127,6 +127,8 @@
       "first_tiles_open": "Öffne Tessera in Home Assistant",
       "first_tiles_pick": "Wähle Kacheln für {name}",
       "first_tiles_save": "Tippe auf Speichern & senden",
+      "update_title": "Firmware-Update",
+      "update_keep_power": "Stromversorgung nicht trennen",
       "updating": "Firmware wird aktualisiert {percent}",
       "update_restart": "Aktualisiert, Neustart",
       "update_failed": "Aktualisierung fehlgeschlagen",

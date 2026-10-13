@@ -3,7 +3,7 @@
 #pragma once
 #include "components/smart_display/screen_text.h"
 
-static_assert(screen_text::KEYS_HASH == 0x3AA6ABD7u && screen_text::KEY_COUNT == 469,
+static_assert(screen_text::KEYS_HASH == 0x6249FFD8u && screen_text::KEY_COUNT == 471,
               "screen_text_keys.h does not match screen_manager/translations/en.json: run tools/i18n.py header");
 const char *const screen_text::TABLE[] = {
     ".",
@@ -106,6 +106,8 @@ const char *const screen_text::TABLE[] = {
     "Open Tessera in Home Assistant",
     "Pick tiles for {name}",
     "Press Save & send",
+    "Firmware update",
+    "Keep power connected",
     "Updating firmware {percent}",
     "Update complete, restarting",
     "Update failed",

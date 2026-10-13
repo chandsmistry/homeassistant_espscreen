@@ -127,6 +127,8 @@
       "first_tiles_open": "Otwórz Tessera w Home Assistant",
       "first_tiles_pick": "Wybierz kafelki dla {name}",
       "first_tiles_save": "Naciśnij Zapisz i wyślij",
+      "update_title": "Aktualizacja oprogramowania",
+      "update_keep_power": "Nie odłączaj zasilania",
       "updating": "Aktualizacja firmware {percent}",
       "update_restart": "Zaktualizowano, ponowne uruchamianie",
       "update_failed": "Aktualizacja nie powiodła się",

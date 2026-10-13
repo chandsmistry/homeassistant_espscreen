@@ -127,6 +127,8 @@
       "first_tiles_open": "Open Tessera in Home Assistant",
       "first_tiles_pick": "Pick tiles for {name}",
       "first_tiles_save": "Press Save & send",
+      "update_title": "Firmware update",
+      "update_keep_power": "Keep power connected",
       "updating": "Updating firmware {percent}",
       "update_restart": "Update complete, restarting",
       "update_failed": "Update failed",

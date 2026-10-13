@@ -127,6 +127,8 @@
       "first_tiles_open": "Apri Tessera in Home Assistant",
       "first_tiles_pick": "Scegli i riquadri per {name}",
       "first_tiles_save": "Premi Salva e invia",
+      "update_title": "Aggiornamento firmware",
+      "update_keep_power": "Mantieni collegata l'alimentazione",
       "updating": "Aggiornamento firmware {percent}",
       "update_restart": "Aggiornato, riavvio",
       "update_failed": "Aggiornamento non riuscito",

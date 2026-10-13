@@ -127,6 +127,8 @@
       "first_tiles_open": "Open Tessera in Home Assistant",
       "first_tiles_pick": "Kies tegels voor {name}",
       "first_tiles_save": "Druk op Opslaan & versturen",
+      "update_title": "Firmware-update",
+      "update_keep_power": "Houd de voeding aangesloten",
       "updating": "Firmware bijwerken {percent}",
       "update_restart": "Bijgewerkt, opnieuw opstarten",
       "update_failed": "Bijwerken mislukt",

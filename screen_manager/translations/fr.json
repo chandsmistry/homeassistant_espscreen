@@ -127,6 +127,8 @@
       "first_tiles_open": "Ouvrez Tessera dans Home Assistant",
       "first_tiles_pick": "Choisissez des tuiles pour {name}",
       "first_tiles_save": "Appuyez sur Enregistrer et envoyer",
+      "update_title": "Mise à jour du firmware",
+      "update_keep_power": "Gardez l'alimentation branchée",
       "updating": "Mise à jour du firmware {percent}",
       "update_restart": "Mise à jour terminée, redémarrage",
       "update_failed": "Échec de la mise à jour",

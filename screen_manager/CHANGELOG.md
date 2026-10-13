@@ -1,3 +1,9 @@
+## Unreleased
+
+- **MistryneT branding (fork).** The starting screen and the top bar's home key show the MistryneT mark and name, the
+  add-on has its own icon and logo, and the firmware update screen is redrawn: lockup, "Firmware update", "Keep power
+  connected", a thin progress bar (amber while it runs, green when done, red on failure) and the percent.
+
 ## 0.4.87 (firmware 0.55.0)
 
 - **Plugins for everyone.** The Plugins page is now in every Tessera app, not only the dev app: add a tile, a top bar

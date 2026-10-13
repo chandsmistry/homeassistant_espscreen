@@ -127,6 +127,8 @@
       "first_tiles_open": "Nyisd meg a Tesserát a Home Assistantben",
       "first_tiles_pick": "Válassz csempéket ehhez: {name}",
       "first_tiles_save": "Nyomd meg: Mentés és küldés",
+      "update_title": "Firmware-frissítés",
+      "update_keep_power": "Ne húzza ki a tápellátást",
       "updating": "Firmware frissítése {percent}",
       "update_restart": "Frissítve, újraindítás",
       "update_failed": "A frissítés nem sikerült",

@@ -9103,11 +9103,13 @@ inline BootView boot_view(uint32_t now) {
 // An update coming in, over everything (ota_status.h): drawn at once, since ESPHome's update loop holds LVGL's own. It
 // stands on LVGL's top layer, over the screensaver, a card and the settings page, and the screen wakes for it first
 // (ota_status::wake): an update that ran under a screensaver showed nothing until the screen restarted.
-inline lv_obj_t *ota_panel = nullptr, *ota_label = nullptr;
+inline lv_obj_t *ota_panel = nullptr, *ota_label = nullptr, *ota_bar = nullptr;
 inline void ota_forget() {
   if (ota_panel) lv_obj_delete(ota_panel);
-  ota_panel = ota_label = nullptr;
+  ota_panel = ota_label = ota_bar = nullptr;
 }
+// MistryneT update screen: the lockup, "Firmware update", "Keep power connected", a thin bar (amber while it runs,
+// green when done, red when it failed) and the percent under it. One column in the middle of the glass.
 inline void ota_draw() {
   const auto &p = ota_status::now;
   if (p.phase == ota_status::Phase::none) { ota_forget(); return; }
@@ -9120,17 +9122,38 @@ inline void ota_draw() {
     lv_obj_add_flag(ota_panel, LV_OBJ_FLAG_CLICKABLE);  // nothing under it takes a tap meanwhile
     lv_obj_set_style_bg_color(ota_panel, theme::color(theme::PAGE), 0);
     lv_obj_set_style_bg_opa(ota_panel, LV_OPA_COVER, 0);
-    ota_label = lv_label_create(ota_panel);
-    lv_obj_add_style(ota_label, theme::style(theme::Paint::ink), 0);
-    if (watch_font) lv_obj_set_style_text_font(ota_label, watch_font, 0);
-    lv_obj_set_style_text_align(ota_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(ota_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(ota_label, lv_pct(86));
-    lv_obj_center(ota_label);
+    lv_obj_set_flex_flow(ota_panel, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(ota_panel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(ota_panel, ui::px(20), 0);
+    boot_brand_create(ota_panel);
+    auto line = [](const lv_font_t *font, theme::Paint paint, const char *text) {
+      auto *label = lv_label_create(ota_panel);
+      lv_obj_add_style(label, theme::style(paint), 0);
+      if (font) lv_obj_set_style_text_font(label, font, 0);
+      lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+      lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+      lv_obj_set_width(label, lv_pct(86));
+      lv_label_set_text(label, text);
+      return label;
+    };
+    line(watch_font, theme::Paint::ink, tr(txt::status_update_title));
+    line(label_font ? label_font : watch_font, theme::Paint::muted, tr(txt::status_update_keep_power));
+    ota_bar = lv_bar_create(ota_panel);
+    lv_obj_remove_style_all(ota_bar);
+    lv_obj_set_size(ota_bar, ui::px(320), ui::px(6));
+    lv_bar_set_range(ota_bar, 0, 100);
+    lv_obj_set_style_bg_color(ota_bar, theme::color(theme::TRACK), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(ota_bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(ota_bar, LV_OPA_COVER, LV_PART_INDICATOR);
+    ota_label = line(label_font ? label_font : watch_font, theme::Paint::ink, "");
   }
   lv_obj_move_foreground(ota_panel);
-  const std::string text = p.phase == ota_status::Phase::done ? std::string(tr(txt::status_update_restart))
-                         : p.phase == ota_status::Phase::failed ? std::string(tr(txt::status_update_failed))
+  const bool failed = p.phase == ota_status::Phase::failed, done = p.phase == ota_status::Phase::done;
+  lv_bar_set_value(ota_bar, p.percent, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(ota_bar, failed ? lv_color_hex(theme::foreground(theme::ha::RED))
+                                    : theme::color(done ? theme::MARK_GREEN : theme::MARK_AMBER), LV_PART_INDICATOR);
+  const std::string text = done ? std::string(tr(txt::status_update_restart))
+                         : failed ? std::string(tr(txt::status_update_failed))
                          : fill(txt::status_updating, "percent", screen_text::percent(p.percent));
   lv_label_set_text(ota_label, text.c_str());
   lv_refr_now(nullptr);

@@ -127,6 +127,8 @@
       "first_tiles_open": "Abre Tessera en Home Assistant",
       "first_tiles_pick": "Elige mosaicos para {name}",
       "first_tiles_save": "Pulsa Guardar y enviar",
+      "update_title": "Actualización de firmware",
+      "update_keep_power": "Mantén la alimentación conectada",
       "updating": "Actualizando firmware {percent}",
       "update_restart": "Actualizado, reiniciando",
       "update_failed": "La actualización falló",
