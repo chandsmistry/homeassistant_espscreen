@@ -18,7 +18,7 @@ import tile_icons
 DOMAINS = catalogue.DOMAINS
 # Built-in cards without a Home Assistant entity; firmware 0.2.14+ renders them. The names in English: a screen gets them in
 # its language and the editor in its own (builtin_name, app 0.2.90).
-BUILTIN = {'screen.clock': 'Clock', 'screen.nightstand': 'Bedside clock', 'screen.settings': 'Settings', 'screen.map': 'Map', 'screen.energy': 'Energy', **{f'screen.page_{n}': f'Go to page {n}' for n in range(1, 33)}}
+BUILTIN = {'screen.clock': 'Clock', 'screen.nightstand': 'Bedside clock', 'screen.settings': 'Settings', 'screen.map': 'Map', 'screen.energy': 'Energy', 'screen.pd_header': 'PD header', 'screen.pd_dp3': 'PD Delta Pro 3', 'screen.pd_ultra': 'PD Stream Ultra X', 'screen.pd_ac': 'PD Stream AC', 'screen.pd_max': 'PD Stream MAX', **{f'screen.page_{n}': f'Go to page {n}' for n in range(1, 33)}}
 # A navigation tile (firmware 0.2.62+): screen.page_<n> goes to page n, up to page 32 on a board that holds that many
 # (firmware 0.34.0+); whether the screen has page n is the screen's Grid's to say. Firmware 0.2.65+ takes the same one on several
 # pages (a "Back to page 1" on every page), firmware 0.16.0+ any entity on several tiles (GitHub #83) but the bedside
@@ -48,6 +48,8 @@ def builtin_name(entity, text=screen_t):
         return text('addon.screen.builtin.map')
     if entity == ENERGY_TILE:
         return text('addon.screen.builtin.energy')
+    if entity in BUILTIN and entity.startswith('screen.pd_'):
+        return BUILTIN[entity]
     return text('screen.settings.title' if entity == 'screen.settings' else 'addon.screen.builtin.clock')
 # A camera or an image entity opens full screen on a Guition with firmware 0.2.57+ (camera_feed.py).
 CAMERA_DOMAINS = frozenset(('camera', 'image'))
@@ -1876,7 +1878,7 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
                 raise ValueError(t('addon.errors.layout.unknown_settings'))
             displays = DISPLAYS.get(domain, ('standard', 'watch'))
             # The map tile (app 0.4.36) is a map and nothing else, and has no slider or controls of its own.
-            if tile['entity'] == MAP_TILE:
+            if tile['entity'] == MAP_TILE or tile['entity'].startswith('screen.pd_'):
                 displays = ('map',)
                 options = {**{k: v for k, v in options.items() if k not in ('inline', 'controls', 'history_hours', 'sub')}, 'display': 'map'}
             # The energy card draws its diagram on every size it takes, with no face, slider or second line of its own.
@@ -2322,6 +2324,9 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
     # A map card carries only its movement mark (app 0.4.33): the screen asks for a new picture when it changes, so
     # nothing polls and no place goes out (map_card.fingerprint).
     if (tile.get('options') or {}).get('display') == 'map':
+        if tile['entity'].startswith('screen.pd_'):
+            import pd_cards
+            return {'mk': pd_cards.fingerprint(tile, states)}
         import map_card
         return {'mk': map_card.fingerprint(tile, states, entries)}
     if domain == 'light':

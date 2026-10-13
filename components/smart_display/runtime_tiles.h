@@ -5737,6 +5737,7 @@ inline void event(lv_event_t *event) {
   // from this tile's own choices (its index), in the screen's look.
   // Held, a person's tile opens its card with the history, as it always did; a person's map too.
   const bool held = code == LV_EVENT_LONG_PRESSED;
+  if(tile.is_pd())return;
   if(tile.is_map()&&!held){if(camera_supported())camera_open(tile.entity,tile.name.empty()?tile.entity:tile.name,(int)w.index);return;}
   // A person tile tapped (Automatic, firmware 0.21.0+): where they are, on the full map focused on them with their card,
   // as Home Assistant's own map shows a person picked; on a board without pictures the card opens as before.

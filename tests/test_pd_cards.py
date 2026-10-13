@@ -28,6 +28,17 @@ class PdCards(unittest.TestCase):
             self.assertEqual(pd_cards.write_all(STATES, folder, scale=1), list(pd_cards.NAMES))
             self.assertEqual(pd_cards.write_all(STATES, folder, scale=1), [])
 
+    def test_library_cards_draw_at_the_size_asked(self):
+        for entity in pd_cards.TILES:
+            image = pd_cards.render_tile({'entity': entity}, STATES, (400, 200), dark=True)
+            self.assertEqual(image.size, (400, 200), entity)
+        self.assertTrue(pd_cards.fingerprint({'entity': 'screen.pd_dp3'}, STATES))
+
+    def test_fingerprint_follows_the_card_state(self):
+        before = pd_cards.fingerprint({'entity': 'screen.pd_dp3'}, STATES)
+        changed = {**STATES, pd_cards.ELIGIBILITY['dp3']: {'state': 'off', 'attributes': {}}}
+        self.assertNotEqual(before, pd_cards.fingerprint({'entity': 'screen.pd_dp3'}, changed))
+
 
 if __name__ == '__main__':
     unittest.main()

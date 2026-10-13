@@ -259,6 +259,8 @@ export function defaultOptions(id: string, covers = false): Partial<Tile> {
   // The bedside clock is the whole page, always, and starts without a card: its digits on the dark page (app 0.4.12).
   if (id === "screen.nightstand") return { options: { size: "full", background: "none" } };
   // The map tile (app 0.4.36) starts double width, following everyone Home Assistant knows the place of.
+  // The Power Distribution cards (fork): the header is a wide picture, a battery card too.
+  if (id.startsWith("screen.pd_")) return { options: { display: "map", size: "wide" } };
   if (id === "screen.map") return { options: { display: "map", size: "wide" } };
   // The energy card (app 0.4.77) starts 2 x 2, the least power-flow-card-plus takes; the store takes a larger size where
   // the glass is too low for that (startTile).

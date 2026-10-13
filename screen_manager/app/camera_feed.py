@@ -279,7 +279,7 @@ def live_request(request, atlas=False):
 
 def map_supported(entity):
     """Whether an entity's tile may be a map: a person's (app 0.4.33), and the screen's own map tile (app 0.4.36)."""
-    return isinstance(entity, str) and (entity.startswith('person.') or entity == 'screen.map')
+    return isinstance(entity, str) and (entity.startswith('person.') or entity == 'screen.map' or entity.startswith('screen.pd_'))
 
 
 def live_dark(request):

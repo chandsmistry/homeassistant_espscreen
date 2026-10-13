@@ -173,6 +173,11 @@ inline bool plugin_key(const std::string &entity) {
   }
   return true;
 }
+// The fork's Power Distribution cards (Library, Screen): five pictures the app draws.
+inline bool is_pd_entity(const std::string &entity) {
+  return entity == "screen.pd_header" || entity == "screen.pd_dp3" || entity == "screen.pd_ultra" ||
+         entity == "screen.pd_ac" || entity == "screen.pd_max";
+}
 inline bool valid_entity(const std::string &entity) {
   if (entity.size() > 120) return false;
   if (entity.rfind("plugin:", 0) == 0) return plugin_key(entity);
@@ -188,7 +193,7 @@ inline bool valid_entity(const std::string &entity) {
     // screen.map (firmware 0.21.0+): the map of the screen's own cards, a picture the app draws. screen.energy
     // (firmware 0.47.0+): the house's power, Home Assistant's energy distribution live (energy_card.h).
     if (entity == "screen.clock" || entity == "screen.settings" || entity == "screen.nightstand" || entity == "screen.map" ||
-        entity == "screen.energy") return true;
+        entity == "screen.energy" || is_pd_entity(entity)) return true;
     return page_entity(entity) && page_number(entity) <= grid.pages();
   }
   // The types the tile catalogue has (catalogue/*.yaml, tile_catalogue.h): the same list the add-on and the editor take.
@@ -490,7 +495,9 @@ struct Tile {
   // A map of where this person and the people with them are (firmware 0.20.0+, app 0.4.33): the app draws the whole
   // card, its name included, and sends it in the page's strip like a live camera, so no map arithmetic lives here.
   // The map tile of the screen's own cards (firmware 0.21.0+) is the same picture, following whom the app is told to.
-  bool is_map() const { return display == "map" && (domain() == "person" || entity == "screen.map"); }
+  bool is_map() const { return display == "map" && (domain() == "person" || entity == "screen.map" || is_pd_entity(entity)); }
+  // The Power Distribution cards of the fork's Library (screen.pd_*): pictures the app draws, shown like the map; a tap does nothing.
+  bool is_pd() const { return is_pd_entity(entity); }
   // The energy card (firmware 0.47.0+): the house's power, drawn from the numbers the app sends (energy_card.h).
   bool is_energy() const { return entity == "screen.energy"; }
   // A favourite (firmware 0.24.0+): a player's tile that plays one thing of its library on a tap, with that thing's

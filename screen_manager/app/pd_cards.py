@@ -491,3 +491,35 @@ async def keep_drawn(server, folder=FOLDER):
             await loop.run_in_executor(None, write_all, dict(server.states), folder)
         except Exception:
             LOG.exception('PD cards could not be drawn')
+
+
+# ----- the screen's own cards (Library, Screen): one picture tile per card -----
+TILES = {'screen.pd_header': 'header', 'screen.pd_dp3': 'dp3', 'screen.pd_ultra': 'ultra', 'screen.pd_ac': 'ac', 'screen.pd_max': 'max'}
+
+
+def is_tile(entity):
+    return entity in TILES
+
+
+def fingerprint(tile, states, dark=False):
+    """A short hash of everything the card is drawn from; the screen asks for a new picture when it changes."""
+    import hashlib
+    name = TILES.get(tile['entity'], 'header')
+    keys = [HEADER, ACTIVE_COLOR, BURST, 'input_select.pd_control_mode'] if name == 'header' else [BATTERIES, ACTIVE_COLOR, ELIGIBILITY[name]]
+    seen = [(k, (states.get(k) or {}).get('state'), json.dumps((states.get(k) or {}).get('attributes'), sort_keys=True, default=str)) for k in keys]
+    return hashlib.sha1(json.dumps(seen, default=str).encode()).hexdigest()[:10]
+
+
+def render_tile(tile, states, size, dark=False):
+    """The card as a picture of exactly `size`: drawn at its own proportions, fitted inside, on the card's own colour."""
+    from PIL import Image
+    name = TILES.get(tile['entity'], 'header')
+    theme = 'dark' if dark else 'light'
+    canvas = header(states, theme) if name == 'header' else device(states, name, theme)
+    card = canvas.image.convert('RGB')
+    width, height = size
+    ratio = min(width / card.width, height / card.height)
+    card = card.resize((max(1, round(card.width * ratio)), max(1, round(card.height * ratio))), Image.LANCZOS)
+    out = Image.new('RGB', (width, height), THEMES[theme]['card'])
+    out.paste(card, ((width - card.width) // 2, (height - card.height) // 2))
+    return out

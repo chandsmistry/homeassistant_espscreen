@@ -27,6 +27,8 @@ const MAP = ofType("person")?.map;
 const MAP_OWN = ["map", "framing", "distance", "follow", "markers", "names", "zones", "streets", "look"];
 // The map tile of the screen's own cards (app 0.4.36): a map and nothing else.
 const MAP_TILE = "screen.map";
+// The fork's Power Distribution cards (Library, Screen): pictures the add-on draws, shown like a map.
+const isPdCard = (entity: string) => entity.startsWith("screen.pd_");
 
 // What a choice that asks a second step stands for while the inspector tries it: Perform action asks which action,
 // a value of the entity which value, words of your own the words. The step itself is checked when it is taken.
@@ -41,7 +43,7 @@ const pageTile = (entity: string) => /^screen\.page_\d+$/.test(entity);
 /** Mirrors core.validate_layout's normalization, so the document the editor saves is already canonical. */
 export function canonicalOptions(entity: string, options: TileOptions = {}, key = false): TileOptions {
   const out: TileOptions = { ...options };
-  if (entity === MAP_TILE) { out.display = "map"; for (const field of ["inline", "controls", "history_hours", "sub"]) delete out[field]; }
+  if (entity === MAP_TILE || isPdCard(entity)) { out.display = "map"; for (const field of ["inline", "controls", "history_hours", "sub"]) delete out[field]; }
   if (typeof out.sub === "string" && out.sub.startsWith("text:")) {
     const words = out.sub.slice(5).trim();
     out.sub = words ? `text:${words}` : "none";

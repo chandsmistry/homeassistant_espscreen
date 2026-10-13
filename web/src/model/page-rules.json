@@ -419,6 +419,11 @@
     "energy",
     "map",
     "nightstand",
+    "pd_ac",
+    "pd_dp3",
+    "pd_header",
+    "pd_max",
+    "pd_ultra",
     "settings"
   ],
   "keyHolders": {

@@ -1,5 +1,6 @@
 ## Unreleased
 
+- **PD cards in Library → Screen (fork).** The Power Distribution header and the four battery cards (Delta Pro 3, Stream Ultra X, Stream AC, Stream MAX) are cards of the screen's own, drawn by the add-on like the map and shown as pictures; they follow the PD sensors. Firmware change: the five `screen.pd_*` entities.
 - **PD console cards as pictures (fork).** The add-on draws the Power Distribution header and the four battery cards exactly as the dashboard cards look (Roboto, emoji, glow, pills, bars) and saves them as pictures in `/config/www/pd_cards/`, redrawn when the PD sensors change. Needs the fonts added to the add-on image; no firmware change. See docs/PD_CARDS.md.
 - **Photos screensaver.** Photos is a step of its own in the screensaver, beside Music, Camera and Clock. It shows the
   pictures in `/media/screensaver` (a local folder or a network share added in Home Assistant), shuffled, each for

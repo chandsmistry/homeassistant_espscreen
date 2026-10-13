@@ -2315,6 +2315,8 @@ class Manager:
             return tuple(cover_related(tile['entity'], self.device_entries(tile['entity']), self.ha.states).values())
         # A map (app 0.4.33) is drawn from everyone on it and the zones around them: a move or a zone's edit reaches
         # its movement mark only through this.
+        if pd_cards.is_tile(tile['entity']):
+            return tuple(e for e in pd_cards.WATCH if e != tile['entity'])
         if (tile.get('options') or {}).get('display') == 'map':
             # The map tile following everyone reads every person and tracker: one that gets a place joins the map.
             everyone = tile['entity'] == map_card.MAP_TILE and map_card.options_of(tile)['follow'] == 'everyone'
@@ -3474,10 +3476,21 @@ class Manager:
     # The maps kept drawn: a page's maps in both looks and the page before it.
     MAP_RENDERS_KEPT = 12
 
+    def pd_render(self, tile, dark):
+        """(mark, draw) of one PD card (pd_cards.py, Library → Screen), drawn at the size the screen asks for."""
+        mark = lambda: pd_cards.fingerprint(tile, self.ha.states) + ('d' if dark else 'l')
+
+        async def draw(width, height):
+            return await asyncio.get_running_loop().run_in_executor(
+                None, lambda: pd_cards.render_tile(tile, dict(self.ha.states), (width, height), dark))
+        return mark, draw
+
     def map_render(self, tile, shape, dark, full=False, focus=None, move=None):
         """(mark, draw) of one saved map tile for CameraFeed.live: the mark is its movement mark and the look, `draw`
         reads Home Assistant's states and asks for the streets when it runs. A drawn card is kept by mark, frame and
         look, so two screens in different looks each keep their own, and one whose streets did not all come is not."""
+        if pd_cards.is_tile(tile['entity']):
+            return self.pd_render(tile, dark)
         board = map_card.Board(shape)
         # The screen's look, unless the card keeps one of its own (`look`, app 0.4.36).
         dark = map_card.dark_for(tile, dark)
