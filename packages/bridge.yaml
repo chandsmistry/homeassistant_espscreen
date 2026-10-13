@@ -20,7 +20,7 @@ packages:
 external_components:
   - source:
       type: git
-      url: https://github.com/MaxGramser/homeassistant_espscreen.git
+      url: https://github.com/chandsmistry/homeassistant_espscreen.git
       ref: ${GITHUB_REF}
       path: components
     refresh: 0s
