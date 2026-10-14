@@ -72,7 +72,8 @@ int main() {
     a.dark = true;
     std::map<std::string, std::string> f;
     for (const auto &field : fields(a)) f[field.first] = field.second;
-    assert(f.size() == 6 && f["tiles"] == "camera.drive" && f["idx"] == "7" && f["size"] == "160");
+    assert(f.size() == 7 && f["tiles"] == "camera.drive" && f["idx"] == "7" && f["size"] == "160");
+    assert(f["picture_encoding"] == "rle8");
     assert(f["bg"] == "101010" && f["dark"] == "1" && f["atlas"] == "[[0,0,504,316,12,170]]");
     a.circle = 4;
     for (const auto &field : fields(a)) f[field.first] = field.second;

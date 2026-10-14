@@ -115,8 +115,17 @@ enum Role : uint8_t {
   // Assistant's own weather pictures draw them; a sun, drops and flakes keep their condition colours
   WEATHER_CLOUD,
   WEATHER_CLOUD_BACK,
-  PD_SOC_1, PD_SOC_2, PD_SOC_3, PD_SOC_4, PD_ACT, PD_SOLAR,
-  PD_OK, PD_OK_INK, PD_BAD, PD_BAD_INK, PD_PILL_INK,
+  PD_SOC_1,
+  PD_SOC_2,
+  PD_SOC_3,
+  PD_SOC_4,
+  PD_ACT,
+  PD_SOLAR,
+  PD_OK,
+  PD_OK_INK,
+  PD_BAD,
+  PD_BAD_INK,
+  PD_PILL_INK,
   ROLE_COUNT
 };
 
