@@ -37,6 +37,8 @@
 
 - **Independent PD actions.** Configure a target entity and supported HA action for each battery block or the header. Unset blocks keep the card action; View only disables a block. The new pd_actions capability gates saves. Hit regions reuse accepted geometry, with no visual changes. Local action/gesture tests passed; physical block actions remain untested.
 
+- **Map and Energy taps.** Restore default auto taps for the Map tile and Energy circles; Nothing still prevents opening. PD keeps its catalogue-configured tap action. Automated regression checks cover the change; physical acceptance is pending.
+
 - **Native PD cards.** Firmware negotiating pd_native draws the header, individual battery panels and combined allocations from live data using a persistent LVGL draw object. Embedded decorations and PD-only Roboto fonts provide symbols, regular labels, bold values, badges and bars. No full-card download or picture throttle is used on this path.
 - **PD appearance.** The header and combined allocations at 58765a31 were visually accepted on a physical panel. Allocations use the tile padding once and have no duplicate heading. This does not claim native touch, drag or speed acceptance, or other-board testing.
 - **PD controls.** The catalogue defines On tap choices and the configurable Open selector action. The Action section chooses a select or input_select target; Home Assistant confirms the chosen value. PD is saved without map display. An internal drag beyond 3 mm is rejected by the native short-click handler; shared edge navigation is unchanged. Interaction checks are automated, with earlier-stage user confirmations recorded separately.
