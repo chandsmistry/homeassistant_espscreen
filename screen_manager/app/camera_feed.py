@@ -489,11 +489,12 @@ class Watch:
 
 
 class Link:
-    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared', 'issued', 'changes')
+    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared', 'issued', 'changes', 'refresh')
 
-    def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None, prepared=None):
+    def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None, prepared=None, refresh=None):
         self.entity, self.box, self.used = entity, box, now
         self.issued, self.changes = now, None  # when the link was made, and the PD sensor change count then (timing logs)
+        self.refresh = refresh  # optional async provider for a slideshow on a stable URL
         self.prepared = prepared  # (etag, bytes) pinned when the link is issued; GET never renders again
         self.still = still
         self.cover = cover  # (size, background) of a media player's cover, else None
@@ -862,12 +863,12 @@ class CameraFeed:
         while len(self.links) >= MAX_LINKS:
             del self.links[min(self.links, key=lambda token: self.links[token].used)]
 
-    def link(self, entity, box, still=None, cover=None, live=None, saver=None, prepared=None):
+    def link(self, entity, box, still=None, cover=None, live=None, saver=None, prepared=None, refresh=None):
         """A new random token for one camera at one size; `still` makes it one fixed image (an alert's), `cover`
         (size, background) a media player's cover, `live` (entities, size, grounds, paces) a page's live tiles."""
         self.prune()
         token = secrets.token_urlsafe(18)
-        self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver, prepared)
+        self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver, prepared, refresh)
         if prepared is not None and self.changes:
             self.links[token].changes = self.changes()
         return token
@@ -881,6 +882,12 @@ class CameraFeed:
             return 404, None, ''
         age = (now - link.issued) * 1000
         link.used = now
+        if link.refresh is not None:
+            try:
+                link.prepared = await link.refresh()
+            except (OSError, ValueError) as error:
+                LOG.info('Photos screensaver: %s', error)
+                return 503, None, ''
         if link.prepared is not None:
             if link.entity == 'image.screensaver_photos' and etag == link.prepared[0]:
                 return 304, None, link.prepared[0]

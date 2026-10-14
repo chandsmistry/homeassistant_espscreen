@@ -3328,11 +3328,16 @@ class Manager:
             try:
                 sender = self.page_senders.get(inbox)
                 packed = catalogue.PHOTOS['packed_feature'] in (getattr(sender, 'features', None) or ())
-                image, _ = await self.photo_show(inbox).frame(choice, self.photo_box(box,choice), rle=packed)
-                import hashlib
-                tag = '"' + hashlib.sha256(image).hexdigest()[:16] + '"'
+                async def photo_frame():
+                    # The screen polls the same URL. Resolve the settled frame on each GET,
+                    # reusing the prepared cache until the photo's display interval expires.
+                    import hashlib
+                    current_choice = self.savers.get(screen.get('device_id'))
+                    image, _ = await self.photo_show(inbox).frame(current_choice, self.photo_box(box,current_choice), rle=packed)
+                    return '"' + hashlib.sha256(image).hexdigest()[:16] + '"', image
+                tag, image = await photo_frame()
                 old = self.photo_links.get(inbox)
-                token = old[1] if old and old[0] == tag and old[1] in self.camera.links else self.camera.link(entity, box, prepared=(tag, image))
+                token = old[1] if old and old[0] == tag and old[1] in self.camera.links else self.camera.link(entity, box, prepared=(tag, image), refresh=photo_frame)
                 self.photo_links[inbox] = (tag, token)
                 if len(self.photo_links) > 32:
                     self.photo_links.pop(next(iter(self.photo_links)))

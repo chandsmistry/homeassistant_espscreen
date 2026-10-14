@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **Photos playback correction.** A stable slideshow link resolves the current prepared frame at each request. Matching ETags keep the cached image only until its interval expires, then the next prepared photo is returned. Fixed-image PD links remain pinned.
+
 - **Photos preview correction.** Same-origin preview URLs work with the existing image security policy; no blob allowance or broader policy is needed.
 - **Photos loading and clock position.** Prepare the first photo before standby, use lossless RLE when negotiated and smaller, and offer opt-in 960/640-pixel transfer sizes with full resolution still the default. Seven clock anchors preserve equal safe margins and are capability-gated. Existing transition effects and PD behaviour are unchanged. Local tests passed; physical improvement remains to be measured.
 

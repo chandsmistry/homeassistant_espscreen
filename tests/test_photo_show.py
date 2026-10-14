@@ -56,6 +56,27 @@ class PhotoShowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await feed.serve(token,'"photo"'),(304,None,'"photo"'))
         pd=feed.link('screen.pd_header',(160,80),prepared=('"pd"',b'pd frame'))
         self.assertEqual(await feed.serve(pd,'"pd"'),(200,b'pd frame','"pd"'))
+    async def test_slideshow_stable_url_advances_after_interval(self):
+        from camera_feed import CameraFeed
+        import hashlib
+        self.make('a.png',(40,80),'red');self.make('b.png',(40,80),'blue')
+        async def frame():
+            image,_=await self.show.frame({'photo_order':'filename','photo_seconds':30},(160,80),rle=True)
+            return hashlib.sha256(image).hexdigest(),image
+        async def unexpected(_):
+            raise AssertionError('must not fetch through Home Assistant')
+        feed=CameraFeed(unexpected)
+        prepared=await frame()
+        token=feed.link(photos.PHOTOS,(160,80),prepared=prepared,refresh=frame)
+        status,first,tag=await feed.serve(token)
+        self.assertEqual(status,200)
+        self.now+=29
+        self.assertEqual(await feed.serve(token,tag),(304,None,tag))
+        self.now+=2
+        status,second,next_tag=await feed.serve(token,tag)
+        self.assertEqual(status,200);self.assertNotEqual(first,second);self.assertNotEqual(tag,next_tag)
+        self.assertEqual(await feed.serve(token,next_tag),(304,None,next_tag))
+
     async def test_finished_cache_stays_bounded(self):
         for i in range(7):self.make(f'{i}.png',(40,80),'red')
         for i in range(8):
