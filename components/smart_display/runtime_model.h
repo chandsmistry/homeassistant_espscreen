@@ -176,7 +176,7 @@ inline bool plugin_key(const std::string &entity) {
 // The fork's Power Distribution cards (Library, Screen): five pictures the app draws.
 inline bool is_pd_entity(const std::string &entity) {
   return entity == "screen.pd_header" || entity == "screen.pd_dp3" || entity == "screen.pd_ultra" ||
-         entity == "screen.pd_ac" || entity == "screen.pd_max";
+         entity == "screen.pd_ac" || entity == "screen.pd_max" || entity == "screen.pd_batteries";
 }
 inline bool valid_entity(const std::string &entity) {
   if (entity.size() > 120) return false;

@@ -1,5 +1,6 @@
 ## Unreleased
 
+- **PD Battery Allocations card.** A single picture card stacks all four battery panels, including eligibility, connection pills, charge state and three bars, like the dashboard's battery management card.
 - **PD header rendering.** Collapse template whitespace like the dashboard, fit long handover lines, and include the symbol font needed by the header's hexagrams.
 - **PD picture delivery.** Hold each screen picture's change mark for 15 seconds so frequent sensor updates do not repeatedly cancel a download.
 - **PD cards in Library → Screen (fork).** The Power Distribution header and the four battery cards (Delta Pro 3, Stream Ultra X, Stream AC, Stream MAX) are cards of the screen's own, drawn by the add-on like the map and shown as pictures; they follow the PD sensors. Firmware change: the five `screen.pd_*` entities.

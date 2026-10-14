@@ -13,6 +13,18 @@ STATES = json.loads((ROOT / 'tests/fixtures/pd_cards_states.json').read_text())
 
 
 class PdCards(unittest.TestCase):
+    def test_composite_card_follows_each_battery(self):
+        import copy
+        initial = pd_cards.render('batteries', STATES)
+        for key in ('dp3', 'ultra', 'ac', 'max'):
+            changed = copy.deepcopy(STATES)
+            batteries = json.loads(changed[pd_cards.BATTERIES]['attributes']['batteries'])
+            batteries[key]['soc'] = 12.3
+            changed[pd_cards.BATTERIES]['attributes']['batteries'] = json.dumps(batteries)
+            self.assertNotEqual(pd_cards.render('batteries', changed), initial, key)
+            self.assertNotEqual(pd_cards.fingerprint({'entity': 'screen.pd_batteries'}, changed),
+                                pd_cards.fingerprint({'entity': 'screen.pd_batteries'}, STATES), key)
+
     def test_screen_mark_waits_for_download_then_follows_latest_data(self):
         import copy
         tile, cache = {'entity': 'screen.pd_header'}, {}

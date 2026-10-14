@@ -153,10 +153,10 @@ def symbol_font(px, text=''):
 
 
 class Canvas:
-    def __init__(self, width, height, background, scale=SCALE):
+    def __init__(self, width, height, background, scale=SCALE, transparent=False):
         from PIL import Image, ImageDraw
         self.s, self.w, self.h = scale, width, height
-        self.image = Image.new('RGBA', (round(width * scale), round(height * scale)), background + (255,))
+        self.image = Image.new('RGBA', (round(width * scale), round(height * scale)), background + (0 if transparent else 255,))
         self.draw = ImageDraw.Draw(self.image)
 
     def px(self, v):
@@ -366,16 +366,17 @@ def eligible_of(states, key, d):
     return live == 'on' if live in ('on', 'off') else truthy(d.get('eligible'))
 
 
-def device(states, key, theme='light', scale=SCALE):
+def device(states, key, theme='light', scale=SCALE, margin_y=None, transparent=False):
     t = THEMES[theme]
     data = parse_batteries(states)
     d = (data or {}).get(key) or {}
     css = CLASSES[key]
     margin = GLOW_MARGIN
+    margin_y = margin if margin_y is None else margin_y
     w = DEVICE_WIDTH
     inner_h = 150
-    c = Canvas(w + 2 * margin, inner_h + 2 * margin, t['card'], scale)
-    x0, y0 = margin, margin
+    c = Canvas(w + 2 * margin, inner_h + 2 * margin_y, t['card'], scale, transparent=transparent)
+    x0, y0 = margin, margin_y
     glow = str(d.get('glow_class') or 'glow-off')
     glow_color = hex_rgb(state_of(states, ACTIVE_COLOR, '#9ca3af'))
     if glow == 'glow-charge':
@@ -462,15 +463,43 @@ def footer(states, theme='light', scale=SCALE):
     return labels
 
 
+def battery_management(states, theme='light'):
+    """One dashboard-style Battery Allocations card with all four device panels."""
+    panels = [device(states, key, theme, transparent=True) for key in ('dp3', 'ultra', 'ac', 'max')]
+    labels = footer(states, theme)
+    title_height, panel_height = 32, 150 + 24
+    width = panels[0].w
+    bottom = title_height + (len(panels) - 1) * panel_height + panels[-1].h
+    height = bottom + (28 if labels else 8)
+    c = Canvas(width, height, THEMES[theme]['card'])
+    c.text(20, 7, 'Battery Allocations', 14, 400, THEMES[theme]['ink'])
+    for index, panel in enumerate(panels):
+        c.image.alpha_composite(panel.image, (0, c.px(title_height + index * panel_height)))
+    if labels:
+        text = ' · '.join(labels)
+        size = 11 * min(1, (width - 32) / max(1, c.text_width(text, 11)))
+        c.text(width / 2, bottom + 4, text, size, 400,
+               THEMES[theme]['ink'], 'm')
+    return c
+
+
+def card_canvas(name, states, theme):
+    if name == 'header':
+        return header(states, theme)
+    if name == 'batteries':
+        return battery_management(states, theme)
+    return device(states, name, theme)
+
+
 def render(name, states, theme='light', scale=SCALE):
     """PNG bytes for `header`, or a battery key (`dp3`, `ultra`, `ac`, `max`)."""
-    canvas = header(states, theme) if name == 'header' else device(states, name, theme)
+    canvas = card_canvas(name, states, theme)
     return canvas.png(scale)
 
 
 WATCH = {HEADER, BATTERIES, ACTIVE_COLOR, BURST, 'input_select.pd_control_mode', *ELIGIBILITY.values()}
 FOLDER = '/config/www/pd_cards'
-NAMES = ('header', 'dp3', 'ultra', 'ac', 'max')
+NAMES = ('header', 'dp3', 'ultra', 'ac', 'max', 'batteries')
 
 
 def write_all(states, folder=FOLDER, theme='light', scale=2):
@@ -506,7 +535,8 @@ async def keep_drawn(server, folder=FOLDER):
 
 
 # ----- the screen's own cards (Library, Screen): one picture tile per card -----
-TILES = {'screen.pd_header': 'header', 'screen.pd_dp3': 'dp3', 'screen.pd_ultra': 'ultra', 'screen.pd_ac': 'ac', 'screen.pd_max': 'max'}
+TILES = {'screen.pd_header': 'header', 'screen.pd_dp3': 'dp3', 'screen.pd_ultra': 'ultra', 'screen.pd_ac': 'ac', 'screen.pd_max': 'max',
+         'screen.pd_batteries': 'batteries'}
 
 
 def is_tile(entity):
@@ -517,7 +547,8 @@ def fingerprint(tile, states, dark=False):
     """A short hash of everything the card is drawn from; the screen asks for a new picture when it changes."""
     import hashlib
     name = TILES.get(tile['entity'], 'header')
-    keys = [HEADER, ACTIVE_COLOR, BURST, 'input_select.pd_control_mode'] if name == 'header' else [BATTERIES, ACTIVE_COLOR, ELIGIBILITY[name]]
+    keys = [HEADER, ACTIVE_COLOR, BURST, 'input_select.pd_control_mode'] if name == 'header' else \
+        [BATTERIES, ACTIVE_COLOR, *(ELIGIBILITY.values() if name == 'batteries' else [ELIGIBILITY[name]])]
     seen = [(k, (states.get(k) or {}).get('state'), json.dumps((states.get(k) or {}).get('attributes'), sort_keys=True, default=str)) for k in keys]
     return hashlib.sha1(json.dumps(seen, default=str).encode()).hexdigest()[:10]
 
@@ -542,7 +573,7 @@ def render_tile(tile, states, size, dark=False):
     from PIL import Image
     name = TILES.get(tile['entity'], 'header')
     theme = 'dark' if dark else 'light'
-    canvas = header(states, theme) if name == 'header' else device(states, name, theme)
+    canvas = card_canvas(name, states, theme)
     card = canvas.image.convert('RGB')
     width, height = size
     ratio = min(width / card.width, height / card.height)

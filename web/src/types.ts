@@ -1,7 +1,7 @@
 /** The cards built into a screen, with no Home Assistant entity of their own (core.py BUILTIN, the page tiles aside). */
-export type BuiltinName = "clock" | "nightstand" | "settings" | "map" | "energy" | "pd_header" | "pd_dp3" | "pd_ultra" | "pd_ac" | "pd_max";
+export type BuiltinName = "clock" | "nightstand" | "settings" | "map" | "energy" | "pd_header" | "pd_dp3" | "pd_ultra" | "pd_ac" | "pd_max" | "pd_batteries";
 export const BUILTIN_CARDS: string[] = ["screen.clock", "screen.nightstand", "screen.settings", "screen.map", "screen.energy",
-  "screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max"];
+  "screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"];
 export type TileOptions = {
   // A plugin tile's own options (design): what its manifest lets the inspector set.
   plugin?: Record<string, string | number | boolean>;
