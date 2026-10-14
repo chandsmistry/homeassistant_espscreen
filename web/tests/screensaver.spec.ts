@@ -105,11 +105,24 @@ describe("a step in the drawer", () => {
   it("sets how long a photo stays and the largest file the Photos step uses", async () => {
     const wrapper = mount(SaverInspector, { props: { step: "photos" } });
     const values = () => wrapper.findAllComponents(UiSelect).map((select) => (select.props() as { modelValue: number }).modelValue);
-    expect(values()).toEqual([30, 8]);
+    expect(values()).toEqual(["fill", "shuffle", 30, 8, "none"]);
     useScreensaverStore().changeSaver({ photo_seconds: 60, photo_mb: 4 });
     await flushPromises();
     expect(useScreenStore().currentScreen!.screensaver).toMatchObject({ photo_seconds: 60, photo_mb: 4 });
-    expect(values()).toEqual([60, 4]);
+    expect(values()).toEqual(["fill", "shuffle", 60, 4, "none"]);
+  });
+
+  it("offers portrait pairs, order, optional clock and every photo transition without touching tiles", async () => {
+    useScreenStore().currentScreen!.screensaver = saver({ photo_effects: true });
+    const wrapper = mount(SaverInspector, { props: { step: "photos" } });
+    const selects = wrapper.findAllComponents(UiSelect);
+    expect((selects[0]!.props() as {options: readonly (readonly string[])[]}).options.map((p: readonly string[]) => p[0])).toEqual(["fit", "fill", "pair"]);
+    expect((selects[1]!.props() as {options: readonly (readonly string[])[]}).options.map((p: readonly string[]) => p[0])).toEqual(["shuffle", "filename"]);
+    expect((selects[4]!.props() as {options: readonly (readonly string[])[]}).options).toHaveLength(20);
+    selects[0]!.vm.$emit("update:modelValue", "pair");
+    selects[4]!.vm.$emit("update:modelValue", "random");
+    await flushPromises();
+    expect(useScreenStore().currentScreen!.screensaver).toMatchObject({photo_fit: "pair", photo_transition: "random"});
   });
 
   it("shows the clock in the glass's own shape, without a temperature when none is chosen", async () => {

@@ -164,3 +164,181 @@ class Photos:
                 return data
             self.since = None  # unreadable: take the next one at once
         raise ValueError('no readable photo')
+
+
+class PhotoShow:
+    """Per-screen playback and bounded, finished-frame cache. Originals are only read."""
+    def __init__(self, folder=FOLDER, clock=time.monotonic, rng=None):
+        import asyncio
+        from collections import OrderedDict
+        self.album = Photos(folder, clock, rng)
+        self.frames = OrderedDict()
+        self.lock = asyncio.Lock()
+        self.current_paths = ()
+        self.since = None
+        self.settings = None
+        self.ahead = None
+        self.prefetch = None
+        self.metadata = {}
+        import threading
+        self.render_lock = threading.Lock()
+        self.state_lock = threading.RLock()
+
+    def describe(self, max_mb=8, force=False):
+        with self.state_lock:
+            return self._describe(max_mb, force)
+
+    def _describe(self, max_mb=8, force=False):
+        from PIL import Image
+        self.album.scan(force=force)
+        entries = []
+        for path in self.album.files:
+            reason, portrait = '', False
+            try:
+                st = os.stat(path)
+                key = (st.st_mtime_ns, st.st_size)
+                if st.st_size > max_mb * 1024 * 1024:
+                    reason = 'size_limit'
+                else:
+                    cached = self.metadata.get(path)
+                    if not cached or cached[0] != key:
+                        self.album.skipped.discard(path)
+                        try:
+                            with Image.open(path) as im:
+                                width, height = im.size
+                                if im.getexif().get(274) in (5, 6, 7, 8):
+                                    width, height = height, width
+                                cached = (key, 'too_many_pixels' if width * height > MAX_PIXELS else '', height > width)
+                        except Exception:
+                            cached = (key, 'unreadable', False)
+                        self.metadata[path] = cached
+                    _, reason, portrait = cached
+                if path in self.album.skipped:
+                    reason = 'unreadable'
+            except OSError:
+                reason = 'unreadable'
+            entries.append({'name': os.path.relpath(path, self.album.folder), 'reason': reason, 'portrait': portrait})
+        self.metadata = {p: v for p, v in self.metadata.items() if p in self.album.files}
+        return {'exists': os.path.isdir(self.album.folder), 'total': len(entries),
+                'usable': sum(not e['reason'] for e in entries),
+                'portraits': sum(not e['reason'] and e['portrait'] for e in entries),
+                'skipped': [e for e in entries if e['reason']]}
+
+    def candidates(self, settings):
+        with self.state_lock:
+            return self._candidates(settings)
+
+    def _candidates(self, settings):
+        report = self.describe(settings.get('photo_mb', 8))
+        bad = {e['name'] for e in report['skipped']}
+        paths = [p for p in self.album.files if os.path.relpath(p, self.album.folder) not in bad]
+        if settings.get('photo_fit', 'fill') == 'pair':
+            portraits = [p for p in paths if self.metadata.get(p, (None, '', False))[2]]
+            if portraits:
+                paths = portraits
+        return sorted(paths, key=lambda p: os.path.relpath(p, self.album.folder).casefold())
+
+    def next_paths(self, settings):
+        with self.state_lock:
+            return self._next_paths(settings)
+
+    def _next_paths(self, settings):
+        available = self.candidates(settings)
+        self.album.order = [p for p in self.album.order if p in available]
+        count = min(2 if settings.get('photo_fit') == 'pair' else 1, len(available))
+        selected = []
+        for _ in range(count):
+            if not self.album.order:
+                self.album.order = list(available)
+                if settings.get('photo_order', 'shuffle') == 'shuffle':
+                    self.album.rng.shuffle(self.album.order)
+                    if len(available) > count and self.album.order[0] in self.current_paths:
+                        self.album.order = self.album.order[1:] + self.album.order[:1]
+            path = next((p for p in self.album.order if p not in selected), '')
+            if path:
+                self.album.order.remove(path)
+                selected.append(path)
+        return tuple(selected)
+
+    def render(self, paths, box, fit):
+        with self.render_lock:
+            return self._render(paths, box, fit)
+
+    def _render(self, paths, box, fit):
+        from PIL import Image, ImageOps
+        import tile_art
+        if not paths:
+            raise FileNotFoundError('no readable photos')
+        signatures = tuple((p, os.stat(p).st_mtime_ns, os.stat(p).st_size) for p in paths)
+        key = (signatures, box, fit)
+        if key in self.frames:
+            self.frames.move_to_end(key)
+            return self.frames[key]
+        canvas = Image.new('RGB', box)
+        width, height = box
+        gap = max(2, round(width / 160)) if len(paths) == 2 else 0
+        frame_w = (width - gap) // 2 if len(paths) == 2 else width
+        for i, path in enumerate(paths):
+            try:
+                with Image.open(path) as source:
+                    if source.width * source.height > MAX_PIXELS:
+                        raise ValueError('too many pixels')
+                    source.draft('RGB', (frame_w, height))
+                    image = ImageOps.exif_transpose(source).convert('RGB')
+                    bounds = (frame_w if i == 0 else width - frame_w - gap, height)
+                    if fit == 'fill' and len(paths) == 1:
+                        image = ImageOps.fit(image, bounds, Image.Resampling.LANCZOS)
+                    else:
+                        image.thumbnail(bounds, Image.Resampling.LANCZOS)
+                    x = (0 if i == 0 else frame_w + gap) + (bounds[0] - image.width) // 2
+                    canvas.paste(image, (x, (height - image.height) // 2))
+            except Exception:
+                with self.state_lock:
+                    self.album.skipped.add(path)
+                raise ValueError('unreadable photo') from None
+        out = io.BytesIO()
+        canvas.save(out, 'JPEG', quality=85)
+        result = (tile_art.bmp(canvas, compact=True), out.getvalue())
+        self.frames[key] = result
+        # Full-screen frames can be large. Keep at most four and at most 16 MB per active screen.
+        while len(self.frames) > 4 or sum(len(a) + len(b) for a, b in self.frames.values()) > 16 * 1024 * 1024:
+            self.frames.popitem(last=False)
+        return result
+
+    async def frame(self, settings, box, preview=False):
+        import asyncio
+        loop = asyncio.get_running_loop()
+        async with self.lock:
+            if preview:
+                paths = tuple((await loop.run_in_executor(None, self.candidates, settings))[:2 if settings.get('photo_fit') == 'pair' else 1])
+                return await loop.run_in_executor(None, self.render, paths, box, settings.get('photo_fit', 'fill'))
+            signature = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'), settings.get('photo_mb', 8), box)
+            if signature != self.settings:
+                self.settings, self.current_paths, self.since, self.ahead = signature, (), None, None
+                self.album.order = []
+                if self.prefetch:
+                    await self.prefetch
+                    self.prefetch = None
+            due = self.since is None or self.album.clock() - self.since >= settings.get('photo_seconds', 30)
+            if due or any(not os.path.isfile(p) for p in self.current_paths):
+                if self.prefetch:
+                    await self.prefetch
+                    self.prefetch = None
+                self.current_paths = self.ahead or await loop.run_in_executor(None, self.next_paths, settings)
+                self.ahead = None
+                self.since = self.album.clock()
+            try:
+                result = await loop.run_in_executor(None, self.render, self.current_paths, box, signature[0])
+            except (OSError, ValueError):
+                self.since, self.ahead = None, None
+                raise
+            if self.ahead is None:
+                self.ahead = await loop.run_in_executor(None, self.next_paths, settings)
+                if self.ahead:
+                    async def prepare(paths=self.ahead, bounds=box, fit=signature[0]):
+                        try:
+                            await loop.run_in_executor(None, self.render, paths, bounds, fit)
+                        except (OSError, ValueError):
+                            pass  # describe reports the failed file; the next request can choose another
+                    self.prefetch = asyncio.create_task(prepare())
+            return result

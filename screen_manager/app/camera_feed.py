@@ -882,9 +882,11 @@ class CameraFeed:
         age = (now - link.issued) * 1000
         link.used = now
         if link.prepared is not None:
+            if link.entity == 'image.screensaver_photos' and etag == link.prepared[0]:
+                return 304, None, link.prepared[0]
             since = (self.changes() - link.changes) if self.changes and link.changes is not None else -1
-            LOG.info('pd_cards GET cache_hit=true bytes=%d render_ms=0 link_age_ms=%.0f sensor_changes_since_link=%d',
-                     len(link.prepared[1]), age, since)
+            LOG.info('%s GET cache_hit=true bytes=%d render_ms=0 link_age_ms=%.0f sensor_changes_since_link=%d',
+                     'photos' if link.entity == 'image.screensaver_photos' else 'pd_cards', len(link.prepared[1]), age, since)
             return 200, link.prepared[1], link.prepared[0]
         if link.still:
             return (304, None, link.etag) if etag == link.etag else (200, link.still, link.etag)

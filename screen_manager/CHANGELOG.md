@@ -1,5 +1,8 @@
 ## Unreleased
 
+- **Photos controls.** Read-only preview, usable and skipped counts with reasons, Fit or Fill, two distinct portrait photos side by side, Shuffle or Filename order and optional native clock. Each screen has independent playback, bounded screen-sized frame caching and next-frame preparation. Original files are unchanged.
+- **Photos transitions.** Hard cut, dissolve, four directional wipes and slides, slow zoom/pan, diamond, checkerboard, spiral, jumbled blocks, venetian blinds and Random. Effects retain at most one additional frame of up to 8 MB using the picture allocator; insufficient memory falls back to hard cut. The clock and transitions require matching firmware. Local renderer and logic tests passed; no physical acceptance is claimed.
+
 - **Independent PD actions.** Configure a target entity and supported HA action for each battery block or the header. Unset blocks keep the card action; View only disables a block. The new pd_actions capability gates saves. Hit regions reuse accepted geometry, with no visual changes. Local action/gesture tests passed; physical block actions remain untested.
 
 - **Native PD cards.** Firmware negotiating pd_native draws the header, individual battery panels and combined allocations from live data using a persistent LVGL draw object. Embedded decorations and PD-only Roboto fonts provide symbols, regular labels, bold values, badges and bars. No full-card download or picture throttle is used on this path.

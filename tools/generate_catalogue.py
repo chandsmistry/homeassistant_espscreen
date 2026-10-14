@@ -31,7 +31,7 @@ VERSION = re.compile(r'^\d+\.\d+\.\d+$')
 FIRST_TYPES = frozenset('alarm_control_panel automation binary_sensor button camera climate cover fan image input_boolean input_button '
                         'input_number input_select light lock media_player number person scene screen script select sensor sun switch '
                         'timer vacuum weather'.split())
-TOP = {'domain', 'firmware', 'displays', 'controls', 'inline', 'toggle', 'taps', 'guards', 'picture', 'map', 'key', 'keypad', 'memory', 'cards', 'favorite', 'energy', 'pd'}
+TOP = {'domain', 'firmware', 'displays', 'controls', 'inline', 'toggle', 'taps', 'guards', 'picture', 'map', 'key', 'keypad', 'memory', 'cards', 'favorite', 'energy', 'pd', 'photos'}
 # What one tile of a type keeps in the memory inside a screen's chip (firmware 0.34.0+, docs/TILE_MEMORY.md): `bytes`
 # measured on a board with PSRAM, `extras` whether it keeps a block of extras. Every type says it, so a new one cannot
 # leave the screen's memory budget guessing; the most a tile may keep is a sanity bound, not a rule.
@@ -238,6 +238,9 @@ def normalise(tile, types, translations, facts, commands=None):
             check_keys(f'{where} energy', energy, {'flow'})
             if domain != 'screen' or 'energy' not in cards_of(data):
                 fail(where, 'energy options belong to the screen\'s energy card')
+        photo_options = data.get('photos')
+        if photo_options and (domain != 'screen' or set(photo_options) != {'feature', 'transitions'} or not isinstance(photo_options['transitions'], list)):
+            fail(where, 'invalid photos metadata')
         pd = data.get('pd')
         if pd is not None:
             check_keys(f'{where} pd', pd, {'entities', 'taps', 'action', 'action_name', 'action_description', 'entity_field',
@@ -290,6 +293,7 @@ def normalise(tile, types, translations, facts, commands=None):
                if favorite else {}),
             **({'energy': energy} if energy else {}),
             **({'pd': pd} if pd else {}),
+            **({'photos': photo_options} if photo_options else {}),
         }
     check_keys('catalogue/_tile.yaml', tile, {'taps', 'sizes', 'history_hours', 'memory'})
     choice = tile.get('memory')
@@ -324,6 +328,9 @@ def header(catalogue):
               'inline constexpr Memory CARDS[] = {' + ', '.join(
                   f'{{"{e}", {price["bytes"]}, {"true" if price["extras"] else "false"}}}'
                   for data in catalogue['domains'].values() for e, price in data.get('cards', {}).items()) + '};', '']
+    photos = catalogue['domains']['screen'].get('photos')
+    if photos:
+        lines += ['namespace photos {', 'inline constexpr const char *FEATURE = ' + json.dumps(photos['feature']) + ';', 'inline constexpr const char *TRANSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['transitions']) + '};', '}']
     pd = catalogue['domains']['screen'].get('pd')
     if pd:
         lines += ['namespace pd {', 'inline constexpr const char *ENTITIES[] = {' + ', '.join(json.dumps(e) for e in pd['entities']) + '};']

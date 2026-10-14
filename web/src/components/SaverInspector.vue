@@ -7,6 +7,7 @@ import { t } from "../i18n";
 import { glyph } from "../model/topbar";
 import { useSortableRows } from "../composables/useSortableRows";
 import type { SaverKind } from "../types";
+import PhotosInspector from "./PhotosInspector.vue";
 import SaverGlass from "./SaverGlass.vue";
 import Icon from "./ui/Icon.vue";
 import InspectorHead from "./ui/InspectorHead.vue";
@@ -79,11 +80,7 @@ watch(() => screensaver.weatherSource, (id) => id && entities.loadLibraryStates(
     </Section>
 
     <Section v-else-if="step === 'photos'" :title="saverLabel('photos')">
-      <label for="saver-photo-seconds">{{ T("photo_seconds") }}</label>
-      <UiSelect id="saver-photo-seconds" :model-value="screensaver.photoSeconds" :options="screensaver.secondsChoices" @update:model-value="(value: number) => screensaver.changeSaver({ photo_seconds: value })" />
-      <label for="saver-photo-mb">{{ T("photo_mb") }}</label>
-      <UiSelect id="saver-photo-mb" :model-value="screensaver.photoMb" :options="screensaver.mbChoices" @update:model-value="(value: number) => screensaver.changeSaver({ photo_mb: value })" />
-      <small class="help">{{ T("photos_hint") }}</small>
+      <PhotosInspector />
     </Section>
 
     <template v-else>

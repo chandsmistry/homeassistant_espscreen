@@ -303,3 +303,5 @@ def selector_target(tile):
     target = (action.get('data') or {}).get(PD['entity_field'])
     return target if options.get('tap') == PD['taps'][0] and action.get('action') == PD['action'] and \
         isinstance(target, str) and target.split('.')[0] in PD['selector_domains'] else None
+
+PHOTOS = TYPES['screen']['photos']

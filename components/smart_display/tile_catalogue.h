@@ -22,6 +22,10 @@ inline constexpr Memory MEMORY[] = {{"alarm_control_panel", 160, true}, {"automa
 // The screen's own cards that keep more than their type, priced by their entity first (catalogue/screen.yaml `cards`).
 inline constexpr Memory CARDS[] = {{"screen.energy", 6144, true}, {"screen.pd_header", 8192, true}, {"screen.pd_dp3", 8192, true}, {"screen.pd_ultra", 8192, true}, {"screen.pd_ac", 8192, true}, {"screen.pd_max", 8192, true}, {"screen.pd_batteries", 12288, true}};
 
+namespace photos {
+inline constexpr const char *FEATURE = "photo_effects";
+inline constexpr const char *TRANSITIONS[] = {"none", "fade", "wipe_left", "wipe_right", "wipe_up", "wipe_down", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out", "pan_left", "pan_right", "diamond", "checker", "spiral", "blocks", "blinds", "random"};
+}
 namespace pd {
 inline constexpr const char *ENTITIES[] = {"screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"};
 inline constexpr const char *ACTION = "screen.open_selector";

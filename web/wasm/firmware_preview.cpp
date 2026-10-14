@@ -57,6 +57,11 @@ void nav(lv_event_t *event) {
 extern "C" {
 // Whether the previewed board draws pictures (firmware 0.46.0): a board without PSRAM, such as the CYD, has no camera
 // hooks, so its media card keeps no square for a cover; the preview drops them the same way after preview_init.
+void preview_standby(int on) {
+  runtime_tiles::screen_awake = [on] { return !on; };
+  runtime_tiles::saver_sync(on);
+  dirty = true;
+}
 void preview_pictures(int on) {
   if (on) return;
   runtime_tiles::camera_full = {};

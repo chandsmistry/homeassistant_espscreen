@@ -1,3 +1,4 @@
+#include "photo_transition.h"
 #pragma once
 #include <cmath>
 #include <cstring>
@@ -234,10 +235,14 @@ struct SaverChoice {
   std::string state;
   uint32_t features = 0;
   bool muted = false;
+  bool photo_clock = false;
+  std::string photo_transition = "none";
+  int photo_seconds = 30;
   bool operator==(const SaverChoice &o) const {
     return kind == o.kind && entity == o.entity && name == o.name && title == o.title && artist == o.artist &&
            album == o.album && picture == o.picture && ground == o.ground && weather == o.weather && row == o.row &&
-           state == o.state && features == o.features && muted == o.muted;
+           state == o.state && features == o.features && muted == o.muted && photo_clock == o.photo_clock &&
+           photo_transition == o.photo_transition && photo_seconds == o.photo_seconds;
   }
 };
 inline SaverChoice saver_next, saver_now;  // the app's latest word, and what the glass shows
@@ -11341,6 +11346,7 @@ inline void camera_release() {
 
 
 inline void camera_close() {
+  photo_transition::clear();
   if (!camera_root) return;
   // A live picture stops first: nothing of it writes the glass once LVGL draws the page there again.
   live_view::close(camera.live_handle);
@@ -11766,6 +11772,11 @@ inline void view_done(picture_loader::Outcome outcome) {
   camera.shown = true;
   const bool first = camera_picture == nullptr;
   camera_show(camera_root, camera_picture, src, outcome == picture_loader::Outcome::LOADED);
+  if (camera_picture && saver_camera && photo_transition::buffer) {
+    photo_transition::start(camera_root,src,saver_now.photo_transition,overlay_card::screen_width(),overlay_card::screen_height(),saver_now.photo_seconds);
+    if (saver_first) lv_obj_move_foreground(saver_first);
+    if (saver_second) lv_obj_move_foreground(saver_second);
+  }
   if (first && camera_picture && saver_camera) {
     // The screensaver's picture is the whole glass; one that came smaller (the size cap, picture_store::MAX_BYTES) is
     // scaled to it, the same proportions. Its words lie over it.
@@ -11841,6 +11852,15 @@ inline void picture_done(picture_loader::Slot slot, bool ok, bool cached) {
   if (!key.empty()) {
     auto &hooks = slot_hooks(slot);
     lv_image_dsc_t *src = hooks.source ? hooks.source() : nullptr;
+    if (slot == picture_loader::Slot::FULL && ok && !cached && saver_camera && saver_now.entity == "image.screensaver_photos" && camera_picture && saver_now.photo_transition != "none") {
+#if LV_USE_IMAGE
+      auto *old = static_cast<const lv_image_dsc_t *>(lv_image_get_src(camera_picture));
+      if (old && src && old->data && src->data && (old->data_size != src->data_size || std::memcmp(old->data,src->data,src->data_size))) {
+        photo_transition::allocate = pictures.allocate; photo_transition::release = pictures.release;
+        if (!photo_transition::retain(old)) ESP_LOGW("saver", "Photo transition falls back to hard cut: insufficient memory");
+      }
+#endif
+    }
     const int s = static_cast<int>(slot);
     bool kept = false;
     if (pictures_kept() && src && src->data) {
@@ -12167,8 +12187,10 @@ inline void saver_words() {
   const lv_font_t *first_font = watch_font ? watch_font : detail_font;
   const lv_font_t *second_font = control_font ? control_font : detail_font;
   const bool media = c.kind == "media";
-  const std::string first = media && !c.title.empty() ? c.title : c.name;
-  const std::string second = media ? media_card::subtitle(c.artist, c.album) : std::string();
+  const bool photo = c.entity == "image.screensaver_photos";
+  const auto photo_now = now_time ? now_time() : esphome::ESPTime{};
+  const std::string first = photo ? (c.photo_clock ? time_text(photo_now) : "") : media && !c.title.empty() ? c.title : c.name;
+  const std::string second = photo && c.photo_clock ? date_text(photo_now) : media ? media_card::subtitle(c.artist, c.album) : std::string();
   const lv_font_t *font = media ? first_font : second_font;
   const int first_h = font ? lv_font_get_line_height(font) : 24;
   const int second_h = second.empty() || !second_font ? 0 : lv_font_get_line_height(second_font);
@@ -12324,7 +12346,7 @@ inline void saver_show() {
     lv_obj_move_to_index(camera_root, 0);
     // A camera refreshes at its pace; a cover loads once, and a new track is a new picture (saver_sync).
     if (saver_now.kind == "media") camera.once = true;
-    else camera.every = SAVER_CAMERA_MS;
+    else camera.every = saver_now.entity == "image.screensaver_photos" ? uint32_t(saver_now.photo_seconds) * 1000u : SAVER_CAMERA_MS;
     ESP_LOGI("saver", "%s %s", saver_now.kind.c_str(), saver_now.entity.c_str());
     return;
   }
@@ -12349,6 +12371,7 @@ inline void saver_follow() {
   if (saver_next.kind == saver_now.kind && saver_next.entity == saver_now.entity && saver_next.picture == saver_now.picture &&
       (saver_next.ground == saver_now.ground || !ground_shows)) {
     saver_now = saver_next;
+    if (saver_now.entity == "image.screensaver_photos") camera.every = uint32_t(saver_now.photo_seconds) * 1000u;
     if (!saver_words_due) saver_words();
     else saver_keys_draw();
     return;
@@ -12359,7 +12382,7 @@ inline void saver_follow() {
   saver_keys_draw();  // the keys are the next player's at once; its words wait for its picture
   camera.open(saver_now.entity);
   if (saver_now.kind == "media") camera.once = true;
-  else camera.every = SAVER_CAMERA_MS;
+  else camera.every = saver_now.entity == "image.screensaver_photos" ? uint32_t(saver_now.photo_seconds) * 1000u : SAVER_CAMERA_MS;
   saver_words_due = true;
   ESP_LOGI("saver", "%s %s, the last picture stays until it comes", saver_now.kind.c_str(), saver_now.entity.c_str());
 }
@@ -12396,6 +12419,7 @@ inline void saver_receive(const SaverChoice &next) {
 inline void saver_tick(uint32_t now) {
   if (now - saver_ticked < 1000) return;
   saver_ticked = now;
+  if (saver_camera && saver_now.entity == "image.screensaver_photos" && saver_now.photo_clock && !saver_words_due) saver_words();
   // A play key that turned ahead of Home Assistant and heard nothing shows what the app last said again.
   if (saver_flipped && now - saver_flipped > 5000) {
     saver_flipped = 0;

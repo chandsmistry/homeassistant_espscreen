@@ -1920,6 +1920,31 @@
       "max"
      ]
     }
+   },
+   "photos": {
+    "feature": "photo_effects",
+    "transitions": [
+     "none",
+     "fade",
+     "wipe_left",
+     "wipe_right",
+     "wipe_up",
+     "wipe_down",
+     "slide_left",
+     "slide_right",
+     "slide_up",
+     "slide_down",
+     "zoom_in",
+     "zoom_out",
+     "pan_left",
+     "pan_right",
+     "diamond",
+     "checker",
+     "spiral",
+     "blocks",
+     "blinds",
+     "random"
+    ]
    }
   },
   "script": {

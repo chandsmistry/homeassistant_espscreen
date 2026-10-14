@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timezone
 
 import core
+import catalogue
 import photos
 
 LOG = logging.getLogger(__name__)
@@ -66,7 +67,7 @@ GONE = frozenset(('', 'unavailable', 'unknown'))
 
 def validate(value):
     """A clean copy of a screensaver choice, or ValueError. Every field is optional; the default fills the rest."""
-    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb'}:
+    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb', 'photo_fit', 'photo_order', 'photo_clock', 'photo_transition'}:
         raise ValueError('screensaver fields')
     result = {**DEFAULT, 'order': list(DEFAULT['order']), 'off': [], 'more': [], 'items': []}
     if 'show' in value:
@@ -85,6 +86,16 @@ def validate(value):
             if isinstance(number, bool) or not isinstance(number, int) or not low <= number <= high:
                 raise ValueError(f'screensaver {name}')
             result[name] = number
+    for name, allowed in (('photo_fit', ('fit', 'fill', 'pair')), ('photo_order', ('shuffle', 'filename')),
+                          ('photo_transition', catalogue.PHOTOS['transitions'])):
+        if name in value:
+            if value[name] not in allowed:
+                raise ValueError(f'screensaver {name}')
+            result[name] = value[name]
+    if 'photo_clock' in value:
+        if not isinstance(value['photo_clock'], bool):
+            raise ValueError('screensaver photo_clock')
+        result['photo_clock'] = value['photo_clock']
     if 'more' in value:
         more = value['more']
         if not isinstance(more, list) or len(more) > MORE_PLAYERS or len(set(more)) != len(more) or any(
@@ -240,7 +251,10 @@ def message(choice, states, pictures, short, media_extras, ground=None, keys=Fal
     kind = pick(choice, states, pictures, keys, now, held, broken)
     if kind == 'photos':
         # The screen knows a camera: the Photos folder is one, named Photos (firmware needs nothing new).
-        return {'op': 'saver', 'k': 'camera', 'e': photos.PHOTOS, 'n': 'Photos'}
+        result = {'op': 'saver', 'k': 'camera', 'e': photos.PHOTOS, 'n': 'Photos'}
+        if any(key in choice for key in ('photo_clock', 'photo_transition', 'photo_seconds')):
+            result.update(pc=choice.get('photo_clock', False), pt=choice.get('photo_transition', 'none'), ps=choice.get('photo_seconds', 30))
+        return result
     result = {'op': 'saver', 'k': kind}
     if kind == 'clock':
         # The outside temperature under the time (app 0.4.52, firmware 0.31.0+); older firmware reads past it.

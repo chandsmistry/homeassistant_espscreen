@@ -878,7 +878,8 @@
         "entity": "Choose a Home Assistant entity for the action.",
         "legacy": "Use the card action to open its existing selector.",
         "firmware": "Update this screen firmware before saving individual PD actions."
-      }
+      },
+      "photos_update": "Update the screen firmware before enabling photo transitions or the clock."
     },
     "status": {
       "first_tiles": "Elige tus primeros mosaicos",
@@ -2633,8 +2634,8 @@
         "choose_camera": "Elige una cámara",
         "camera_hint": "Su imagen, cada 15 segundos",
         "photos_hint": "Las imágenes de la carpeta /media/screensaver de Home Assistant, en orden aleatorio. También sirve una unidad de red añadida en Ajustes, Sistema, Almacenamiento. Los archivos pequeños cambian más rápido.",
-        "photo_seconds": "Mostrar cada foto durante",
-        "photo_mb": "Archivo más grande usado",
+        "photo_seconds": "Show each photo for",
+        "photo_mb": "Largest file used",
         "glass": "En la pantalla",
         "temperature": "Temperatura",
         "weather_auto": "Automática",
@@ -2652,7 +2653,57 @@
         "item_both": "Ambos",
         "item_look": "Muestra",
         "item_hint": "En blanco y negro en el salvapantallas, sea cual sea el color de la entidad.",
-        "items_add_title": "Añadir al reloj"
+        "items_add_title": "Añadir al reloj",
+        "photo_preview": "Photo preview",
+        "photo_loading": "Preparing preview…",
+        "photo_empty": "No usable photos",
+        "photo_unavailable": "Photo preview is unavailable",
+        "photo_count": "{usable} usable of {total} photos",
+        "photo_folder_missing": "The screensaver folder is missing.",
+        "photo_pair_fallback": "With one portrait, it is centred. With no portraits, the whole photo is shown.",
+        "photo_skipped": "{n} skipped files",
+        "photo_refresh": "Refresh preview",
+        "photo_display": "Display",
+        "photo_order": "Order",
+        "photo_clock": "Show clock over photos",
+        "photo_transition": "Transition",
+        "photo_update": "Update this screen’s firmware to enable the clock and transitions.",
+        "photo_modes": {
+          "fit": "Fit, show the whole photo",
+          "fill": "Fill, crop to the screen",
+          "pair": "Two portraits side by side"
+        },
+        "photo_orders": {
+          "shuffle": "Shuffle",
+          "filename": "Filename order"
+        },
+        "photo_reasons": {
+          "size_limit": "Above the file size limit",
+          "unreadable": "Unreadable image",
+          "too_many_pixels": "Too many pixels"
+        },
+        "photo_transitions": {
+          "none": "Hard cut",
+          "fade": "Fade / dissolve",
+          "wipe_left": "Wipe from left",
+          "wipe_right": "Wipe from right",
+          "wipe_up": "Wipe from top",
+          "wipe_down": "Wipe from bottom",
+          "slide_left": "Slide from left",
+          "slide_right": "Slide from right",
+          "slide_up": "Slide from top",
+          "slide_down": "Slide from bottom",
+          "zoom_in": "Slow zoom in",
+          "zoom_out": "Slow zoom out",
+          "pan_left": "Ken Burns, pan left",
+          "pan_right": "Ken Burns, pan right",
+          "diamond": "Diamond reveal",
+          "checker": "Checkerboard",
+          "spiral": "Spiral",
+          "blocks": "Jumbled blocks",
+          "blinds": "Venetian blinds",
+          "random": "Random"
+        }
       },
       "plugins": {
         "title": "Plugins",

@@ -949,6 +949,8 @@ class Manager:
         # Camera images (firmware 0.2.57+): the feed behind the camera port, and the cameras of recent alerts
         # (entity -> monotonic time) that a screen may open full screen without a tile.
         self.photos = photos.Photos()
+        self.photo_shows = {}
+        self.photo_links = {}
         self.camera = camera_feed.CameraFeed(lambda entity: self.photos.image(self.photo_settings()) if entity == photos.PHOTOS
                                              else self.ha.camera_image(entity),
                                              fetch_cover=lambda entity: self.ha.media_image(self.followed(entity)),
@@ -3135,6 +3137,18 @@ class Manager:
         device = (self.screen(inbox) or {}).get('device_id')
         return screen_saver.entities(self.savers.get(device), self.ha.states) if device else set()
 
+    def photo_show(self, inbox):
+        if inbox not in self.photo_shows:
+            # Bound retained per-screen caches, without sharing playback state.
+            if len(self.photo_shows) >= 4:
+                victim = next((k for k, v in self.photo_shows.items() if not v.prefetch or v.prefetch.done()), None)
+                if victim is not None:
+                    del self.photo_shows[victim]
+                else:
+                    raise ValueError('photo preparation busy')
+            self.photo_shows[inbox] = photos.PhotoShow()
+        return self.photo_shows[inbox]
+
     def photo_settings(self):
         """How the Photos folder shows (screen_saver `photo_seconds`, `photo_mb`): the first screensaver that uses it."""
         choice = next((c for c in self.savers.choices.values() if c.get('show') and 'photos' not in c.get('off', ())),
@@ -3287,7 +3301,22 @@ class Manager:
                 ground = int(colours.split(',')[0], 16)
         url = ''
         base = await camera_feed.base_url(self.ha.request)
-        if base and await self.camera.saver(entity, box, kind, ground):
+        if entity == photos.PHOTOS and base:
+            choice = self.savers.get(screen.get('device_id'))
+            try:
+                image, _ = await self.photo_show(inbox).frame(choice, box)
+                import hashlib
+                tag = '"' + hashlib.sha256(image).hexdigest()[:16] + '"'
+                old = self.photo_links.get(inbox)
+                token = old[1] if old and old[0] == tag and old[1] in self.camera.links else self.camera.link(entity, box, prepared=(tag, image))
+                self.photo_links[inbox] = (tag, token)
+                if len(self.photo_links) > 32:
+                    self.photo_links.pop(next(iter(self.photo_links)))
+                url = f'{base}/camera/{token}.bmp'
+                LOG.info('photos prepared screen=%s bytes=%d', screen['name'], len(image))
+            except (OSError, ValueError) as error:
+                LOG.info('Photos screensaver: %s', error)
+        elif base and await self.camera.saver(entity, box, kind, ground):
             url = f'{base}/camera/{self.camera.link(entity, box, saver=(kind, ground))}.bmp'
         if not url and kind == 'media' and self.camera.cover_pending(entity):
             # The cover is still on its way: no answer, so the screen asks again (camera_view::ASK_AGAIN_MS) and gets it
@@ -3916,7 +3945,8 @@ def create_app(manager, development=False):
             # draws pictures (else the clock alone) and whether it goes into standby at all.
             screen['screensaver'] = {**manager.savers.get(screen.get('device_id')),
                                      'ready': (manager.firmware_version(screen['id'], screen) or (0, 0, 0)) >= SCREENSAVER_MIN_FIRMWARE,
-                                     'pictures': bool(camera_feed.box(screen, 'full')), 'standby': can_standby(screen)}
+                                     'pictures': bool(camera_feed.box(screen, 'full')), 'standby': can_standby(screen),
+                                     'photo_effects': catalogue.PHOTOS['feature'] in (getattr(sender, 'features', None) or ())}
             # The delivery and our own word for a screen that reports nothing, in the editor's language (app 0.2.90).
             status = manager.status.get(screen['id'])
             word = PAGE_DELIVERY_WORDS.get(status) if isinstance(status, str) else None
@@ -4152,14 +4182,42 @@ def create_app(manager, development=False):
         label = manager.labels.set(screen['device_id'], data['name'])
         manager.notify()
         return web.json_response({'name': label or screen['name']})
+    async def photo_library(request):
+        inbox = request.match_info['inbox']
+        screen = manager.screen(inbox)
+        if not screen:
+            raise web.HTTPNotFound()
+        choice = manager.savers.get(screen.get('device_id'))
+        if 'fit' in request.query or 'mb' in request.query:
+            try:
+                choice = screen_saver.validate({**choice, 'photo_fit': request.query.get('fit', choice.get('photo_fit', 'fill')),
+                                                'photo_mb': int(request.query.get('mb', choice.get('photo_mb', 8)))})
+            except (ValueError, TypeError):
+                raise web.HTTPBadRequest(text='Invalid photo preview settings')
+        show = manager.photo_show(inbox)
+        if request.query.get('preview') == '1':
+            try:
+                box = camera_feed.box(screen, 'full') or (1280, 800)
+                scale = min(1, 640 / max(box))
+                _, image = await show.frame(choice, tuple(max(1, round(n * scale)) for n in box), preview=True)
+                return web.Response(body=image, content_type='image/jpeg', headers={'Cache-Control': 'no-store'})
+            except (OSError, ValueError):
+                raise web.HTTPNotFound(text='No readable photos')
+        report = await asyncio.get_running_loop().run_in_executor(None, show.describe, choice.get('photo_mb', 8), True)
+        return web.json_response(report)
+
     async def change_screensaver(request):
         """The screensaver of one screen (app 0.4.48): the whole choice at once; the screen hears of it on the next pass."""
         data = await request.json()
         screen = manager.screen(request.match_info['inbox'])
         if screen is None or not screen.get('device_id'):
             raise ValueError(t('addon.errors.not_paired'))
+        requested = data.get('screensaver') if isinstance(data, dict) else None
+        sender = manager.page_senders.get(manager.aliases.get(screen['id'], screen['id']))
+        if isinstance(requested, dict) and (requested.get('photo_clock') or requested.get('photo_transition', 'none') != 'none') and catalogue.PHOTOS['feature'] not in (getattr(sender, 'features', None) or ()):
+            raise ValueError(t('addon.errors.photos_update'))
         try:
-            choice = manager.savers.set(screen['device_id'], data.get('screensaver') if isinstance(data, dict) else None)
+            choice = manager.savers.set(screen['device_id'], requested)
         except ValueError as error:
             raise ValueError(t('addon.errors.pages.fields')) from error
         manager.ha.changed.set()
@@ -4761,6 +4819,7 @@ def create_app(manager, development=False):
     app.router.add_post('/api/screens/{inbox}/allow-actions', allow_actions)
     app.router.add_put('/api/screens/{inbox}/name', rename_screen)
     app.router.add_put('/api/screens/{inbox}/settings', change_settings)
+    app.router.add_get('/api/screens/{inbox}/photos', photo_library)
     app.router.add_put('/api/screens/{inbox}/screensaver', change_screensaver)
     app.router.add_post('/api/screens/{inbox}/feedback', feedback_action)
     app.router.add_static('/assets/', static / 'assets')

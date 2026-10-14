@@ -416,3 +416,15 @@ through, how much it matters, and how the app is asked for it. One loader decide
   renewing, retiring and freeing each copy (and why), a picture put on its card on the glass or on a kept page, and an
   answer to an older question dropped. The `store:` line at INFO sums it up whenever it changes; "0 to go" means no
   copy waits to be freed.
+
+## Photos screensaver
+
+The Photos step reads images from the screensaver folder without modifying originals. The editor offers a read-only preview, usable and skipped counts, and each skipped file's reason. Refresh preview rescans the folder; previewing never advances the screen's slideshow.
+
+Fit centres the whole photo on black. Fill crops to the screen. Two portraits side by side uses two distinct portrait files in equally sized frames with a small gap, fitting each without cropping. One portrait is centred; if none are usable, a whole photo is fitted. Orientation follows EXIF. Shuffle and Filename order are independent of this choice.
+
+Each screen owns its playback state. Current and upcoming frames are prepared at the requested screen dimensions, with cache keys including file modification time, file size, dimensions and display mode. Each active screen retains at most four finished frames or 16 MB, and at most four screen caches are retained. Issued download links point to prepared bytes, so their GET does not re-encode. Unchanged frames reuse their link and ETag and can return 304 without image transfer. Matching firmware requests photos at the chosen interval rather than the camera interval. The preview has its own smaller dimensions. Unreadable, excessively large and oversized-pixel files are reported and skipped.
+
+Matching firmware offers an optional live clock and transitions: Hard cut, dissolve, four directional wipes and slides, slow zoom in/out and pans, diamond, checkerboard, spiral, jumbled blocks, venetian blinds and Random. Dissolve blends the previous and new image. Other reveals draw clipped sections without a second full-size render layer. The previous frame is retained through the existing picture allocator, capped at 8 MB; allocation failure uses a hard cut. Zoom/pan lasts the chosen photo interval, other effects last 900 ms. Closing standby frees transition state. Still photos are supported; video playback is not part of this folder.
+
+The catalogue's photo_effects capability gates the clock and transition controls. Older firmware retains ordinary Photos playback and can use add-on-side Fit, Fill, pairing and order. These changes have local software tests; physical smoothness, memory behaviour and appearance still need checking on the actual display.

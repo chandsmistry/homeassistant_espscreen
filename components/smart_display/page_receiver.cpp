@@ -410,6 +410,14 @@ std::string receive(const std::string &payload) {
         if (!valid_entity(next.entity)) return false;
         next.name = string(root["n"], 80);
       }
+      if (next.entity == "image.screensaver_photos") {
+        next.photo_clock = root["pc"].is<bool>() && root["pc"].as<bool>();
+        next.photo_transition = string(root["pt"], 16);
+        bool known = false;
+        for (const auto *option : tile_catalogue::photos::TRANSITIONS) if (next.photo_transition == option) known = true;
+        if (!known) next.photo_transition = "none";
+        next.photo_seconds = root["ps"].is<int>() ? std::clamp(root["ps"].as<int>(), 15, 3600) : 30;
+      }
       if (next.kind == "media") {
         auto extra = root["x"];
         next.title = string(root["t"], 80);
