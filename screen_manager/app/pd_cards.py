@@ -59,7 +59,8 @@ DEFAULT_EMOJI = set('\u231A\u231B\u23E9\u23EA\u23EB\u23EC\u23F0\u23F3\u25FD\u25F
                     '\u264C\u264D\u264E\u264F\u2650\u2651\u2652\u2653\u267F\u2693\u26A1\u26AA\u26AB\u26BD\u26BE\u26C4\u26C5'
                     '\u26CE\u26D4\u26EA\u26F2\u26F3\u26F5\u26FA\u26FD\u2705\u270A\u270B\u2728\u274C\u274E\u2753\u2754\u2755'
                     '\u2757\u2795\u2796\u2797\u27B0\u27BF\u2B1B\u2B1C\u2B50\u2B55')
-SYMBOL_FONTS = ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+SYMBOL_FONTS = ('/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf',
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/dejavu/DejaVuSans.ttf',
                 '/usr/share/fonts/TTF/DejaVuSans.ttf', str(FONT_DIR / 'DejaVuSans.ttf'))
 
 
@@ -73,7 +74,12 @@ def is_emoji_at(text, i):
 def needs_symbols(ch):
     """A character Roboto lacks that the browser takes from a symbols font."""
     o = ord(ch)
-    return 0x2190 <= o <= 0x2BFF or 0x2500 <= o <= 0x27BF or o in (0x25CF, 0x25CB)
+    return 0x2190 <= o <= 0x2BFF or 0x4DC0 <= o <= 0x4DFF or o in (0x25CF, 0x25CB)
+
+
+def inline_text(value):
+    """Match the dashboard's normal HTML whitespace, including template newlines."""
+    return ' '.join(str(value).split())
 
 
 def font(px, weight=400):
@@ -283,14 +289,14 @@ def header(states, theme='light', scale=SCALE):
         c.text(w / 2, h / 2 - 12, '⏳ Waiting for controller data… ⏳', 17.6, 400, t['ink'], 'm', 0.8)
         return c
     a = source.get('attributes') or {}
-    mode = a.get('mode') or '\U0001F534 Controller Disabled \U0001F534'
+    mode = inline_text(a.get('mode') or '\U0001F534 Controller Disabled \U0001F534')
     color = hex_rgb(a.get('active_color') or '#9ca3af')
     controller = truthy(a.get('ctrl'))
-    story = a.get('story') or 'Waiting for controller state…'
+    story = inline_text(a.get('story') or 'Waiting for controller state…')
     grid, total = trunc(a.get('grid_w')), trunc(a.get('total_w'))
     target = trunc(a.get('tgt_w')) if a.get('tgt_w') is not None else -100
     burst = truthy(a.get('burst'))
-    glance = a.get('glance') or '⚖️ DP3: 0 W | Ultra X: 0 W | AC: 0 W ⚖️'
+    glance = inline_text(a.get('glance') or '⚖️ DP3: 0 W | Ultra X: 0 W | AC: 0 W ⚖️')
     ink = t['ink']
     icon = '⚙️' if controller else '\U0001F534'
     # title: font 1.55em of 14 px, weight 800, translateY(17px)
@@ -332,8 +338,10 @@ def header(states, theme='light', scale=SCALE):
         c.text(x + pw / 2, y2 + 6, label, pill_font, 700, fg, 'm')
         x += pw + 10
     y3 = y2 + 34 + 12 + 10
-    c.text(w / 2, y3, story, fs3, 400, ink, 'm')
-    c.text(w / 2, y3 + fs3 * 1.2 + 10 + 10, glance, fs3, 400, ink, 'm', 0.92)
+    story_size = fs3 * min(1, (w - 32) / max(1, c.text_width(story, fs3)))
+    glance_size = fs3 * min(1, (w - 32) / max(1, c.text_width(glance, fs3)))
+    c.text(w / 2, y3, story, story_size, 400, ink, 'm')
+    c.text(w / 2, y3 + fs3 * 1.2 + 10 + 10, glance, glance_size, 400, ink, 'm', 0.92)
     return c
 
 

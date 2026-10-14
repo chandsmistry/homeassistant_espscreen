@@ -13,6 +13,18 @@ STATES = json.loads((ROOT / 'tests/fixtures/pd_cards_states.json').read_text())
 
 
 class PdCards(unittest.TestCase):
+    def test_header_collapses_template_whitespace_like_html(self):
+        import copy
+        multiline = copy.deepcopy(STATES)
+        multiline[pd_cards.HEADER]['attributes']['story'] = '👑 DP3 is Primary · → UX in ~\n  6h 55m\n (17:31) 👑'
+        singleline = copy.deepcopy(multiline)
+        singleline[pd_cards.HEADER]['attributes']['story'] = pd_cards.inline_text(
+            multiline[pd_cards.HEADER]['attributes']['story'])
+        self.assertEqual(pd_cards.render('header', multiline), pd_cards.render('header', singleline))
+
+    def test_hexagram_uses_symbol_font(self):
+        self.assertEqual(pd_cards.runs('䷡'), [('symbol', '䷡')])
+
     def test_every_card_is_a_png(self):
         for name in pd_cards.NAMES:
             self.assertTrue(pd_cards.render(name, STATES, 'light', 1).startswith(b'\x89PNG'), name)
