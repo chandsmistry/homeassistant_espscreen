@@ -105,6 +105,7 @@ inline std::vector<std::pair<std::string, std::string>> fields(const Ask &a) {
           {"size", std::to_string(std::max(CIRCLE_MIN, std::min(CIRCLE_MAX, a.circle)))},
           {"bg", ground},
           {"dark", a.dark ? "1" : "0"},
+          {"picture_encoding", "rle8"},
           {"atlas", atlas}};
 }
 

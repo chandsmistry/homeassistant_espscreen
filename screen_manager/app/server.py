@@ -3347,7 +3347,9 @@ class Manager:
         base = await camera_feed.base_url(self.ha.request)
         if base:
             # A screen whose decoder reads 8-bit colour gets a third of the bytes (app 0.3.8).
-            extra = {'compact': camera_feed.compact_pictures(screen), **({'atlas': atlas, 'modes': modes} if atlas else {}),
+            extra = {'compact': camera_feed.compact_pictures(screen),
+                     'rle': request.get('picture_encoding') == 'rle8' and bool(atlas) and all(pd_cards.is_tile(e) for e in entities),
+                     **({'atlas': atlas, 'modes': modes} if atlas else {}),
                      **({'renders': renders} if renders else {})}
             found = await self.camera.live(entities, size, grounds, paces, **extra)
             if found:

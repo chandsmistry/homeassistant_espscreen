@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **Faster PD cards.** Lossless RLE8 picture transfer for the header and combined batteries, negotiated by updated firmware; older screens keep plain BMPs. Layout and picture resolution are unchanged.
+
 - **PD Battery Allocations card.** A single picture card stacks all four battery panels, including eligibility, connection pills, charge state and three bars, like the dashboard's battery management card.
 - **PD header rendering.** Collapse template whitespace like the dashboard, fit long handover lines, and include the symbol font needed by the header's hexagrams.
 - **PD picture delivery.** Hold each screen picture's change mark for 45 seconds so frequent sensor updates do not repeatedly cancel a download, including the combined battery card.

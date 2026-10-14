@@ -104,6 +104,23 @@ int main() {
     assert(px.size() == 6);
     for (size_t i = 0; i < 6; ++i) assert(px[i] == expect(rgb[i]));
   }
+  // RLE8: a run, odd-length literal with padding, row ends; any network chunk boundary.
+  file = make_bmp(3, 2, 8, rgb);
+  file.resize(1078);
+  const std::vector<uint8_t> rle{0,3,3,4,5,0,0,0,0,3,0,1,2,0,0,0,0,1};
+  file.insert(file.end(), rle.begin(), rle.end());
+  put32(file, 30, 1); put32(file, 2, file.size());
+  for (size_t step : {1,2,3,7,1080,5000}) {
+    auto result = decode(file, step);
+    assert(result.size() == 6);
+    for (size_t i = 0; i < 6; ++i) assert(result[i] == expect(rgb[i]));
+  }
+  auto invalid = file;
+  invalid[1078] = 4; invalid[1079] = 0;  // run exceeds row width
+  bool rejected = false;
+  assert(decode(invalid, 1, &rejected).empty() && rejected);
+  invalid = file; invalid[1078] = 0; invalid[1079] = 2;  // unsupported delta cannot expose stale pixels
+  assert(decode(invalid, 1, &rejected).empty() && rejected);
   // ---- top-down, and 16-bit 5-6-5 with masks ----
   file = make_bmp(3, 2, 24, rgb, true);
   assert(parse_bmp(file.data(), file.size()).top_down);

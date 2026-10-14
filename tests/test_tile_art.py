@@ -31,6 +31,21 @@ class TileArt(unittest.TestCase):
             self.assertEqual(im.getpixel((4,8)),(238,238,238))
             self.assertEqual(im.getpixel((105,30)),(18,52,86))
 
+    def test_rle_lossless_and_smaller(self):
+        image = Image.new('RGB', (600, 700), '#101419')
+        from PIL import ImageDraw
+        ImageDraw.Draw(image).rectangle((20,20,500,80), fill='#22cc66')
+        plain = tile_art.bmp(image, compact=True)
+        packed = tile_art.bmp(image, compact=True, rle=True)
+        self.assertLess(len(packed), len(plain) // 10)
+        with Image.open(io.BytesIO(plain)) as a, Image.open(io.BytesIO(packed)) as b:
+            self.assertEqual(a.convert('RGB').tobytes(), b.convert('RGB').tobytes())
+        # Literal runs, odd padding and 255-byte run boundaries.
+        image = Image.new('RGB', (521, 9))
+        image.putdata([(x % 256, x*7 % 256, x*19 % 256) for x in range(521*9)])
+        with Image.open(io.BytesIO(tile_art.bmp(image, True))) as a, Image.open(io.BytesIO(tile_art.bmp(image, True, True))) as b:
+            self.assertEqual(a.convert('RGB').tobytes(), b.convert('RGB').tobytes())
+
     def test_board_canvas_is_the_allocation_limit(self):
         self.assertIsNone(tile_art.parse('[[0,0,800,480,8,170]]',(480,800),1))
         self.assertIsNotNone(tile_art.parse('[[0,0,800,480,8,170]]',(800,480),1))

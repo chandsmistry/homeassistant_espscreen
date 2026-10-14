@@ -192,6 +192,8 @@ inline Bmp parse_bmp(const uint8_t *data, size_t size) {
     // The masks follow a 40-byte header; a larger header (V4, V5) holds them at the same place.
     if (size < BMP_HEAD + 12) return b;
     for (int i = 0; i < 3; ++i) b.masks[i] = le32(data + BMP_HEAD + 4 * i);
+  } else if (b.compression == 1) {
+    if (b.bpp != 8 || b.top_down) return b;
   } else if (b.compression != 0) {
     return b;
   }
@@ -290,7 +292,35 @@ class Decoder {
         row_.resize(bmp_.row_bytes);
         row_fill_ = 0;
       }
+      if (pos >= size) break;
       if (rows_done_ >= bmp_.height) return true;  // the rest of the file (nothing the add-on sends) is ignored
+      if (bmp_.compression == 1) {
+        command_.push_back(data[pos++]);
+        if (command_.size() < 2) continue;
+        const unsigned count = command_[0], value = command_[1];
+        if (count == 0 && value >= 3 && command_.size() < 2 + value + (value & 1)) continue;
+        if (count == 0 && value == 2) return fail();  // encoder never skips pixels
+        if (count == 0 && value == 1) {
+          if (rows_done_ != bmp_.height) return fail();
+          command_.clear();
+          continue;
+        }
+        if (count == 0 && value == 0) {
+          if (row_fill_ != static_cast<size_t>(bmp_.width)) return fail();
+          const int y = bmp_.height - 1 - rows_done_;
+          convert_row(bmp_, reinterpret_cast<const uint8_t *>(head_.data()) + bmp_.palette_offset(), row_.data(),
+                      pixels_ + static_cast<size_t>(y) * bmp_.width);
+          ++rows_done_; row_fill_ = 0;
+        } else {
+          const unsigned length = count ? count : value;
+          if (row_fill_ + length > static_cast<size_t>(bmp_.width)) return fail();
+          if (count) std::memset(row_.data() + row_fill_, value, length);
+          else std::memcpy(row_.data() + row_fill_, command_.data() + 2, length);
+          row_fill_ += length;
+        }
+        command_.clear();
+        continue;
+      }
       const size_t take = std::min(size - pos, bmp_.row_bytes - row_fill_);
       std::memcpy(row_.data() + row_fill_, data + pos, take);
       row_fill_ += take;
@@ -314,7 +344,7 @@ class Decoder {
   bool fail() { failed_ = true; return false; }
   Ready ready_;
   std::string head_;
-  std::vector<uint8_t> row_;
+  std::vector<uint8_t> row_, command_;
   size_t row_fill_ = 0;
   Bmp bmp_;
   bool headed_ = false, failed_ = false, masks_ = false;

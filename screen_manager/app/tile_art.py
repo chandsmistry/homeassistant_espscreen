@@ -7,6 +7,7 @@ per tile. The allocation is bounded by the paired screen's reported canvas.
 import contextlib
 import io
 import json
+import struct
 
 
 def parse(value, canvas, count):
@@ -48,7 +49,7 @@ FADE_SHARE = 0.42
 FADE_DEPTH = 150
 
 
-def bmp(image, compact=False):
+def bmp(image, compact=False, rle=False):
     """A BMP of `image`: 24-bit, or with `compact` 8-bit on a palette of the picture's own 256 colours, dithered so a
     shade stays smooth (app 0.3.8). A third of the bytes, which is what a screen downloads and decodes in its main loop,
     at about the quality of its RGB565 glass; Pillow's fast octree keeps it cheap on a Raspberry Pi."""
@@ -58,10 +59,47 @@ def bmp(image, compact=False):
         image = image.quantize(palette=palette, dither=Image.Dither.FLOYDSTEINBERG)
     output = io.BytesIO()
     image.save(output, 'BMP')
-    return output.getvalue()
+    plain = output.getvalue()
+    if not (compact and rle):
+        return plain
+    # RLE8 preserves every indexed pixel; runs particularly suit the PD cards' flat backgrounds.
+    packed = bytearray()
+    pixels = image.tobytes()
+    for y in range(image.height - 1, -1, -1):
+        row = pixels[y * image.width:(y + 1) * image.width]
+        x = 0
+        while x < len(row):
+            end = x + 1
+            while end < len(row) and row[end] == row[x] and end - x < 255:
+                end += 1
+            if end - x >= 3:
+                packed.extend((end - x, row[x])); x = end
+                continue
+            start = x
+            x = end
+            while x < len(row) and x - start < 254:
+                if x + 2 < len(row) and row[x] == row[x + 1] == row[x + 2]:
+                    break
+                x += 1
+            literal = row[start:x]
+            if len(literal) < 3:
+                for value in literal:
+                    packed.extend((1, value))
+            else:
+                packed.extend((0, len(literal))); packed.extend(literal)
+                if len(literal) & 1:
+                    packed.append(0)
+        packed.extend((0, 0))
+    packed.extend((0, 1))
+    offset = struct.unpack_from('<I', plain, 10)[0]
+    result = bytearray(plain[:offset]) + packed
+    struct.pack_into('<I', result, 2, len(result))
+    struct.pack_into('<I', result, 30, 1)
+    struct.pack_into('<I', result, 34, len(packed))
+    return bytes(result) if len(result) < len(plain) else plain
 
 
-def encode(raws, grounds, atlas, modes=None, compact=False):
+def encode(raws, grounds, atlas, modes=None, compact=False, rle=False):
     """A native-sized BMP, cropped, dimmed and rounded before transmission.
 
     `modes` gives each frame (fit, fade) for a camera that fills its card (app 0.3.8): fit 'fill' cuts the picture
@@ -103,4 +141,4 @@ def encode(raws, grounds, atlas, modes=None, compact=False):
             mask = mask.resize((w, h), Image.Resampling.LANCZOS)
             tile.paste(cover, mask=mask)
         image.paste(tile, (x, y))
-    return bmp(image, compact)
+    return bmp(image, compact, rle)

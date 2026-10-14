@@ -666,7 +666,7 @@ class CameraFeed:
         self.ahead(entity, watch, pace)
         return watch.raw
 
-    async def live(self, entities, size, grounds, paces, wait=FIRST_FRAME_SECONDS, *, atlas=None, modes=None, compact=False, renders=None):
+    async def live(self, entities, size, grounds, paces, wait=FIRST_FRAME_SECONDS, *, atlas=None, modes=None, compact=False, renders=None, rle=False):
         """(etag, BMP, entities with '' where a camera has no snapshot) of the strip for a page's camera tiles at
         `size` with `grounds` behind the corners and `paces` in seconds per tile, or None when no camera has one.
 
@@ -683,7 +683,7 @@ class CameraFeed:
         digests = [mark if render else (self.watches[entity].digest if raw is not None else '')
                    for entity, raw, render, mark in zip(entities, raws, renders, marks)]
         # The place a picture is made for, and what it shows there: a camera's next snapshot replaces its last picture.
-        place = ('live', tuple(entities), size, tuple(grounds), atlas, tuple(modes or ()), compact)
+        place = ('live', tuple(entities), size, tuple(grounds), atlas, tuple(modes or ()), compact, rle)
         key = place + (tuple(digests),)
         tag = f'"{hashlib.sha1(repr(key).encode()).hexdigest()[:16]}-l{size}"'  # names the strip; not sent
         made = self.strips.pop(place, None)
@@ -695,7 +695,7 @@ class CameraFeed:
                     if render:
                         width, height = (frames[n][2], frames[n][3]) if n < len(frames) else (size, size)
                         raws[n] = await render[1](width, height)
-                image = await asyncio.get_running_loop().run_in_executor(None, tile_art.encode, raws, grounds, atlas, modes, compact) if atlas else await asyncio.get_running_loop().run_in_executor(None, encode_live, raws, size, grounds, compact)
+                image = await asyncio.get_running_loop().run_in_executor(None, tile_art.encode, raws, grounds, atlas, modes, compact, rle) if atlas else await asyncio.get_running_loop().run_in_executor(None, encode_live, raws, size, grounds, compact)
             except Exception as error:
                 LOG.info('The live pictures of %s cannot be read (%s)', ', '.join(entities), type(error).__name__)
                 return None
