@@ -951,6 +951,7 @@ class Manager:
         self.photos = photos.Photos()
         self.photo_shows = {}
         self.photo_links = {}
+        self.photo_warming = {}
         self.camera = camera_feed.CameraFeed(lambda entity: self.photos.image(self.photo_settings()) if entity == photos.PHOTOS
                                              else self.ha.camera_image(entity),
                                              fetch_cover=lambda entity: self.ha.media_image(self.followed(entity)),
@@ -3137,6 +3138,12 @@ class Manager:
         device = (self.screen(inbox) or {}).get('device_id')
         return screen_saver.entities(self.savers.get(device), self.ha.states) if device else set()
 
+    @staticmethod
+    def photo_box(box, choice):
+        limit={'native':max(box),'fast':960,'small':640}.get(choice.get('photo_quality','native'),max(box))
+        scale=min(1,limit/max(box))
+        return tuple(max(1,round(n*scale)) for n in box)
+
     def photo_show(self, inbox):
         if inbox not in self.photo_shows:
             # Bound retained per-screen caches, without sharing playback state.
@@ -3191,6 +3198,21 @@ class Manager:
                 or screen_saver.FEATURE not in (getattr(sender, 'features', None) or ()):
             return
         message = self.saver_message(screen)
+        if message.get('e') == photos.PHOTOS:
+            choice=self.savers.get(screen.get('device_id'))
+            box=camera_feed.box(screen,'full')
+            if box: box=self.photo_box(box,choice)
+            packed=catalogue.PHOTOS['packed_feature'] in (getattr(sender,'features',None) or ())
+            warm_key=json.dumps([choice.get('photo_fit','fill'),choice.get('photo_order','shuffle'),choice.get('photo_mb',8),box,packed])
+            prior=self.photo_warming.get(inbox)
+            if box and (not prior or prior[0] != warm_key) and (not prior or prior[1].done()):
+                async def warm_photo():
+                    try:
+                        await self.photo_show(inbox).warm(choice,box,rle=packed)
+                    except (OSError,ValueError) as error:
+                        LOG.info('Photos preparation: %s',error)
+                self.photo_warming[inbox]=(warm_key,asyncio.create_task(warm_photo()))
+
         key = (sender.session, json.dumps(message, sort_keys=True))
         if self.saver_sent.get(inbox) == key:
             return
@@ -3304,7 +3326,9 @@ class Manager:
         if entity == photos.PHOTOS and base:
             choice = self.savers.get(screen.get('device_id'))
             try:
-                image, _ = await self.photo_show(inbox).frame(choice, box)
+                sender = self.page_senders.get(inbox)
+                packed = catalogue.PHOTOS['packed_feature'] in (getattr(sender, 'features', None) or ())
+                image, _ = await self.photo_show(inbox).frame(choice, self.photo_box(box,choice), rle=packed)
                 import hashlib
                 tag = '"' + hashlib.sha256(image).hexdigest()[:16] + '"'
                 old = self.photo_links.get(inbox)
@@ -3946,7 +3970,8 @@ def create_app(manager, development=False):
             screen['screensaver'] = {**manager.savers.get(screen.get('device_id')),
                                      'ready': (manager.firmware_version(screen['id'], screen) or (0, 0, 0)) >= SCREENSAVER_MIN_FIRMWARE,
                                      'pictures': bool(camera_feed.box(screen, 'full')), 'standby': can_standby(screen),
-                                     'photo_effects': catalogue.PHOTOS['feature'] in (getattr(sender, 'features', None) or ())}
+                                     'photo_effects': catalogue.PHOTOS['feature'] in (getattr(sender, 'features', None) or ()),
+                                     'photo_positions': catalogue.PHOTOS['clock_feature'] in (getattr(sender, 'features', None) or ())}
             # The delivery and our own word for a screen that reports nothing, in the editor's language (app 0.2.90).
             status = manager.status.get(screen['id'])
             word = PAGE_DELIVERY_WORDS.get(status) if isinstance(status, str) else None
@@ -4214,6 +4239,8 @@ def create_app(manager, development=False):
             raise ValueError(t('addon.errors.not_paired'))
         requested = data.get('screensaver') if isinstance(data, dict) else None
         sender = manager.page_senders.get(manager.aliases.get(screen['id'], screen['id']))
+        if isinstance(requested, dict) and requested.get('photo_clock_position', 'bottom_left') != 'bottom_left' and catalogue.PHOTOS['clock_feature'] not in (getattr(sender, 'features', None) or ()):
+            raise ValueError(t('addon.errors.photos_update'))
         if isinstance(requested, dict) and (requested.get('photo_clock') or requested.get('photo_transition', 'none') != 'none') and catalogue.PHOTOS['feature'] not in (getattr(sender, 'features', None) or ()):
             raise ValueError(t('addon.errors.photos_update'))
         try:

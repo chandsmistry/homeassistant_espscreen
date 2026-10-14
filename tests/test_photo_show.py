@@ -63,9 +63,23 @@ class PhotoShowTests(unittest.IsolatedAsyncioTestCase):
         if self.show.prefetch:await self.show.prefetch
         self.assertLessEqual(len(self.show.frames),4)
         self.assertLessEqual(sum(len(a)+len(b) for a,b in self.show.frames.values()),16*1024*1024)
+    async def test_warm_prepares_first_frame_without_starting_interval(self):
+        self.make('a.png',(40,80),'red');self.make('b.png',(40,80),'blue')
+        settings={'photo_order':'filename'}
+        await self.show.warm(settings,(160,80),rle=True)
+        self.assertIsNone(self.show.since);first=self.show.ahead
+        cached=next(iter(self.show.frames.values()))
+        shown=await self.show.frame(settings,(160,80),rle=True)
+        self.assertEqual(self.show.current_paths,first);self.assertIs(shown,cached)
+    async def test_rle_is_smaller_and_preserves_all_pixels(self):
+        path=self.make('a.png',(40,80),'red')
+        plain=self.show.render((str(path),),(160,80),'fit')[0]
+        packed=self.show.render((str(path),),(160,80),'fit',True)[0]
+        self.assertLess(len(packed),len(plain))
+        self.assertEqual(Image.open(io.BytesIO(plain)).convert('RGB').tobytes(),Image.open(io.BytesIO(packed)).convert('RGB').tobytes())
     def test_validation_and_old_defaults(self):
         self.assertNotIn('photo_transition',screen_saver.validate({}))
         for name in ('none','fade','wipe_left','slide_up','zoom_in','pan_right','diamond','checker','spiral','blocks','blinds','random'):
             self.assertEqual(screen_saver.validate({'photo_transition':name})['photo_transition'],name)
-        for data in ({'photo_fit':'bad'},{'photo_clock':1},{'photo_transition':'video'}):
+        for data in ({'photo_fit':'bad'},{'photo_clock':1},{'photo_transition':'video'},{'photo_clock_position':'wrong'}):
             with self.assertRaises(ValueError):screen_saver.validate(data)

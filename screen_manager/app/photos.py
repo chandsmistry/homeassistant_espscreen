@@ -260,17 +260,17 @@ class PhotoShow:
                 selected.append(path)
         return tuple(selected)
 
-    def render(self, paths, box, fit):
+    def render(self, paths, box, fit, rle=False):
         with self.render_lock:
-            return self._render(paths, box, fit)
+            return self._render(paths, box, fit, rle)
 
-    def _render(self, paths, box, fit):
+    def _render(self, paths, box, fit, rle=False):
         from PIL import Image, ImageOps
         import tile_art
         if not paths:
             raise FileNotFoundError('no readable photos')
         signatures = tuple((p, os.stat(p).st_mtime_ns, os.stat(p).st_size) for p in paths)
-        key = (signatures, box, fit)
+        key = (signatures, box, fit, rle)
         if key in self.frames:
             self.frames.move_to_end(key)
             return self.frames[key]
@@ -298,21 +298,38 @@ class PhotoShow:
                 raise ValueError('unreadable photo') from None
         out = io.BytesIO()
         canvas.save(out, 'JPEG', quality=85)
-        result = (tile_art.bmp(canvas, compact=True), out.getvalue())
+        result = (tile_art.bmp(canvas, compact=True, rle=rle), out.getvalue())
         self.frames[key] = result
         # Full-screen frames can be large. Keep at most four and at most 16 MB per active screen.
         while len(self.frames) > 4 or sum(len(a) + len(b) for a, b in self.frames.values()) > 16 * 1024 * 1024:
             self.frames.popitem(last=False)
         return result
 
-    async def frame(self, settings, box, preview=False):
+    async def warm(self, settings, box, rle=False):
+        """Prepare the first frame while the ordinary page is showing, without starting its display interval."""
+        import asyncio
+        loop=asyncio.get_running_loop()
+        async with self.lock:
+            signature=(settings.get('photo_fit','fill'),settings.get('photo_order','shuffle'),settings.get('photo_mb',8),box,rle)
+            if self.settings == signature and (self.current_paths or self.ahead):
+                return
+            if self.prefetch:
+                await self.prefetch
+                self.prefetch=None
+            self.settings,self.current_paths,self.since=signature,(),None
+            self.album.order=[]
+            self.ahead=await loop.run_in_executor(None,self.next_paths,settings)
+            if self.ahead:
+                await loop.run_in_executor(None,self.render,self.ahead,box,signature[0],rle)
+
+    async def frame(self, settings, box, preview=False, rle=False):
         import asyncio
         loop = asyncio.get_running_loop()
         async with self.lock:
             if preview:
                 paths = tuple((await loop.run_in_executor(None, self.candidates, settings))[:2 if settings.get('photo_fit') == 'pair' else 1])
                 return await loop.run_in_executor(None, self.render, paths, box, settings.get('photo_fit', 'fill'))
-            signature = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'), settings.get('photo_mb', 8), box)
+            signature = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'), settings.get('photo_mb', 8), box, rle)
             if signature != self.settings:
                 self.settings, self.current_paths, self.since, self.ahead = signature, (), None, None
                 self.album.order = []
@@ -328,16 +345,16 @@ class PhotoShow:
                 self.ahead = None
                 self.since = self.album.clock()
             try:
-                result = await loop.run_in_executor(None, self.render, self.current_paths, box, signature[0])
+                result = await loop.run_in_executor(None, self.render, self.current_paths, box, signature[0], rle)
             except (OSError, ValueError):
                 self.since, self.ahead = None, None
                 raise
             if self.ahead is None:
                 self.ahead = await loop.run_in_executor(None, self.next_paths, settings)
                 if self.ahead:
-                    async def prepare(paths=self.ahead, bounds=box, fit=signature[0]):
+                    async def prepare(paths=self.ahead, bounds=box, fit=signature[0], packed=rle):
                         try:
-                            await loop.run_in_executor(None, self.render, paths, bounds, fit)
+                            await loop.run_in_executor(None, self.render, paths, bounds, fit, packed)
                         except (OSError, ValueError):
                             pass  # describe reports the failed file; the next request can choose another
                     self.prefetch = asyncio.create_task(prepare())

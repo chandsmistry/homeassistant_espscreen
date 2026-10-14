@@ -1,5 +1,8 @@
 ## Unreleased
 
+- **Photos preview correction.** Same-origin preview URLs work with the existing image security policy; no blob allowance or broader policy is needed.
+- **Photos loading and clock position.** Prepare the first photo before standby, use lossless RLE when negotiated and smaller, and offer opt-in 960/640-pixel transfer sizes with full resolution still the default. Seven clock anchors preserve equal safe margins and are capability-gated. Existing transition effects and PD behaviour are unchanged. Local tests passed; physical improvement remains to be measured.
+
 - **Photos controls.** Read-only preview, usable and skipped counts with reasons, Fit or Fill, two distinct portrait photos side by side, Shuffle or Filename order and optional native clock. Each screen has independent playback, bounded screen-sized frame caching and next-frame preparation. Original files are unchanged.
 - **Photos transitions.** Hard cut, dissolve, four directional wipes and slides, slow zoom/pan, diamond, checkerboard, spiral, jumbled blocks, venetian blinds and Random. Effects retain at most one additional frame of up to 8 MB using the picture allocator; insufficient memory falls back to hard cut. The clock and transitions require matching firmware. Local renderer and logic tests passed; no physical acceptance is claimed.
 

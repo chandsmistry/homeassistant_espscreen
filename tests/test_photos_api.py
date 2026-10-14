@@ -23,10 +23,16 @@ class PhotosApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_preview_and_status_do_not_advance_or_change_layout(self):
         before=self.path.read_bytes()
         status=await self.client.get('/api/screens/text.screen/photos?fit=pair&mb=1');self.assertEqual(status.status,200);self.assertEqual((await status.json())['portraits'],1)
-        preview=await self.client.get('/api/screens/text.screen/photos?preview=1&fit=pair&mb=1');self.assertEqual(preview.status,200);self.assertEqual(preview.content_type,'image/jpeg')
+        preview=await self.client.get('/api/screens/text.screen/photos?preview=1&fit=pair&mb=1');self.assertEqual(preview.status,200);self.assertEqual(preview.content_type,'image/jpeg');self.assertIn("img-src 'self' data:",preview.headers['Content-Security-Policy'])
         self.assertIsNone(self.manager.photo_shows['text.screen'].since);self.assertEqual(self.path.read_bytes(),before);self.assertEqual(self.manager.ha.messages,[])
         self.assertEqual((await self.client.get('/api/screens/absent/photos')).status,404)
         self.assertEqual((await self.client.get('/api/screens/text.screen/photos?fit=bad')).status,400)
+    def test_optional_transfer_sizes_preserve_aspect_ratio(self):
+        from server import Manager
+        self.assertEqual(Manager.photo_box((1280,800),{}),(1280,800))
+        self.assertEqual(Manager.photo_box((1280,800),{'photo_quality':'fast'}),(960,600))
+        self.assertEqual(Manager.photo_box((1280,800),{'photo_quality':'small'}),(640,400))
+        self.assertEqual(Manager.photo_box((320,480),{'photo_quality':'small'}),(320,480))
     async def test_old_firmware_effect_gate_and_new_firmware_save(self):
         screen=self.manager.screen('text.screen');screen['device_id']='device'
         sender=self.manager.page_sender('text.screen',screen);sender.features=set()

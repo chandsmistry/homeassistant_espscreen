@@ -239,7 +239,7 @@ def normalise(tile, types, translations, facts, commands=None):
             if domain != 'screen' or 'energy' not in cards_of(data):
                 fail(where, 'energy options belong to the screen\'s energy card')
         photo_options = data.get('photos')
-        if photo_options and (domain != 'screen' or set(photo_options) != {'feature', 'transitions'} or not isinstance(photo_options['transitions'], list)):
+        if photo_options and (domain != 'screen' or set(photo_options) != {'feature', 'clock_feature', 'packed_feature', 'transitions', 'clock_positions'} or not isinstance(photo_options['transitions'], list)):
             fail(where, 'invalid photos metadata')
         pd = data.get('pd')
         if pd is not None:
@@ -330,7 +330,7 @@ def header(catalogue):
                   for data in catalogue['domains'].values() for e, price in data.get('cards', {}).items()) + '};', '']
     photos = catalogue['domains']['screen'].get('photos')
     if photos:
-        lines += ['namespace photos {', 'inline constexpr const char *FEATURE = ' + json.dumps(photos['feature']) + ';', 'inline constexpr const char *TRANSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['transitions']) + '};', '}']
+        lines += ['namespace photos {', 'inline constexpr const char *FEATURE = ' + json.dumps(photos['feature']) + ';', 'inline constexpr const char *CLOCK_FEATURE = ' + json.dumps(photos['clock_feature']) + ';', 'inline constexpr const char *PACKED_FEATURE = ' + json.dumps(photos['packed_feature']) + ';', 'inline constexpr const char *CLOCK_POSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['clock_positions']) + '};', 'inline constexpr const char *TRANSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['transitions']) + '};', '}']
     pd = catalogue['domains']['screen'].get('pd')
     if pd:
         lines += ['namespace pd {', 'inline constexpr const char *ENTITIES[] = {' + ', '.join(json.dumps(e) for e in pd['entities']) + '};']

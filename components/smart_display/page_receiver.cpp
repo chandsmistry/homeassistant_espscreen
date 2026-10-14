@@ -411,6 +411,10 @@ std::string receive(const std::string &payload) {
         next.name = string(root["n"], 80);
       }
       if (next.entity == "image.screensaver_photos") {
+        next.photo_clock_position = string(root["pp"],16);
+        bool position_known=false;
+        for (const auto *option : tile_catalogue::photos::CLOCK_POSITIONS) if (next.photo_clock_position == option) position_known=true;
+        if (!position_known) next.photo_clock_position="bottom_left";
         next.photo_clock = root["pc"].is<bool>() && root["pc"].as<bool>();
         next.photo_transition = string(root["pt"], 16);
         bool known = false;

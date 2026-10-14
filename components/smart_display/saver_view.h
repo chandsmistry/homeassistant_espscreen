@@ -10,6 +10,7 @@
 // A touch wakes the screen, as it always did in standby, except on a player's three keys (firmware 0.33.0+): play or
 // pause and the volume work from the screensaver, and the screen stays in standby.
 #include <algorithm>
+#include <string>
 #include "media_card.h"
 
 namespace saver_view {
@@ -42,6 +43,15 @@ inline Words words(Shape s, int width, int height, int margin, int first_h, int 
   out.first = {x, y, std::max(1, w), first_h};
   if (second_h) out.second = {x, y + first_h + gap, std::max(1, w), second_h};
   return out;
+}
+
+// Clock overlay uses one equal safe margin and the same bounds for all seven anchors.
+inline Words photo_words(int width,int height,int margin,int first_h,int second_h,int gap,const std::string &position) {
+  const int block=first_h+(second_h?gap+second_h:0);
+  int y=height-margin-block;
+  if(position.rfind("top_",0)==0) y=margin;
+  else if(position=="center") y=(height-block)/2;
+  return {{margin,y,std::max(1,width-2*margin),first_h}, {margin,y+first_h+gap,std::max(1,width-2*margin),second_h}};
 }
 
 // A player's keys (firmware 0.33.0+): play or pause in the bottom right corner, a margin from the right edge and from

@@ -2703,6 +2703,23 @@
           "blocks": "Jumbled blocks",
           "blinds": "Venetian blinds",
           "random": "Random"
+        },
+        "photo_clock_position": "Clock position",
+        "photo_positions": {
+          "top_left": "Top left",
+          "top_center": "Top centre",
+          "top_right": "Top right",
+          "center": "Centre",
+          "bottom_left": "Bottom left",
+          "bottom_center": "Bottom centre",
+          "bottom_right": "Bottom right"
+        },
+        "photo_quality": "Image detail",
+        "photo_quality_hint": "Smaller images transfer faster. The panel scales them to fill the same area; original files stay unchanged.",
+        "photo_qualities": {
+          "native": "Full resolution",
+          "fast": "Faster loading (up to 960 px)",
+          "small": "Fastest loading (up to 640 px)"
         }
       },
       "plugins": {

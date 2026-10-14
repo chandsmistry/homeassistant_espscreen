@@ -101,6 +101,16 @@ static void clock_in_the_middle() {
 }
 
 int main() {
+  for(const char *position : {"top_left","top_center","top_right","center","bottom_left","bottom_center","bottom_right"}) {
+    auto words=saver_view::photo_words(1280,800,28,32,20,4,position);
+    assert(words.first.x==28 && words.first.w==1224);
+    assert(words.second.y==words.first.y+36);
+    assert(words.first.y>=28 && words.second.bottom()<=772);
+    if(std::string(position).rfind("top_",0)==0) assert(words.first.y==28);
+    else if(std::string(position)=="center") assert(words.first.y==372);
+    else assert(words.second.bottom()==772);
+  }
+
   words_on_every_glass();
   keys_on_every_glass();
   clock_in_the_middle();

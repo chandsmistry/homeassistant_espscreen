@@ -236,13 +236,14 @@ struct SaverChoice {
   uint32_t features = 0;
   bool muted = false;
   bool photo_clock = false;
+  std::string photo_clock_position = "bottom_left";
   std::string photo_transition = "none";
   int photo_seconds = 30;
   bool operator==(const SaverChoice &o) const {
     return kind == o.kind && entity == o.entity && name == o.name && title == o.title && artist == o.artist &&
            album == o.album && picture == o.picture && ground == o.ground && weather == o.weather && row == o.row &&
            state == o.state && features == o.features && muted == o.muted && photo_clock == o.photo_clock &&
-           photo_transition == o.photo_transition && photo_seconds == o.photo_seconds;
+           photo_transition == o.photo_transition && photo_seconds == o.photo_seconds && photo_clock_position == o.photo_clock_position;
   }
 };
 inline SaverChoice saver_next, saver_now;  // the app's latest word, and what the glass shows
@@ -12211,8 +12212,14 @@ inline void saver_words() {
   }
   for (lv_obj_t **words : {&saver_first, &saver_second}) if (*words) { lv_obj_delete(*words); *words = nullptr; }
   saver_words_due = false;
-  saver_first = saver_text(camera_root, font, media_ink(), w.first, first, LV_TEXT_ALIGN_LEFT);
-  if (second_h) saver_second = saver_text(camera_root, second_font, theme::mix(media_ink(), 0, 200), w.second, second, LV_TEXT_ALIGN_LEFT);
+  lv_text_align_t alignment = LV_TEXT_ALIGN_LEFT;
+  if (photo && c.photo_clock) {
+    w = saver_view::photo_words(width,height,margin,w.first.h,second_h,gap,c.photo_clock_position);
+    if (c.photo_clock_position == "center" || c.photo_clock_position.find("center") != std::string::npos) alignment = LV_TEXT_ALIGN_CENTER;
+    else if (c.photo_clock_position.find("right") != std::string::npos) alignment = LV_TEXT_ALIGN_RIGHT;
+  }
+  saver_first = saver_text(camera_root, font, media_ink(), w.first, first, alignment);
+  if (second_h) saver_second = saver_text(camera_root, second_font, theme::mix(media_ink(), 0, 200), w.second, second, alignment);
   saver_keys_draw();
 }
 // The keys: white rounds over the darkened cover, the play key whole and the two volume keys a haze with a white sign,

@@ -67,7 +67,7 @@ GONE = frozenset(('', 'unavailable', 'unknown'))
 
 def validate(value):
     """A clean copy of a screensaver choice, or ValueError. Every field is optional; the default fills the rest."""
-    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb', 'photo_fit', 'photo_order', 'photo_clock', 'photo_transition'}:
+    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb', 'photo_fit', 'photo_order', 'photo_clock', 'photo_transition', 'photo_clock_position', 'photo_quality'}:
         raise ValueError('screensaver fields')
     result = {**DEFAULT, 'order': list(DEFAULT['order']), 'off': [], 'more': [], 'items': []}
     if 'show' in value:
@@ -87,7 +87,7 @@ def validate(value):
                 raise ValueError(f'screensaver {name}')
             result[name] = number
     for name, allowed in (('photo_fit', ('fit', 'fill', 'pair')), ('photo_order', ('shuffle', 'filename')),
-                          ('photo_transition', catalogue.PHOTOS['transitions'])):
+                          ('photo_transition', catalogue.PHOTOS['transitions']), ('photo_clock_position', catalogue.PHOTOS['clock_positions']), ('photo_quality', ('native', 'fast', 'small'))):
         if name in value:
             if value[name] not in allowed:
                 raise ValueError(f'screensaver {name}')
@@ -252,8 +252,8 @@ def message(choice, states, pictures, short, media_extras, ground=None, keys=Fal
     if kind == 'photos':
         # The screen knows a camera: the Photos folder is one, named Photos (firmware needs nothing new).
         result = {'op': 'saver', 'k': 'camera', 'e': photos.PHOTOS, 'n': 'Photos'}
-        if any(key in choice for key in ('photo_clock', 'photo_transition', 'photo_seconds')):
-            result.update(pc=choice.get('photo_clock', False), pt=choice.get('photo_transition', 'none'), ps=choice.get('photo_seconds', 30))
+        if any(key in choice for key in ('photo_clock', 'photo_transition', 'photo_seconds', 'photo_clock_position')):
+            result.update(pc=choice.get('photo_clock', False), pt=choice.get('photo_transition', 'none'), ps=choice.get('photo_seconds', 30), pp=choice.get('photo_clock_position', 'bottom_left'))
         return result
     result = {'op': 'saver', 'k': kind}
     if kind == 'clock':

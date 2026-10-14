@@ -40,4 +40,17 @@ load(pattern);const early=frame();tick(7500);assert.notDeepEqual(frame(),early,'
 receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:true,pt:'none',ps:30});m._preview_standby(1);tick();load(bmp(10,10,10));
 const clockFrame=frame();let white=0;for(let i=0;i<clockFrame.length;i+=4) if(clockFrame[i]>150&&clockFrame[i+1]>150&&clockFrame[i+2]>150) white++;assert.ok(white>100,'native clock overlay draws live white text');
 m._preview_standby(0);tick();assert.equal(m.ccall('preview_next_image','string',[],[]),'','closing standby ends photo downloads');
-console.log(`PASS ${options.length} photo transitions, dissolve pixels, clock and wake lifecycle`);
+const anchors=JSON.parse(readFileSync(new URL('../src/model/catalogue.json',import.meta.url))).domains.screen.photos.clock_positions;
+for(const position of anchors){
+ receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:true,pp:position,pt:'none',ps:30});m._preview_standby(1);tick();load(bmp(10,10,10));
+ const pixels=frame();let xs=0,ys=0,count=0;
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(pixels[i]>150&&pixels[i+1]>150&&pixels[i+2]>150){xs+=x;ys+=y;count++;}}
+ assert.ok(count>100,position+' clock visible');const x=xs/count,y=ys/count;
+ if(position.includes('left'))assert.ok(x<w/2,position+' left');
+ if(position.includes('right'))assert.ok(x>w/2,position+' right');
+ if(position.startsWith('top'))assert.ok(y<h/3,position+' top');
+ if(position.startsWith('bottom'))assert.ok(y>h*2/3,position+' bottom');
+ if(position==='center')assert.ok(Math.abs(y-h/2)<h/5,'centre clock');
+ m._preview_standby(0);tick();
+}
+console.log(`PASS ${options.length} photo transitions, dissolve pixels, seven clock anchors and wake lifecycle`);
