@@ -1069,7 +1069,7 @@ class LiveApp(unittest.IsolatedAsyncioTestCase):
             (_, inbox, message), = [entry for entry in ha.log if entry[0] == 'send']
             self.assertEqual((inbox, message['op'], message['t'], message['e']), ('text.d1_tiles', 'camera', 'live', 'camera.max,camera.garden'))
             token = message['u'].rsplit('/', 1)[1][:-4]
-            self.assertEqual(m.camera.links[token].live, (['camera.max', 'camera.garden'], 54, [0xFFFFFF, 0xFADADD], [15, 30], {'compact': False}))
+            self.assertEqual(m.camera.links[token].live, (['camera.max', 'camera.garden'], 54, [0xFFFFFF, 0xFADADD], [15, 30], {'compact': False, 'rle': False}))
             ha.log.clear()
             # A tile that shows its icon, a camera off the layout, a screen on older firmware, a CYD: no strip.
             for request in ({'inbox': 'text.d1_tiles', 'tiles': 'camera.max,camera.shed', 'size': '54', 'bg': 'FFFFFF,FFFFFF'},

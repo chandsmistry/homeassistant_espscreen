@@ -192,6 +192,7 @@ class HomeAssistant:
         self.online = False
         self.changed = asyncio.Event()
         self.pd_changed = asyncio.Event()
+        self.pd_changes = 0  # how many PD sensor changes there have been (PD timing logs)
         self.state_events = preview_events.Changes()
         # Entity ids the manager cares about; None wakes it for every state change.
         self.relevant = None
@@ -299,6 +300,7 @@ class HomeAssistant:
                     else:
                         self.states.pop(eid, None)
                     if eid in pd_cards.WATCH:
+                        self.pd_changes += 1
                         self.pd_changed.set()
                     # Unsaved/virtual previews also follow entities not used by a physical screen.
                     self.state_events.notify(eid)
@@ -951,6 +953,7 @@ class Manager:
                                              else self.ha.camera_image(entity),
                                              fetch_cover=lambda entity: self.ha.media_image(self.followed(entity)),
                                              picture=lambda entity: self.ha.media_picture(self.followed(entity)))
+        self.camera.changes = lambda: getattr(self.ha, 'pd_changes', 0)
         self.alert_cameras = {}
         # A camera live, full screen, on a P4 (live_feed.py): its links and the sources behind them, on the camera port.
         self.live = live_feed.LiveFeed(lambda entity: self.ha.camera_image(entity), lambda: self.ha.websocket(),

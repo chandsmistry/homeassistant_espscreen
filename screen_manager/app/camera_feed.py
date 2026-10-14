@@ -489,10 +489,11 @@ class Watch:
 
 
 class Link:
-    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared')
+    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared', 'issued', 'changes')
 
     def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None, prepared=None):
         self.entity, self.box, self.used = entity, box, now
+        self.issued, self.changes = now, None  # when the link was made, and the PD sensor change count then (timing logs)
         self.prepared = prepared  # (etag, bytes) pinned when the link is issued; GET never renders again
         self.still = still
         self.cover = cover  # (size, background) of a media player's cover, else None
@@ -511,6 +512,7 @@ class CameraFeed:
         self.fetch_cover, self.picture = fetch_cover, picture
         self.watches, self.links = {}, {}
         self.strips = {}
+        self.changes = None  # a callable giving how many PD sensor changes there have been, for the PD timing logs
 
     # ----- fetching -----
     # A camera is fetched in the screen's own rhythm: a load sets the next fetch for just before the next load (ahead),
@@ -866,6 +868,8 @@ class CameraFeed:
         self.prune()
         token = secrets.token_urlsafe(18)
         self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver, prepared)
+        if prepared is not None and self.changes:
+            self.links[token].changes = self.changes()
         return token
 
     async def serve(self, token, etag=None):
@@ -875,9 +879,12 @@ class CameraFeed:
         if link is None or now - link.used > link.lifetime:
             self.links.pop(token, None)
             return 404, None, ''
+        age = (now - link.issued) * 1000
         link.used = now
         if link.prepared is not None:
-            LOG.info('pd_cards GET cache_hit=true bytes=%d render_ms=0', len(link.prepared[1]))
+            since = (self.changes() - link.changes) if self.changes and link.changes is not None else -1
+            LOG.info('pd_cards GET cache_hit=true bytes=%d render_ms=0 link_age_ms=%.0f sensor_changes_since_link=%d',
+                     len(link.prepared[1]), age, since)
             return 200, link.prepared[1], link.prepared[0]
         if link.still:
             return (304, None, link.etag) if etag == link.etag else (200, link.still, link.etag)
@@ -915,12 +922,18 @@ def web_app(feed, live=None):
             response = web.StreamResponse(headers={**headers, 'Content-Type': CONTENT_TYPE, 'Content-Length': str(len(body))})
             await response.prepare(request)
             first_byte_ms = (time.monotonic()-started)*1000
+            outcome = 'cancelled'
             try:
                 await response.write(body)
                 await response.write_eof()
+                outcome = 'sent'
+            except ConnectionError:
+                outcome = 'connection_reset'
+                raise
             finally:
-                LOG.info('pd_cards HTTP first_byte_ms=%.1f response_ms=%.1f bytes=%d',
-                         first_byte_ms, (time.monotonic()-started)*1000, len(body))
+                # Sent means the add-on handed over every byte; the panel's decoding is not seen from here.
+                LOG.info('pd_cards HTTP outcome=%s first_byte_ms=%.1f response_ms=%.1f bytes=%d',
+                         outcome, first_byte_ms, (time.monotonic()-started)*1000, len(body))
             return response
         if status == 200:
             return web.Response(body=body, content_type=CONTENT_TYPE, headers=headers)

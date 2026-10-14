@@ -38,4 +38,16 @@ class PdPictures(unittest.IsolatedAsyncioTestCase):
         clock[0] = camera_feed.LINK_SECONDS + 1
         self.assertEqual((await feed.serve(token))[0], 404)
 
+    async def test_timing_log_counts_sensor_changes_since_the_link(self):
+        async def fetch(entity): return None
+        clock, changes = [0], [3]
+        feed = camera_feed.CameraFeed(fetch, clock=lambda: clock[0])
+        feed.changes = lambda: changes[0]
+        token = feed.link('screen.pd_header', (40, 40), prepared=('tag', b'pixels'))
+        clock[0], changes[0] = 2.5, 7
+        with self.assertLogs(camera_feed.LOG, 'INFO') as logs:
+            await feed.serve(token)
+        self.assertIn('link_age_ms=2500', logs.output[0])
+        self.assertIn('sensor_changes_since_link=4', logs.output[0])
+
 if __name__ == '__main__': unittest.main()
