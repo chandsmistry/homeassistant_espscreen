@@ -3354,7 +3354,9 @@ class Manager:
             found = await self.camera.live(entities, size, grounds, paces, **extra)
             if found:
                 listing = ','.join(found[2])
-                token = self.camera.link(listing, atlas[:2] if atlas else (size, size), live=(entities, size, grounds, paces, extra))
+                token = self.camera.link(listing, atlas[:2] if atlas else (size, size),
+                    prepared=found[:2] if all(pd_cards.is_tile(e) for e in entities) else None,
+                    live=None if all(pd_cards.is_tile(e) for e in entities) else (entities, size, grounds, paces, extra))
                 url = f'{base}/camera/{token}.bmp'
         else:
             LOG.warning('Live pictures: no address for this app on the LAN; set SCREEN_CAMERA_URL')
@@ -3480,11 +3482,12 @@ class Manager:
 
     def pd_render(self, tile, dark):
         """(mark, draw) of one PD card (pd_cards.py, Library → Screen), drawn at the size the screen asks for."""
-        mark = lambda: pd_cards.fingerprint(tile, self.ha.states) + ('d' if dark else 'l')
+        states = dict(self.ha.states)  # mark and pixels must describe the same immutable sensor snapshot
+        mark = lambda: pd_cards.fingerprint(tile, states) + ('d' if dark else 'l')
 
         async def draw(width, height):
             return await asyncio.get_running_loop().run_in_executor(
-                None, lambda: pd_cards.render_tile(tile, dict(self.ha.states), (width, height), dark))
+                None, lambda: pd_cards.render_tile(tile, states, (width, height), dark))
         return mark, draw
 
     def map_render(self, tile, shape, dark, full=False, focus=None, move=None):
@@ -4533,7 +4536,7 @@ def create_app(manager, development=False):
                        'revision': 'addon.errors.feedback.invalid', 'action': 'addon.errors.invalid_input'}
     async def feedback_start(app):
         manager.feedback.start()
-        app['pd_cards'] = asyncio.ensure_future(pd_cards.keep_drawn(manager.ha)) if Path('/config').is_dir() else None
+        app['pd_cards'] = asyncio.ensure_future(pd_cards.keep_drawn(manager.ha)) if os.environ.get('SCREEN_PD_PNG_EXPORT') == '1' and Path('/config').is_dir() else None
     app.on_startup.append(feedback_start)
     async def feedback_action(request):
         """The owner's choice on the feedback card: answer, later, never, cancel, retry or delete. The page names the

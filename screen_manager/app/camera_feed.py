@@ -489,10 +489,11 @@ class Watch:
 
 
 class Link:
-    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver')
+    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared')
 
-    def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None):
+    def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None, prepared=None):
         self.entity, self.box, self.used = entity, box, now
+        self.prepared = prepared  # (etag, bytes) pinned when the link is issued; GET never renders again
         self.still = still
         self.cover = cover  # (size, background) of a media player's cover, else None
         self.live = live    # (entities, size, grounds, paces[, {atlas, modes, compact}]) of a page's live tiles, else None
@@ -674,6 +675,9 @@ class CameraFeed:
         `mark()` names what it would draw right now and stands where a camera's digest stands, `draw(width, height)` is
         an awaitable of that picture at exactly its frame's size. The mark is asked on every load, so a link loaded
         again after someone moved draws where they are then."""
+        measured = all(e.startswith('screen.pd_') for e in entities)
+        started = time.monotonic()
+        render_ms = encode_ms = 0.0
         renders = renders or [None] * len(entities)
         marks = [render[0]() if render else None for render in renders]
         raws = await asyncio.gather(*(self.live_one(entity, pace, wait) if not render else asyncio.sleep(0)
@@ -695,16 +699,22 @@ class CameraFeed:
                     if render:
                         width, height = (frames[n][2], frames[n][3]) if n < len(frames) else (size, size)
                         raws[n] = await render[1](width, height)
+                render_ms = (time.monotonic() - started) * 1000
+                encoded_at = time.monotonic()
                 image = await asyncio.get_running_loop().run_in_executor(None, tile_art.encode, raws, grounds, atlas, modes, compact, rle) if atlas else await asyncio.get_running_loop().run_in_executor(None, encode_live, raws, size, grounds, compact)
             except Exception as error:
                 LOG.info('The live pictures of %s cannot be read (%s)', ', '.join(entities), type(error).__name__)
                 return None
+            encode_ms = (time.monotonic() - encoded_at) * 1000
             # A map drawn while some of its streets did not come is not kept: the next load asks for them again.
             if not any(getattr(raw, 'info', {}).get('provisional') for raw, render in zip(raws, renders) if render):
                 self.keep_strip(place, key, image)
         else:
             image = cached
             self.keep_strip(place, key, image)
+        if measured:
+            LOG.info('pd_cards prepare entities=%s cache_hit=%s render_ms=%.1f encode_ms=%.1f total_ms=%.1f bytes=%d',
+                     ','.join(entities), cached is not None, render_ms, encode_ms, (time.monotonic()-started)*1000, len(image))
         return tag, image, [entity if raw is not None or render else '' for entity, raw, render in zip(entities, raws, renders)]
 
     def keep_strip(self, place, key, image):
@@ -850,12 +860,12 @@ class CameraFeed:
         while len(self.links) >= MAX_LINKS:
             del self.links[min(self.links, key=lambda token: self.links[token].used)]
 
-    def link(self, entity, box, still=None, cover=None, live=None, saver=None):
+    def link(self, entity, box, still=None, cover=None, live=None, saver=None, prepared=None):
         """A new random token for one camera at one size; `still` makes it one fixed image (an alert's), `cover`
         (size, background) a media player's cover, `live` (entities, size, grounds, paces) a page's live tiles."""
         self.prune()
         token = secrets.token_urlsafe(18)
-        self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver)
+        self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver, prepared)
         return token
 
     async def serve(self, token, etag=None):
@@ -866,6 +876,9 @@ class CameraFeed:
             self.links.pop(token, None)
             return 404, None, ''
         link.used = now
+        if link.prepared is not None:
+            LOG.info('pd_cards GET cache_hit=true bytes=%d render_ms=0', len(link.prepared[1]))
+            return 200, link.prepared[1], link.prepared[0]
         if link.still:
             return (304, None, link.etag) if etag == link.etag else (200, link.still, link.etag)
         if link.live:
@@ -891,10 +904,24 @@ def web_app(feed, live=None):
     from aiohttp import web
 
     async def image(request):
+        started = time.monotonic()
+        link = feed.links.get(request.match_info['token'])
+        prepared = link is not None and link.prepared is not None
         status, body, etag = await feed.serve(request.match_info['token'], request.headers.get('If-None-Match'))
         # Last-Modified with every picture: online_image warns at every load about a missing one (it never sends
         # If-Modified-Since on its own; only the ETag decides a 304 here).
         headers = {'Cache-Control': 'no-cache', 'Last-Modified': formatdate(usegmt=True), **({'ETag': etag} if etag else {})}
+        if status == 200 and prepared:
+            response = web.StreamResponse(headers={**headers, 'Content-Type': CONTENT_TYPE, 'Content-Length': str(len(body))})
+            await response.prepare(request)
+            first_byte_ms = (time.monotonic()-started)*1000
+            try:
+                await response.write(body)
+                await response.write_eof()
+            finally:
+                LOG.info('pd_cards HTTP first_byte_ms=%.1f response_ms=%.1f bytes=%d',
+                         first_byte_ms, (time.monotonic()-started)*1000, len(body))
+            return response
         if status == 200:
             return web.Response(body=body, content_type=CONTENT_TYPE, headers=headers)
         if status == 304:

@@ -1,5 +1,8 @@
 ## Unreleased
 
+- **PD picture caching.** Each download link pins the already-rendered image, avoiding a second render after sensor changes. Add-on preparation and HTTP timings are logged. Legacy PNG export is opt-in via SCREEN_PD_PNG_EXPORT=1.
+- **Picture-card resizing.** Resizing PD, Map or Energy cards no longer adds unsupported controls that blocked saving.
+
 - **Faster PD cards.** Lossless RLE8 picture transfer for the header and combined batteries, negotiated by updated firmware; older screens keep plain BMPs. Layout and picture resolution are unchanged.
 
 - **PD Battery Allocations card.** A single picture card stacks all four battery panels, including eligibility, connection pills, charge state and three bars, like the dashboard's battery management card.

@@ -154,3 +154,16 @@ it("frees a plugin's tile that got controls before when it is resized (GitHub #2
   expect(tile().options?.size).toBe('wide');
   expect(tile().options?.controls).toBeUndefined();
 });
+
+for (const name of ['pd_header', 'pd_batteries', 'map'] as const) {
+  it(`resizes ${name} without introducing or retaining unsupported controls`, () => {
+    useInventoryStore().inventory.editor_features = { tall_tiles: true };
+    doc.document!.pages[0].tiles[0].content = { kind: 'builtin', name } as never;
+    doc.document!.pages[0].tiles[0].appearance.display = 'map';
+    doc.document!.pages[0].tiles[0].interaction = { controls: 'none' } as never;
+    expect(resizeTile(tile(), 'wide', 'columns')).toBe(true);
+    expect(resizeTile(tile(), 'square', 'rows')).toBe(true);
+    expect(tile().options?.controls).toBeUndefined();
+    expect(tile().options?.inline).toBeUndefined();
+  });
+}
