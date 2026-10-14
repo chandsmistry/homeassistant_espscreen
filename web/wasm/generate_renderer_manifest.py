@@ -9,7 +9,7 @@ import sys
 root = Path(next((arg for arg in sys.argv[1:] if not arg.startswith('--')), Path(__file__).resolve().parents[2])).resolve()
 files = [root / "components/smart_display/runtime_tiles.h", root / "components/smart_display/renderer_host_api.h",
          root / "components/smart_display/page_receiver.cpp", root / "components/smart_display/media_library.cpp",
-         root / "components/smart_display/energy_view.cpp",
+         root / "components/smart_display/energy_view.cpp", root / "components/smart_display/pd_view.cpp",
          root / "components/smart_display/plugin_host.cpp",
          root / "components/smart_display/screen_hooks.cpp"]
 seen = set()
