@@ -420,7 +420,7 @@ std::string receive(const std::string &payload) {
         bool known = false;
         for (const auto *option : tile_catalogue::photos::TRANSITIONS) if (next.photo_transition == option) known = true;
         if (!known) next.photo_transition = "none";
-        next.photo_seconds = root["ps"].is<int>() ? std::clamp(root["ps"].as<int>(), 15, 3600) : 30;
+        next.photo_seconds = root["ps"].is<int>() ? std::clamp(root["ps"].as<int>(), 5, 3600) : 30;
       }
       if (next.kind == "media") {
         auto extra = root["x"];

@@ -98,6 +98,18 @@ class PhotoShowTests(unittest.IsolatedAsyncioTestCase):
         packed=self.show.render((str(path),),(160,80),'fit',True)[0]
         self.assertLess(len(packed),len(plain))
         self.assertEqual(Image.open(io.BytesIO(plain)).convert('RGB').tobytes(),Image.open(io.BytesIO(packed)).convert('RGB').tobytes())
+    async def test_short_photo_intervals_advance(self):
+        self.make('a.png',(40,80),'red');self.make('b.png',(40,80),'blue')
+        for seconds in (5,10):
+            show=photos.PhotoShow(self.temp.name,clock=lambda:self.now)
+            settings={'photo_order':'filename','photo_seconds':seconds}
+            self.assertEqual(screen_saver.validate(settings)['photo_seconds'],seconds)
+            first=await show.frame(settings,(160,80))
+            self.now+=seconds-1;self.assertEqual(await show.frame(settings,(160,80)),first)
+            self.now+=1;self.assertNotEqual(await show.frame(settings,(160,80)),first)
+            if show.prefetch:await show.prefetch
+        with self.assertRaises(ValueError):screen_saver.validate({'photo_seconds':4})
+
     def test_photo_preferences_survive_disk_reload(self):
         path=Path(self.temp.name)/'screensavers.json'
         choices={'photo_fit':'fit','photo_order':'filename','photo_quality':'fast','photo_seconds':15,'photo_mb':4,

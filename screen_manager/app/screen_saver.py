@@ -53,7 +53,7 @@ PICTURE_KINDS = frozenset(('media', 'camera'))
 DEFAULT = {'show': False, 'media': '', 'camera': '', 'order': list(KINDS), 'off': [], 'weather': 'auto', 'more': [],
            'items': []}
 # Kept only when a choice sets them (an older choice and its saved file stay as they were); read with their defaults.
-PHOTO_SECONDS = (15, 3600, 30)
+PHOTO_SECONDS = (5, 3600, 30)
 PHOTO_MB = (1, 50, 8)
 ITEMS_MAX = 4
 MORE_PLAYERS = 3

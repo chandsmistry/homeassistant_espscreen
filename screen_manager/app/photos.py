@@ -27,7 +27,7 @@ MAX_DEPTH = 3         # folders inside the folder are read, this deep
 MAX_EDGE = 1920       # the long side a photo is cut to, whatever the glass
 MAX_PIXELS = 100_000_000  # a picture larger than this is skipped unread (a decompression bomb)
 RESCAN_SECONDS = 60
-SECONDS = (15, 3600, 30)  # the shortest, the longest and the default time one photo stays
+SECONDS = (5, 3600, 30)  # the shortest, the longest and the default time one photo stays
 MEGABYTES = (1, 50, 8)    # the smallest, the largest and the default size of a file that is used
 
 

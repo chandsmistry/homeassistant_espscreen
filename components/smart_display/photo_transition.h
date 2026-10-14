@@ -123,7 +123,7 @@ inline void start(lv_obj_t *parent, const lv_image_dsc_t *src, const std::string
   lv_obj_add_event_cb(overlay,draw,LV_EVENT_DRAW_MAIN,nullptr);
   lv_anim_t a;lv_anim_init(&a);lv_anim_set_var(&a,overlay);lv_anim_set_values(&a,0,1000);
   bool motion=effect=="zoom_in"||effect=="zoom_out"||effect=="pan_left"||effect=="pan_right";
-  lv_anim_set_duration(&a,motion?std::clamp(seconds,15,3600)*1000:900);
+  lv_anim_set_duration(&a,motion?std::clamp(seconds,5,3600)*1000:900);
   lv_anim_set_exec_cb(&a,[](void *obj,int32_t value){progress=value;lv_obj_invalidate(static_cast<lv_obj_t *>(obj));});
   lv_anim_set_completed_cb(&a,[](lv_anim_t *){
     // Keep the final zoom/pan position until the next photo, avoiding a snap back to the unzoomed image.

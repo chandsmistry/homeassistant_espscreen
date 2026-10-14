@@ -21,7 +21,7 @@ export const SAVER_MIN_FIRMWARE = "0.29.0";
 export const SAVER_ICONS: Record<SaverKind, string> = { media: "F075A", camera: "F07AE", photos: "F02F9", clock: "F0150" };
 export const MAX_PLAYERS = 4;
 // The Photos step (add-on photos.py): the pictures in /media/screensaver, shown one after the other.
-export const PHOTO_SECONDS = [15, 30, 60, 120, 300];
+export const PHOTO_SECONDS = [5, 10, 15, 30, 60, 120, 300];
 export const PHOTO_MB = [2, 4, 8, 16, 32];
 // The clock's row of entities: the top bar's entity items, shown by their state, their icon or both, in the drawer the top
 // bar uses. At most four, in the order they stand on the glass after the temperature.

@@ -33,6 +33,13 @@ for(const name of options){
  if(process.env.PHOTO_RENDER_OUT&&name==='fade')writeFileSync(process.env.PHOTO_RENDER_OUT+'.rgba',middle);
  m._preview_standby(0);tick();
 }
+// The actual receiver and loader must retain short intervals instead of clamping to 15 seconds.
+for(const seconds of [5,10]){
+ m._preview_standby(0);receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:false,pt:'none',ps:seconds});
+ m._preview_standby(1);tick();load(bmp(255,0,0));const firstAt=ms;
+ load(bmp(0,0,255));assert.ok(ms-firstAt<=seconds*1000+2000,`${seconds}s receiver/loader interval retained`);
+ m._preview_standby(0);tick();
+}
 // A patterned image must visibly move during a slow zoom, rather than merely switch colour.
 receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:false,pt:'zoom_in',ps:15});m._preview_standby(1);tick();load(bmp(255,0,0));
 const pattern=bmp(0,0,255);for(let y=0;y<h;y++)for(let x=0;x<w;x++)if((Math.floor(x/24)+Math.floor(y/24))%2){const pos=54+(y*w+x)*3;pattern[pos]=40;pattern[pos+1]=180;pattern[pos+2]=40;}

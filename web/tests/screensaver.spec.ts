@@ -155,6 +155,9 @@ describe("a step in the drawer", () => {
 });
 
 describe("Photos preferences on the real save path", () => {
+  it("offers five and ten second photo intervals", () => {
+    expect(useScreensaverStore().secondsChoices.map(choice=>choice[0])).toEqual([5,10,15,30,60,120,300]);
+  });
   it("sends all photo fields and retains them after inventory refresh and a later step edit", async () => {
     const screen=useScreenStore().currentScreen!;screen.virtual=false;
     const choices={photo_fit:"fit" as const,photo_order:"filename" as const,photo_quality:"fast",photo_seconds:15,photo_mb:4,

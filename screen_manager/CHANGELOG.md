@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **Short Photos intervals.** Add 5- and 10-second choices and accept them in validation, firmware playback and zoom/pan durations. Existing preferences and the 30-second default remain unchanged. Actual photo replacement still waits for download completion.
+
 - **Photos preferences save.** Send Fit/Fill/pair, order, image detail, timing, file limit, clock, clock position and transition through the real settings API so inventory refresh and later edits retain them. Real-save and disk-reload regression tests cover persistence.
 
 - **Photos playback correction.** A stable slideshow link resolves the current prepared frame at each request. Matching ETags keep the cached image only until its interval expires, then the next prepared photo is returned. Fixed-image PD links remain pinned.
