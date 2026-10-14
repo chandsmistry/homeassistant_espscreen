@@ -159,7 +159,8 @@ static void draw(lv_event_t *event) {
     auto *f=face(value,view->width,view->height/3);text(layer,a.x1,a.y1+(view->height-line_height(f))/2,view->width,value,f,theme::color(theme::MUTED));return;
   }
   if(view->header){header(layer,*view,a.x1,a.y1);return;}
-  const auto &d=*view->data;const int pad=std::max(6,std::min(view->width,view->height)/30),gap=std::max(5,pad);
+  // The tile already supplies equal outer padding. Do not add a second inset.
+  const auto &d=*view->data;const int pad=0,gap=std::max(5,view->width/40);
   const int title=0; // No heading inside the approved allocations card.
   const int foot=d.footer.empty()?0:line_height(rt::small_font)+gap;
   if(title)text(layer,a.x1+pad,a.y1+pad,view->width-2*pad,"Battery Allocations",rt::small_font,theme::color(theme::INK),false);
