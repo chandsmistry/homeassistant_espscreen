@@ -241,7 +241,7 @@ const char *preview_layout() {
       lv_point_t one, wrapped;
       lv_text_get_size(&one, text, font, letters, lines, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
       lv_text_get_size(&wrapped, text, font, letters, lines, width, LV_TEXT_FLAG_NONE);
-      o["type"] = "label"; o["text"] = text;
+      o["type"] = "label"; o["text"] = text; o["address"] = reinterpret_cast<uintptr_t>(object);
       o["mode"] = mode == LV_LABEL_LONG_DOT ? "dots" : mode == LV_LABEL_LONG_SCROLL_CIRCULAR || mode == LV_LABEL_LONG_SCROLL ? "marquee"
                 : mode == LV_LABEL_LONG_CLIP ? "clip" : "wrap";
       o["text_width"] = one.x; o["text_height"] = one.y; o["wrapped_height"] = wrapped.y;
@@ -257,6 +257,7 @@ const char *preview_layout() {
     for (uint32_t i = 0; i < lv_obj_get_child_count(object); ++i) walk(lv_obj_get_child(object, i), id, card);
   };
   walk(lv_screen_active(), -1, -1);
+  if (runtime_tiles::saver_camera && runtime_tiles::camera_root) walk(runtime_tiles::camera_root, -1, -1);
   diagnostics.clear(); serializeJson(doc, diagnostics);
   return diagnostics.c_str();
 }

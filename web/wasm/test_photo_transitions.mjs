@@ -45,6 +45,14 @@ receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:false,
 const pattern=bmp(0,0,255);for(let y=0;y<h;y++)for(let x=0;x<w;x++)if((Math.floor(x/24)+Math.floor(y/24))%2){const pos=54+(y*w+x)*3;pattern[pos]=40;pattern[pos+1]=180;pattern[pos+2]=40;}
 load(pattern);const early=frame();tick(7500);assert.notDeepEqual(frame(),early,'slow zoom transforms patterned pixels');m._preview_standby(0);tick();
 receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:true,pt:'none',ps:30});m._preview_standby(1);tick();load(bmp(10,10,10));
+const clockObjects=()=>JSON.parse(m.ccall('preview_layout','string',[],[])).objects.filter(o=>o.type==='label');
+const clockLabel=()=>clockObjects().findLast(o=>/^\d{1,2}:\d{2}$/.test(o.text));
+const originalClock=clockLabel();assert.ok(originalClock,'time-only clock visible');
+assert.ok(!clockObjects().some(o=>/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/.test(o.text)),'photo overlay has no full date');
+for(let i=0;i<3;i++){tick(1000);assert.equal(clockLabel().address,originalClock.address,'clock object retained between ticks');}
+m._preview_time(ms+1000,1789401900,0);m._preview_render();
+assert.equal(clockLabel().address,originalClock.address,'minute update retains clock object');
+assert.notEqual(clockLabel().text,originalClock.text,'minute update changes time text');
 const clockFrame=frame();let white=0;for(let i=0;i<clockFrame.length;i+=4) if(clockFrame[i]>150&&clockFrame[i+1]>150&&clockFrame[i+2]>150) white++;assert.ok(white>100,'native clock overlay draws live white text');
 m._preview_standby(0);tick();assert.equal(m.ccall('preview_next_image','string',[],[]),'','closing standby ends photo downloads');
 const anchors=JSON.parse(readFileSync(new URL('../src/model/catalogue.json',import.meta.url))).domains.screen.photos.clock_positions;

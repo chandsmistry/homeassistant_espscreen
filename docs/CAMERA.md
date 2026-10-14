@@ -436,3 +436,5 @@ Photos preview images use same-origin URLs allowed by the existing security poli
 The clock has seven anchors: top left, top centre, top right, centre, bottom left, bottom centre and bottom right. Vertical positioning and horizontal alignment use the existing safe margin; the default remains bottom left. Firmware advertising photo_clock_position accepts the chosen anchor. The preview reflects it. These controls do not change page layout or Home Assistant actions.
 
 Show each photo for offers 5, 10, 15, 30, 60, 120 and 300 seconds. Matching firmware accepts the shorter intervals, including slow motion effects. A photo that is still downloading delays replacement beyond the selected interval; the previous photo stays visible.
+
+The Photos clock overlay shows the time only, matching its editor preview. Its native label is retained between updates; the minute changes its text without rebuilding the overlay. The separate Clock screensaver and media captions keep their existing date and text behaviour.
