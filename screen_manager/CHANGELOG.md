@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **Photos preferences save.** Send Fit/Fill/pair, order, image detail, timing, file limit, clock, clock position and transition through the real settings API so inventory refresh and later edits retain them. Real-save and disk-reload regression tests cover persistence.
+
 - **Photos playback correction.** A stable slideshow link resolves the current prepared frame at each request. Matching ETags keep the cached image only until its interval expires, then the next prepared photo is returned. Fixed-image PD links remain pinned.
 
 - **Photos preview correction.** Same-origin preview URLs work with the existing image security policy; no blob allowance or broader policy is needed.

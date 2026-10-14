@@ -153,3 +153,23 @@ describe("a step in the drawer", () => {
     expect(insp.inspector).toBeNull();
   });
 });
+
+describe("Photos preferences on the real save path", () => {
+  it("sends all photo fields and retains them after inventory refresh and a later step edit", async () => {
+    const screen=useScreenStore().currentScreen!;screen.virtual=false;
+    const choices={photo_fit:"fit" as const,photo_order:"filename" as const,photo_quality:"fast",photo_seconds:15,photo_mb:4,
+      photo_clock:true,photo_clock_position:"top_right",photo_transition:"fade"};
+    let stored:Record<string,unknown>={};
+    const request=vi.fn(async (_url:string,options:RequestInit)=>{
+      stored=JSON.parse(String(options.body)).screensaver;
+      return new Response(JSON.stringify({screensaver:stored}),{status:200});
+    });vi.stubGlobal("fetch",request);
+    await useScreenStore().setScreensaver(screen,choices);
+    expect(stored).toMatchObject(choices);
+    expect(stored).not.toHaveProperty("ready");expect(stored).not.toHaveProperty("photo_effects");
+    screen.screensaver=saver(stored);
+    expect(screen.screensaver).toMatchObject(choices);
+    await useScreenStore().setScreensaver(screen,{off:["media","camera","clock"]});
+    expect(stored).toMatchObject(choices);expect(request).toHaveBeenCalledTimes(2);
+  });
+});

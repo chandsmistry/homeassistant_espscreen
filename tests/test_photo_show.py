@@ -98,6 +98,14 @@ class PhotoShowTests(unittest.IsolatedAsyncioTestCase):
         packed=self.show.render((str(path),),(160,80),'fit',True)[0]
         self.assertLess(len(packed),len(plain))
         self.assertEqual(Image.open(io.BytesIO(plain)).convert('RGB').tobytes(),Image.open(io.BytesIO(packed)).convert('RGB').tobytes())
+    def test_photo_preferences_survive_disk_reload(self):
+        path=Path(self.temp.name)/'screensavers.json'
+        choices={'photo_fit':'fit','photo_order':'filename','photo_quality':'fast','photo_seconds':15,'photo_mb':4,
+                 'photo_clock':True,'photo_clock_position':'top_right','photo_transition':'fade'}
+        screen_saver.ScreenSavers(path).set('test-device',choices)
+        restored=screen_saver.ScreenSavers(path).get('test-device')
+        for key,value in choices.items():self.assertEqual(restored[key],value)
+
     def test_validation_and_old_defaults(self):
         self.assertNotIn('photo_transition',screen_saver.validate({}))
         for name in ('none','fade','wipe_left','slide_up','zoom_in','pan_right','diamond','checker','spiral','blocks','blinds','random'):
