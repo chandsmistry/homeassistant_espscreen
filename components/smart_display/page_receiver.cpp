@@ -951,7 +951,7 @@ std::string receive(const std::string &payload) {
     // A map card's movement mark (app 0.4.33): a hash, never a place. A changed mark is a changed picture.
     next.map_mark = string(extra["mk"], 16);
     if (tile.is_pd()) {
-      next.pd_mode = string(extra["pm"], 48);
+      tile.state = string(extra["pm"], 48);
       if (extra["po"].is<JsonArray>()) for (JsonVariant option : extra["po"].as<JsonArray>()) {
         if (next.options.size() == 16) break;
         next.options.push_back(string(option, 48));

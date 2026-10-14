@@ -2406,6 +2406,10 @@
           "dots": "Mozgó pontok",
           "lines": "Vonalak és nyilak"
         }
+      },
+      "pd": {
+        "name": "Energiaelosztás",
+        "hint": "Élő energiaelosztási adatok. Az érintési művelet alább állítható be."
       }
     },
     "tile_card": {

@@ -31,7 +31,7 @@ VERSION = re.compile(r'^\d+\.\d+\.\d+$')
 FIRST_TYPES = frozenset('alarm_control_panel automation binary_sensor button camera climate cover fan image input_boolean input_button '
                         'input_number input_select light lock media_player number person scene screen script select sensor sun switch '
                         'timer vacuum weather'.split())
-TOP = {'domain', 'firmware', 'displays', 'controls', 'inline', 'toggle', 'taps', 'guards', 'picture', 'map', 'key', 'keypad', 'memory', 'cards', 'favorite', 'energy'}
+TOP = {'domain', 'firmware', 'displays', 'controls', 'inline', 'toggle', 'taps', 'guards', 'picture', 'map', 'key', 'keypad', 'memory', 'cards', 'favorite', 'energy', 'pd'}
 # What one tile of a type keeps in the memory inside a screen's chip (firmware 0.34.0+, docs/TILE_MEMORY.md): `bytes`
 # measured on a board with PSRAM, `extras` whether it keeps a block of extras. Every type says it, so a new one cannot
 # leave the screen's memory budget guessing; the most a tile may keep is a sanity bound, not a rule.
@@ -238,6 +238,18 @@ def normalise(tile, types, translations, facts, commands=None):
             check_keys(f'{where} energy', energy, {'flow'})
             if domain != 'screen' or 'energy' not in cards_of(data):
                 fail(where, 'energy options belong to the screen\'s energy card')
+        pd = data.get('pd')
+        if pd is not None:
+            check_keys(f'{where} pd', pd, {'entities', 'taps', 'action', 'action_name', 'action_description', 'entity_field',
+                                          'selector_domains', 'legacy_target', 'selector_feature', 'native_feature'})
+            if domain != 'screen' or not isinstance(pd['entities'], list) or not pd['entities'] or \
+                    any(not re.fullmatch(r'screen\.pd_[a-z0-9_]+', e) for e in pd['entities']) or \
+                    set(pd['taps']) != {'action', 'none'} or not re.fullmatch(r'screen\.[a-z0-9_]+', pd['action']) or \
+                    not re.fullmatch(r'[a-z_]+', pd['entity_field']) or \
+                    any(d not in ('select', 'input_select') for d in pd['selector_domains']) or \
+                    pd['legacy_target'].split('.')[0] not in pd['selector_domains'] or \
+                    any(not re.fullmatch(r'[a-z][a-z0-9_]{0,15}', pd[k]) for k in ('selector_feature', 'native_feature')):
+                fail(f'{where} pd', 'invalid PD entities, taps or selector action')
         memory = data.get('memory')
         if memory is None:
             fail(where, 'says what one tile of it keeps in the memory inside the chip (memory: {bytes: N, extras: true or '
@@ -274,6 +286,7 @@ def normalise(tile, types, translations, facts, commands=None):
             **({'favorite': [option(f'{where} favorite {key}', domain, key, value, favorite) for key, value in favorite.items()]}
                if favorite else {}),
             **({'energy': energy} if energy else {}),
+            **({'pd': pd} if pd else {}),
         }
     check_keys('catalogue/_tile.yaml', tile, {'taps', 'sizes', 'history_hours', 'memory'})
     choice = tile.get('memory')
@@ -308,7 +321,15 @@ def header(catalogue):
               'inline constexpr Memory CARDS[] = {' + ', '.join(
                   f'{{"{e}", {price["bytes"]}, {"true" if price["extras"] else "false"}}}'
                   for data in catalogue['domains'].values() for e, price in data.get('cards', {}).items()) + '};', '']
-    keywords = {'switch', 'case', 'default', 'delete', 'new', 'register', 'template', 'this', 'union', 'volatile'}
+    pd = catalogue['domains']['screen'].get('pd')
+    if pd:
+        lines += ['namespace pd {', 'inline constexpr const char *ENTITIES[] = {' + ', '.join(json.dumps(e) for e in pd['entities']) + '};']
+        for key in ('action', 'entity_field', 'legacy_target', 'selector_feature', 'native_feature'):
+            lines.append(f'inline constexpr const char *{key.upper()} = {json.dumps(pd[key])};')
+        lines += ['inline constexpr const char *OPEN_TAP = "action";',
+                  'inline constexpr const char *SELECTOR_DOMAINS[] = {' + ', '.join(json.dumps(e) for e in pd['selector_domains']) + '};',
+                  '}  // namespace pd', '']
+    keywords = {'switch' , 'case', 'default', 'delete', 'new', 'register', 'template', 'this', 'union', 'volatile'}
     for domain, data in catalogue['domains'].items():
         if not data['features']:
             continue

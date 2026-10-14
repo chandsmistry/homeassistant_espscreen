@@ -2319,7 +2319,7 @@ class Manager:
         # A map (app 0.4.33) is drawn from everyone on it and the zones around them: a move or a zone's edit reaches
         # its movement mark only through this.
         if pd_cards.is_tile(tile['entity']):
-            return tuple(e for e in pd_cards.WATCH if e != tile['entity'])
+            return tuple(set(pd_cards.WATCH) | {catalogue.selector_target(tile)} - {None, tile['entity']})
         if (tile.get('options') or {}).get('display') == 'map':
             # The map tile following everyone reads every person and tracker: one that gets a place joins the map.
             everyone = tile['entity'] == map_card.MAP_TILE and map_card.options_of(tile)['follow'] == 'everyone'
@@ -2469,6 +2469,10 @@ class Manager:
         for tile in self.layouts.get(inbox, {}).get('tiles', []):
             before.setdefault(tile['entity'], []).append(tile)
         for tile in layout['tiles']:
+            if pd_cards.is_tile(tile['entity']):
+                target = catalogue.selector_target(tile)
+                if target and target != catalogue.PD['legacy_target'] and catalogue.PD['selector_feature'] not in (getattr(self.page_senders.get(inbox), 'features', set()) or set()):
+                    raise ValueError('Update this screen firmware before configuring another selector entity.')
             copies = before.get(tile['entity'], [])
             if tile['entity'] in BUILTIN or not tile.get('options') or any(copy.get('options') == tile['options'] for copy in copies):
                 continue
@@ -4146,6 +4150,12 @@ def create_app(manager, development=False):
         offers for that entity. Null while Home Assistant can't say."""
         entity = request.query.get('entity', '')
         ha = manager.ha
+        if pd_cards.is_tile(entity):
+            pd = catalogue.PD
+            targets = sorted(e for e in ha.states if e.split('.')[0] in pd['selector_domains'])
+            return web.json_response({'actions': [{'action': pd['action'], 'name': pd['action_name'],
+                'description': pd['action_description'], 'fields': [{'key': pd['entity_field'], 'name': 'Selector entity',
+                    'required': True, 'selector': {'select': {'options': targets}}, 'options': targets}]}]})
         actions = await ha.entity_actions(entity) if entity_id(entity) and hasattr(ha, 'entity_actions') else None
         if actions is None:
             return web.json_response({'actions': None})

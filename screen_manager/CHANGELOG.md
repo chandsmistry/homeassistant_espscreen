@@ -2,7 +2,7 @@
 
 - **PD mode refresh.** Both PD picture cards refresh when the header sensor confirms a changed control mode, without waiting for the 45-second telemetry interval.
 
-- **PD tap controls.** PD cards have their own inspector with Controls → On tap, and no Map settings. A short tap opens the PD control mode selector; swipes and holds cannot open it. Requires updated firmware.
+- **PD tap controls.** PD cards have their own inspector with Controls → On tap, and no Map settings. Controls → On tap offers Perform action; the Action section chooses the selector entity. A short tap opens its selector. Holds and consumed edge swipes do not open it. Requires updated firmware.
 
 - **PD picture caching.** Each download link pins the already-rendered image, avoiding a second render after sensor changes. Add-on preparation and HTTP timings are logged. Legacy PNG export is opt-in via SCREEN_PD_PNG_EXPORT=1.
 - **Picture-card resizing.** Resizing PD, Map or Energy cards no longer adds unsupported controls that blocked saving.

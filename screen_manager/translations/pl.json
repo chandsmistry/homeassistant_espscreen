@@ -2406,6 +2406,10 @@
           "dots": "Ruchome kropki",
           "lines": "Linie i strzałki"
         }
+      },
+      "pd": {
+        "name": "Dystrybucja energii",
+        "hint": "Bieżące dane dystrybucji energii. Poniżej skonfiguruj działanie po dotknięciu."
       }
     },
     "tile_card": {

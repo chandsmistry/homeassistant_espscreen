@@ -2048,9 +2048,7 @@
       },
       "pd": {
         "name": "Power distribution",
-        "hint": "Power Distribution card. Tap to open the PD control mode selector.",
-        "open_mode": "Open PD control mode",
-        "tap_hint": "Opens input_select.pd_control_mode. A swipe changes pages; it does not select a mode."
+        "hint": "Power Distribution card. Tap to open the PD control mode selector."
       }
     },
     "tile_card": {

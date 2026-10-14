@@ -2406,6 +2406,10 @@
           "dots": "Puntos en movimiento",
           "lines": "Líneas y flechas"
         }
+      },
+      "pd": {
+        "name": "Distribución de energía",
+        "hint": "Datos de distribución de energía en directo. Configura abajo la acción al tocar."
       }
     },
     "tile_card": {

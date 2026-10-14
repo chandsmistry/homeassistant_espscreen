@@ -22,6 +22,17 @@ inline constexpr Memory MEMORY[] = {{"alarm_control_panel", 160, true}, {"automa
 // The screen's own cards that keep more than their type, priced by their entity first (catalogue/screen.yaml `cards`).
 inline constexpr Memory CARDS[] = {{"screen.energy", 6144, true}};
 
+namespace pd {
+inline constexpr const char *ENTITIES[] = {"screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"};
+inline constexpr const char *ACTION = "screen.open_selector";
+inline constexpr const char *ENTITY_FIELD = "entity";
+inline constexpr const char *LEGACY_TARGET = "input_select.pd_control_mode";
+inline constexpr const char *SELECTOR_FEATURE = "pd_selector";
+inline constexpr const char *NATIVE_FEATURE = "pd_native";
+inline constexpr const char *OPEN_TAP = "action";
+inline constexpr const char *SELECTOR_DOMAINS[] = {"input_select", "select"};
+}  // namespace pd
+
 namespace alarm_control_panel {
 inline constexpr uint32_t ARM_AWAY = 2;
 inline constexpr uint32_t ARM_CUSTOM_BYPASS = 16;

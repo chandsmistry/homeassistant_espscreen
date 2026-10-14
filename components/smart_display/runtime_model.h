@@ -175,8 +175,8 @@ inline bool plugin_key(const std::string &entity) {
 }
 // The fork's Power Distribution cards (Library, Screen): five pictures the app draws.
 inline bool is_pd_entity(const std::string &entity) {
-  return entity == "screen.pd_header" || entity == "screen.pd_dp3" || entity == "screen.pd_ultra" ||
-         entity == "screen.pd_ac" || entity == "screen.pd_max" || entity == "screen.pd_batteries";
+  for (const auto *known : tile_catalogue::pd::ENTITIES) if (entity == known) return true;
+  return false;
 }
 inline bool valid_entity(const std::string &entity) {
   if (entity.size() > 120) return false;
@@ -311,7 +311,6 @@ struct Extra {
   // are, their states, the zones and the card's own choices (map_card.fingerprint). The screen never sees a place; it
   // folds this into the picture it asks for, so a map is drawn again when something moved and never on a clock.
   std::string map_mark;
-  std::string pd_mode;  // current value of input_select.pd_control_mode; options uses the existing select list
   // The energy card's moment (firmware 0.47.0+): its own block, so no other tile's extras grow by it.
   std::shared_ptr<const energy_card::Data> energy;
   uint32_t media_duration = 0, media_position = 0, media_position_at = 0;
@@ -381,7 +380,7 @@ struct Extra {
            std::isnan(feels) && wind_unit.empty() && std::isnan(bearing) && std::isnan(pressure) && std::isnan(visibility) &&
            pressure_unit.empty() && visibility_unit.empty() && rain_unit.empty() && sunrise.empty() && sunset.empty() && duration.empty() &&
            remaining.empty() && !timer_end && media_title.empty() && media_artist.empty() && media_album.empty() &&
-           media_picture.empty() && map_mark.empty() && pd_mode.empty() && !media_duration && !media_position && !media_position_at && fan_speeds.empty() && fan_speed.empty() &&
+           media_picture.empty() && map_mark.empty() && !media_duration && !media_position && !media_position_at && fan_speeds.empty() && fan_speed.empty() &&
            choices.empty() && room.empty() && !charging && std::isnan(tilt) && action.empty() && action_data.empty() &&
            action_templates.empty() && state_word.empty() && subtitle.empty() && !subtitle_at && effect.empty() &&
            option_rows.empty() && number_rows.empty() && lamps.empty() && code_format.empty() && changed_by.empty() && !arm_code_free &&

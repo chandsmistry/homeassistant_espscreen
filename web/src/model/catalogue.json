@@ -1832,6 +1832,31 @@
      "dots",
      "lines"
     ]
+   },
+   "pd": {
+    "entities": [
+     "screen.pd_header",
+     "screen.pd_dp3",
+     "screen.pd_ultra",
+     "screen.pd_ac",
+     "screen.pd_max",
+     "screen.pd_batteries"
+    ],
+    "taps": [
+     "action",
+     "none"
+    ],
+    "action": "screen.open_selector",
+    "action_name": "Open selector",
+    "action_description": "Open a selector on the panel and choose its value.",
+    "entity_field": "entity",
+    "selector_domains": [
+     "input_select",
+     "select"
+    ],
+    "legacy_target": "input_select.pd_control_mode",
+    "selector_feature": "pd_selector",
+    "native_feature": "pd_native"
    }
   },
   "script": {

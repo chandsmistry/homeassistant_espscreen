@@ -1123,6 +1123,7 @@ inline unsigned detail_index=0;
 // what works on a tile's card (its keys, its tile) finds nothing to do; what reads the open card asks detail_tile().
 inline constexpr unsigned SENSOR_DETAIL=0xFFFFu;
 inline Tile detail_sensor;
+inline std::string selector_source;
 inline Tile *detail_tile(){return detail_index<model.count?&model.tiles[detail_index]:detail_index==SENSOR_DETAIL?&detail_sensor:nullptr;}
 // The open card painted for the tile as it is now; false when it must be built again (another shape, or none).
 inline bool card_repaint(const Tile &t) {
@@ -1580,13 +1581,13 @@ inline void detail_command(int cmd){
     return;
   }
   // The PD selector is a transient card, not an extra tile or a changed layout.
-  if (detail_index == SENSOR_DETAIL && detail_sensor.entity == "input_select.pd_control_mode") {
+  if (detail_index == SENSOR_DETAIL && !selector_source.empty() && (detail_sensor.domain() == "input_select" || detail_sensor.domain() == "select")) {
     if (!fresh() || !detail_sensor.available() || cmd < SELECT_OPTION_FIRST ||
         cmd >= SELECT_OPTION_FIRST + static_cast<int>(detail_sensor.extra().options.size()) ||
         !allowed(esphome::millis(), 300 + cmd, detail_sensor.entity)) return;
     const auto &option = detail_sensor.extra().options[cmd - SELECT_OPTION_FIRST];
     if (option != detail_sensor.state)
-      action("input_select.select_option", detail_sensor.entity, "option", option, true);
+      action(detail_sensor.domain() + ".select_option", detail_sensor.entity, "option", option, true);
     return;
   }
   if(!fresh()||detail_index>=model.count)return;
@@ -5360,27 +5361,38 @@ inline void history_received(){
 }
 // An energy card's circle opens its sensor (firmware 0.47.0+), and the card's next moment brings the sensor's state.
 inline void open_sensor_detail(const std::string &entity,const std::string &name,const std::string &state,const std::string &unit){
-  detail_sensor=Tile{};detail_sensor.entity=entity;detail_sensor.name=name;detail_sensor.state=state;detail_sensor.unit=unit;
+  selector_source.clear();detail_sensor=Tile{};detail_sensor.entity=entity;detail_sensor.name=name;detail_sensor.state=state;detail_sensor.unit=unit;
   detail_sensor.received=true;
   show_detail(SENSOR_DETAIL);
 }
+inline std::string pd_selector_target(const Tile &card) {
+  if (card.extra().action != tile_catalogue::pd::ACTION) return {};
+  for (const auto &field : card.extra().action_data) if (field.first == tile_catalogue::pd::ENTITY_FIELD) {
+    for (const auto *domain : tile_catalogue::pd::SELECTOR_DOMAINS)
+      if (field.second.rfind(std::string(domain) + ".", 0) == 0 && valid_entity(field.second)) return field.second;
+  }
+  return {};
+}
 inline void pd_control_update(const Tile &card) {
-  if (detail_index != SENSOR_DETAIL || detail_sensor.entity != "input_select.pd_control_mode") return;
-  if (detail_sensor.state == card.extra().pd_mode && detail_sensor.extra().options == card.extra().options) return;
-  detail_sensor.state = card.extra().pd_mode;
+  if (detail_index != SENSOR_DETAIL || selector_source != card.entity || detail_sensor.entity != pd_selector_target(card)) return;
+  if (detail_sensor.state == card.state && detail_sensor.extra().options == card.extra().options) return;
+  detail_sensor.state = card.state;
   Extra extra; extra.options = card.extra().options; detail_sensor.set_extra(std::move(extra), true);
   refresh_detail(SENSOR_DETAIL);
 }
 inline void open_pd_control(const Tile &card) {
+  const auto target = pd_selector_target(card);
+  if (target.empty()) return;
+  selector_source = card.entity;
   detail_sensor = Tile{};
-  detail_sensor.entity = "input_select.pd_control_mode";
-  detail_sensor.name = "PD control mode";
-  detail_sensor.state = card.extra().pd_mode.empty() ? "unavailable" : card.extra().pd_mode;
+  detail_sensor.entity = target;
+  detail_sensor.name = target;
+  detail_sensor.state = card.state.empty() ? "unavailable" : card.state;
   detail_sensor.received = true;
   Extra extra; extra.options = card.extra().options; detail_sensor.set_extra(std::move(extra), true);
   select_page = 0;
   show_detail(SENSOR_DETAIL);
-  ESP_LOGI("pd_cards", "opened input_select.pd_control_mode selector (%u options)", (unsigned)card.extra().options.size());
+  ESP_LOGI("pd_cards", "opened %s selector (%u options)", target.c_str(), (unsigned)card.extra().options.size());
 }
 inline void sensor_detail_update(const std::string &entity,const std::string &state){
   if(detail_index!=SENSOR_DETAIL||detail_sensor.entity!=entity||detail_sensor.state==state)return;
@@ -5718,20 +5730,20 @@ inline void event(lv_event_t *event) {
       return;
     }
     if (card.is_pd()) {
-      if (code == LV_EVENT_SHORT_CLICKED && card.tap != "none" &&
+      if (code == LV_EVENT_SHORT_CLICKED && card.tap == tile_catalogue::pd::OPEN_TAP &&
           allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity)) open_pd_control(card);
       return;
     }
     // The map tile opens full screen as any map does (firmware 0.21.0+).
     if (card.is_map()) {
-      if (code == LV_EVENT_SHORT_CLICKED && card.tap != "none" && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+      if (code == LV_EVENT_SHORT_CLICKED && card.tap == tile_catalogue::pd::OPEN_TAP && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         camera_open(card.entity, card.name, (int)w.index);  // its name comes with its state ("Map")
       return;
     }
     // The energy card: a circle with a sensor behind it opens that sensor's history (firmware 0.47.0+).
     if (card.is_energy()) {
       lv_point_t at;
-      if (code == LV_EVENT_SHORT_CLICKED && card.tap != "none" && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+      if (code == LV_EVENT_SHORT_CLICKED && card.tap == tile_catalogue::pd::OPEN_TAP && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         energy_view::tap(w, card, at);
       return;
     }

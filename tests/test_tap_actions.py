@@ -231,7 +231,7 @@ class Editor(unittest.TestCase):
         self.assertIn('keys.push("action");', self.SCRIPT)
         self.assertEqual(editor_sources.text('tile.tap.action'), 'Perform action')
         self.assertIn('getJson(`entity-actions?entity=${encodeURIComponent(entity)}`)', self.SCRIPT)
-        self.assertIn('<ActionPicker v-if="domain !== \'screen\' && !goesTo && tap === \'action\'" :tile="tile" />', self.SCRIPT)
+        self.assertIn('<ActionPicker v-if="(domain !== \'screen\' || pdCard) && !goesTo && tap === \'action\'" :tile="tile" />', self.SCRIPT)
         # Fields follow Home Assistant's selectors; an empty field is left out of the data.
         for marker in ("kindOf(field) === 'boolean'", "kindOf(field) === 'number' || kindOf(field) === 'color_temp'", 'config.options', 'delete data[key]'):
             self.assertIn(marker, self.PICKER, marker)

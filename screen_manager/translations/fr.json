@@ -2406,6 +2406,10 @@
           "dots": "Points animés",
           "lines": "Lignes et flèches"
         }
+      },
+      "pd": {
+        "name": "Distribution électrique",
+        "hint": "Données de distribution électrique en direct. Configurez ci-dessous l’action au toucher."
       }
     },
     "tile_card": {

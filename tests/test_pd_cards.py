@@ -28,6 +28,24 @@ class PdCards(unittest.TestCase):
         value = extras({'entity': 'screen.pd_header', 'options': {'display': 'map'}}, states)
         self.assertEqual((value['pm'], value['po']), ('unavailable', []))
 
+    def test_selector_action_is_configurable_and_rejects_non_select_targets(self):
+        import catalogue
+        from core import validate_layout
+        tile = {'entity': 'screen.pd_header', 'name': '', 'slot': 0, 'options': {'display': 'map',
+                'tap': 'action', 'action': {'action': catalogue.PD['action'], 'data': {'entity': 'select.example'}}}}
+        checked = validate_layout({'title': '', 'tiles': [tile]})
+        self.assertEqual(catalogue.selector_target(checked['tiles'][0]), 'select.example')
+        tile['options']['action']['data']['entity'] = 'input_boolean.example'
+        with self.assertRaises(ValueError):
+            validate_layout({'title': '', 'tiles': [tile]})
+
+    def test_legacy_selector_migration_preserves_nothing_and_explicit_actions(self):
+        import catalogue
+        self.assertEqual(catalogue.pd_options({'tap': 'none'}), {'tap': 'none'})
+        original = {'tap': 'action', 'action': {'action': catalogue.PD['action'], 'data': {'entity': 'select.example'}}}
+        self.assertEqual(catalogue.pd_options(original), original)
+        self.assertEqual(catalogue.selector_target({'entity': 'screen.pd_header', 'options': {}}), catalogue.PD['legacy_target'])
+
     def test_composite_card_follows_each_battery(self):
         import copy
         initial = pd_cards.render('batteries', STATES)

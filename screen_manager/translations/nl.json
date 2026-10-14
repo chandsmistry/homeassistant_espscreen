@@ -2045,6 +2045,10 @@
           "dots": "Bewegende bolletjes",
           "lines": "Lijnen en pijlen"
         }
+      },
+      "pd": {
+        "name": "Stroomverdeling",
+        "hint": "Livegegevens van de stroomverdeling. Stel hieronder de tikactie in."
       }
     },
     "tile_card": {

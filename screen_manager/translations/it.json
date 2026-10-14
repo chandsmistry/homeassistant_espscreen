@@ -2406,6 +2406,10 @@
           "dots": "Punti in movimento",
           "lines": "Linee e frecce"
         }
+      },
+      "pd": {
+        "name": "Distribuzione di energia",
+        "hint": "Dati di distribuzione di energia in tempo reale. Configura sotto l’azione al tocco."
       }
     },
     "tile_card": {

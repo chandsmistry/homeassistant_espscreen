@@ -1777,6 +1777,11 @@ def validate_tap_action(value):
     for key in data:
         if not isinstance(key, str) or not ACTION_FIELD.fullmatch(key) or key in TARGET_KEYS:
             raise ValueError(t('addon.errors.tap_action.field_not_allowed', field=key))
+    if name == catalogue.PD['action']:
+        target = data.get(catalogue.PD['entity_field'])
+        if set(data) != {catalogue.PD['entity_field']} or not isinstance(target, str) or not entity_id(target) or \
+                target.split('.')[0] not in catalogue.PD['selector_domains']:
+            raise ValueError('Choose a select or input_select entity for Open selector.')
     clean = {'action': name, **({'data': dict(data)} if data else {})}
     try:
         act = action_for_screen(clean)
@@ -1879,6 +1884,8 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
             displays = DISPLAYS.get(domain, ('standard', 'watch'))
             # The map tile (app 0.4.36) is a map and nothing else, and has no slider or controls of its own.
             if tile['entity'] == MAP_TILE or tile['entity'].startswith('screen.pd_'):
+                if catalogue.is_pd(tile['entity']):
+                    options = catalogue.pd_options(options)
                 displays = ('map',)
                 options = {**{k: v for k, v in options.items() if k not in ('inline', 'controls', 'history_hours', 'sub')}, 'display': 'map'}
             # The energy card draws its diagram on every size it takes, with no face, slider or second line of its own.
@@ -1891,7 +1898,7 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
             elif 'flow' in options:
                 options = {k: v for k, v in options.items() if k != 'flow'}
             # Every tile's taps and its type's own (run, an automation's alone: firmware 0.7.0+), from the catalogue.
-            taps = tuple(catalogue.taps(domain))
+            taps = tuple(catalogue.PD['taps']) if catalogue.is_pd(tile['entity']) else tuple(catalogue.taps(domain))
             choices = {'tap': taps, 'display': displays, 'inline': ('none', 'slider')}
             if 'size' in options and not is_size(options['size']):
                 raise ValueError(t('addon.errors.layout.invalid_setting', setting='size'))
@@ -1935,7 +1942,7 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
                 raise ValueError(t('addon.errors.layout.no_toggle'))
             # Perform action (app 0.2.67) keeps its action; another tap choice leaves a stale one behind.
             if options.get('tap') == 'action':
-                if domain == 'screen':
+                if domain == 'screen' and (not catalogue.is_pd(tile['entity']) or (options.get('action') or {}).get('action') != catalogue.PD['action']):
                     raise ValueError(t('addon.errors.layout.builtin_action'))
                 options = {**options, 'action': validate_tap_action(options.get('action'))}
             elif 'action' in options:
@@ -2326,7 +2333,7 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
     if (tile.get('options') or {}).get('display') == 'map':
         if tile['entity'].startswith('screen.pd_'):
             import pd_cards
-            mode = states.get('input_select.pd_control_mode') or {}
+            mode = states.get(catalogue.selector_target(tile)) or {}
             choices = (mode.get('attributes') or {}).get('options') or []
             return {'mk': pd_cards.screen_fingerprint(tile, states),
                     'pm': mode.get('state', 'unavailable'),
@@ -2502,6 +2509,8 @@ def state_message(index, tile, states, extra=None, precision=None, entry=None, u
     if tile['entity'] in BUILTIN:
         message = {'v': 1, 'op': 'state', 'i': index, 'entity': tile['entity'],
                    'name': short(tile['name'] or builtin_name(tile['entity']), 80), 'state': 'ok', 'a': {}}
+        if catalogue.is_pd(tile['entity']) and extra:
+            message['state'] = extra.get('pm', 'unavailable')
         # The same wire form as any tile, so a chosen icon travels as its codepoint (app 0.2.74+).
         options = screen_options(tile, {})
         if options is not None:

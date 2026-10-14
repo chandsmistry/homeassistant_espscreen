@@ -540,7 +540,8 @@ TILES = {'screen.pd_header': 'header', 'screen.pd_dp3': 'dp3', 'screen.pd_ultra'
 
 
 def is_tile(entity):
-    return entity in TILES
+    import catalogue
+    return catalogue.is_pd(entity)
 
 
 def fingerprint(tile, states, dark=False):

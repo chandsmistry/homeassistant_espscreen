@@ -3,7 +3,7 @@
  */
 import { t } from '../i18n';
 import { isWideSize } from './sizes';
-import { TILE, ofType, taps as catalogueTaps } from './catalogue';
+import { TILE, ofType, taps as catalogueTaps, PD, isPdCard } from './catalogue';
 import { PLUGIN_TILE } from './plugins';
 import rules from './page-rules.json';
 import type { PageLayout, PageTile } from '../types';
@@ -117,7 +117,7 @@ export function validateCardOptions(tile: PageTile, entityId: string, size: stri
   if (typeof a.label !== 'string' || a.label !== a.label.trim()) fail('normalization');
   // The map tile (app 0.4.36) is a map and nothing else.
   // The fork's Power Distribution cards (Library, Screen) are pictures drawn like a map, and nothing else.
-  const pdCard = entityId.startsWith('screen.pd_');
+  const pdCard = isPdCard(entityId);
   const displays = entityId === 'screen.map' || pdCard ? ['map'] : (rules.displays as Record<string, string[]>)[domain] || ['standard', 'watch'];
   const controls = ['none', ...((rules.controls as Record<string, string[]>)[domain] || [])];
   // Every choice from the tile catalogue (model/catalogue.ts): a type's taps, its guards, the hours a graph shows.
@@ -131,6 +131,7 @@ export function validateCardOptions(tile: PageTile, entityId: string, size: stri
   if (rules.wideOnly.includes(a.display || '') && !isWideSize(size)) fail('normalization');
   if (tile.content.kind === 'navigation' && (size === 'full' || a.display !== undefined || i.inline !== undefined ||
       i.controls !== undefined || a.historyHours !== undefined)) fail('normalization');
+  if (pdCard && i.tap !== undefined && !PD.taps.includes(i.tap)) fail();
   if (i.tap === 'toggle' && domain === 'screen') fail();
   if (i.inline === 'slider' && (!ofType(domain)?.inline || a.display === 'watch')) fail();
   if (a.refresh !== undefined && (a.display !== 'live' || !rules.refresh.includes(a.refresh))) fail('normalization');
@@ -169,11 +170,13 @@ export function validateCardOptions(tile: PageTile, entityId: string, size: stri
         (sub.startsWith('text:') && (!sub.slice(5).trim() || sub.slice(5) !== sub.slice(5).trim()))) fail('normalization');
   }
   if (i.tap === 'action') {
-    if (domain === 'screen') fail();
+    if (domain === 'screen' && (!pdCard || i.action?.action !== PD.action)) fail();
     const action = i.action;
     fields(action, ['action', 'data'], ['action']);
     if (!action || typeof action.action !== 'string' || action.action.length > 64 || !matches(/^[a-z0-9_]+\.[a-z0-9_]+$/, action.action)) fail();
     const data = action.data ?? {};
+    if (action.action === PD.action && (!pdCard || Object.keys(data).length !== 1 ||
+        !entity(data[PD.entity_field], PD.selector_domains))) fail();
     fields(data, Object.keys(data), []);
     if (!finite(data) || Object.keys(data).length > 8 || (action.data !== undefined && !Object.keys(data).length)) fail('normalization');
     const strings: string[][] = [], templates: string[][] = [];

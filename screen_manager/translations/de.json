@@ -2406,6 +2406,10 @@
           "dots": "Bewegte Punkte",
           "lines": "Linien und Pfeile"
         }
+      },
+      "pd": {
+        "name": "Stromverteilung",
+        "hint": "Live-Daten der Stromverteilung. Die Aktion beim Tippen wird unten konfiguriert."
       }
     },
     "tile_card": {

@@ -2,6 +2,7 @@
 // Perform action (app 0.2.67): the actions Home Assistant offers for a tile's entity, under its own names,
 // and one field per value Home Assistant asks for (its selector). An empty field is left out.
 import { computed } from "vue";
+import { PD, isPdCard, pdAction } from "../model/catalogue";
 import { matchesQuery } from "../model/search";
 import { t } from "../i18n";
 import type { EntityAction, Tile } from "../types";
@@ -34,7 +35,7 @@ if (list.value === undefined) entities.loadEntityActions(props.tile.entity);
 // half-made choice never reaches the document (GitHub #47). The chosen action is the tile's own, from the document.
 function pick(action: EntityAction) {
   const same = action.action === chosen.value?.action;
-  if (setTileAction(props.tile, same && chosen.value ? chosen.value : { action: action.action }) || same) insp.actionPickerOpen = false;
+  if (setTileAction(props.tile, same && chosen.value ? chosen.value : (isPdCard(props.tile.entity) && action.action === PD.action ? pdAction() : { action: action.action })) || same) insp.actionPickerOpen = false;
 }
 function setField(key: string, value: unknown) {
   const data: Record<string, unknown> = { ...(props.tile.options?.action?.data || {}) };

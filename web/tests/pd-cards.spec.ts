@@ -10,8 +10,8 @@ describe("the Power Distribution cards (fork)", () => {
     const panel = { supports: () => true } as never;
     for (const entity of ['screen.pd_header', 'screen.pd_batteries']) {
       const tile = { entity, name: '', slot: 0, options: { display: 'map' } };
-      expect(tapChoices(tile, panel, 'auto', []).map(([key]) => key)).toEqual(['auto', 'none']);
-      expect(tapHint(tile, panel, 'auto')?.text).toContain('input_select.pd_control_mode');
+      expect(tapChoices(tile, panel, 'auto', []).map(([key]) => key)).toEqual(['action', 'none']);
+      expect(tapHint(tile, panel, 'auto')?.text).toContain('choose its value');
       expect(tapHint(tile, panel, 'none')).toBeNull();
     }
   });

@@ -100,3 +100,9 @@ export function fits(item: Option | undefined, size: unknown, columns = 2) {
 
 /** The taps a tile of this type may have: every tile's, and its own (an automation's run). */
 export const taps = (domain: string) => [...TILE.taps, ...(TYPES[domain]?.taps ?? [])];
+
+// Device actions are not HA services. The catalogue defines the same boundary for
+// the inspector, validator and firmware.
+export const PD = data.domains.screen.pd;
+export const isPdCard = (entity: string) => PD.entities.includes(entity);
+export const pdAction = () => ({ action: PD.action, data: { [PD.entity_field]: PD.legacy_target } });

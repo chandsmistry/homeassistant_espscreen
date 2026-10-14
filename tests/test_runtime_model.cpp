@@ -354,9 +354,9 @@ static void test_map_tile() {
   for (const char *entity : {"screen.pd_header", "screen.pd_batteries"}) {
     Tile pd; pd.entity = entity; pd.display = "map";
     assert(pd.is_pd() && pd.pictured() && pd.builtin());
-    Extra selector; selector.pd_mode = "Stream Weighted"; selector.options = {"Master Distribution", "Stream Weighted", "Off"};
+    pd.state = "Stream Weighted"; Extra selector; selector.options = {"Master Distribution", "Stream Weighted", "Off"};
     pd.set_extra(std::move(selector));
-    assert(pd.extra().pd_mode == "Stream Weighted" && pd.extra().options.size() == 3);
+    assert(pd.state == "Stream Weighted" && pd.extra().options.size() == 3);
   }
   Tile camera;
   camera.entity = "camera.door";

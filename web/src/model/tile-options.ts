@@ -9,7 +9,7 @@ import { t } from "../i18n";
 import rules from "./page-rules.json";
 import { isTallSize, isWideSize } from "./sizes";
 import { validateCardOptions } from "./page-validation";
-import { controlOption, drawable, fits, ofType } from "./catalogue";
+import { controlOption, drawable, fits, ofType, PD, isPdCard, pdAction } from "./catalogue";
 import { ACTS_ON_TAP, holdHintKey, SLIDER_DOMAINS, SWITCHES_ON_TAP, TOGGLE_BEFORE } from "./layout";
 import { coverPrimary, hasCoverTilt, withCoverTilt } from "./tall-controls";
 import type { Capability, PageTile, Tile, TileOptions } from "../types";
@@ -28,7 +28,6 @@ const MAP_OWN = ["map", "framing", "distance", "follow", "markers", "names", "zo
 // The map tile of the screen's own cards (app 0.4.36): a map and nothing else.
 const MAP_TILE = "screen.map";
 // The fork's Power Distribution cards (Library, Screen): pictures the add-on draws, shown like a map.
-const isPdCard = (entity: string) => entity.startsWith("screen.pd_");
 
 // What a choice that asks a second step stands for while the inspector tries it: Perform action asks which action,
 // a value of the entity which value, words of your own the words. The step itself is checked when it is taken.
@@ -43,6 +42,7 @@ const pageTile = (entity: string) => /^screen\.page_\d+$/.test(entity);
 /** Mirrors core.validate_layout's normalization, so the document the editor saves is already canonical. */
 export function canonicalOptions(entity: string, options: TileOptions = {}, key = false): TileOptions {
   const out: TileOptions = { ...options };
+  if (isPdCard(entity) && (out.tap ?? 'auto') === 'auto') { out.tap = PD.taps[0]; out.action = pdAction(); }
   if (entity === MAP_TILE || isPdCard(entity)) { out.display = "map"; for (const field of ["inline", "controls", "history_hours", "sub"]) delete out[field]; }
   if (typeof out.sub === "string" && out.sub.startsWith("text:")) {
     const words = out.sub.slice(5).trim();
@@ -117,7 +117,7 @@ export function optionsSave(tile: Tile, options: TileOptions): boolean {
  * sample of that step. */
 export function choiceOffered(tile: Tile, key: string, value: unknown, controlled: boolean): boolean {
   let options = canonicalOptions(tile.entity, coupledOptions(tile.options, key, value, controlled), tile.in !== undefined);
-  if (key === "tap" && value === "action" && !options.action) options = { ...options, action: tile.options?.action ?? SAMPLE_ACTION };
+  if (key === "tap" && value === "action" && !options.action) options = { ...options, action: tile.options?.action ?? (isPdCard(tile.entity) ? pdAction() : SAMPLE_ACTION) };
   if (!optionsSave(tile, options)) return false;
   const kept = options[key];
   return JSON.stringify(kept) === JSON.stringify(value) || (kept === undefined && DEFAULTS[key] === value);
@@ -242,7 +242,7 @@ export function controlHint(tile: Tile, panel: TilePanel, controls: string): Hin
  * plugin that left the screen stays listed under its own name until it is changed. */
 export function tapChoices(tile: Tile, panel: TilePanel, tap: string, plugins: [string, string][]) {
   const domain = domainOf(tile);
-  if (isPdCard(tile.entity)) return [["auto", t("editor.tile.pd.open_mode")], ["none", t("editor.tile.tap.none")]] as [string, string][];
+  if (isPdCard(tile.entity)) return PD.taps.map(key => [key, t(`editor.tile.tap.${key}`)] as [string, string]);
   if (domain === "automation") {
     const keys = ["auto", "run", "none", "action"];
     if (!keys.includes(tap)) keys.splice(2, 0, tap);
@@ -258,7 +258,7 @@ export function tapChoices(tile: Tile, panel: TilePanel, tap: string, plugins: [
 }
 /** What the panel says of the tap: what holding the tile does, or what a firmware or Home Assistant lacks for it. */
 export function tapHint(tile: Tile, panel: TilePanel, tap: string): Hint | null {
-  if (isPdCard(tile.entity)) return tap === "none" ? null : { text: t("editor.tile.pd.tap_hint"), warn: false };
+  if (isPdCard(tile.entity)) return tap === "none" ? null : { text: PD.action_description, warn: false };
   const domain = domainOf(tile), supports = panel.supports;
   if (domain === "automation" && !supports(0, 7, 0)) return { text: t("editor.tile.tap.automation_needs_firmware"), warn: true };
   if (domain === "automation" && ["auto", "toggle", "run"].includes(tap))

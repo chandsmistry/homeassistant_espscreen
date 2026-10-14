@@ -5,6 +5,7 @@ layout_migrations.py and never run during normal document edits. Renderers may u
 editable layout. The board's Grid remains the authority for all capacity.
 """
 from copy import deepcopy
+import catalogue
 from collections.abc import Mapping
 import hashlib
 import json
@@ -426,6 +427,7 @@ def validate_document(data, grid):
     silently changing the canonical document's appearance or footprint.
     """
     _object(data, {"title", "homePageId", "pages"}, {"title", "homePageId", "pages"})
+    data = deepcopy(data)
     pages = data["pages"]
     if not isinstance(pages, list) or not 1 <= len(pages) <= grid.pages:
         raise LayoutError(t('addon.errors.pages.pages_full'))
@@ -469,6 +471,12 @@ def validate_document(data, grid):
         for tile in page["tiles"]:
             _tile(tile, 0, grid, {p["id"]: i for i, p in enumerate(pages)}, data["homePageId"], seen)
     flat = {"title": data["title"], "tiles": compile_tiles(data, grid), "pages": len(pages)}
+    for page in data['pages']:
+        for tile in page['tiles']:
+            content = tile.get('content') or {}
+            if content.get('kind') == 'builtin' and catalogue.is_pd('screen.' + content.get('name', '')):
+                tile['interaction'] = catalogue.pd_options(tile['interaction'])
+    flat['tiles'] = compile_tiles(data, grid)
     checked = validate_layout(flat, grid=grid)
     # The legacy validator sorts by slot and normalizes documented defaults.
     # Incompatible size/action combinations must not escape into a document.

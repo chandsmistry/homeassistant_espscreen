@@ -281,3 +281,25 @@ def taps(domain):
 def key_domains():
     """The types that may stand as a key under a bedside clock."""
     return frozenset(domain for domain, entry in TYPES.items() if entry.get('key', True) and domain != 'screen')
+
+
+PD = TYPES['screen']['pd']
+
+def is_pd(entity):
+    return entity in PD['entities']
+
+def pd_options(options):
+    """Migrate only the old implicit selector; preserve explicit configured actions."""
+    options = dict(options or {})
+    if options.get('tap', 'auto') == 'auto':
+        options.update(tap=PD['taps'][0], action={'action': PD['action'], 'data': {PD['entity_field']: PD['legacy_target']}})
+    return options
+
+def selector_target(tile):
+    if not is_pd(tile.get('entity')):
+        return None
+    options = pd_options(tile.get('options'))
+    action = options.get('action') or {}
+    target = (action.get('data') or {}).get(PD['entity_field'])
+    return target if options.get('tap') == PD['taps'][0] and action.get('action') == PD['action'] and \
+        isinstance(target, str) and target.split('.')[0] in PD['selector_domains'] else None

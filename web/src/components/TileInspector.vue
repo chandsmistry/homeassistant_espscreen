@@ -280,7 +280,7 @@ const backgroundName = computed(() => inv.inventory.backgrounds?.[props.tile.opt
           <span v-else class="gesture-note">{{ tapNote.text }}</span>
         </template>
       </PropRow>
-      <ActionPicker v-if="domain !== 'screen' && !goesTo && tap === 'action'" :tile="tile" />
+      <ActionPicker v-if="(domain !== 'screen' || pdCard) && !goesTo && tap === 'action'" :tile="tile" />
       <PropRow v-if="domain === 'lock'" :label="t('editor.tile.guard.label')" icon="check-circle" :hint="t(guard === 'lock_only' ? 'editor.tile.guard.lock_only_hint' : 'editor.tile.guard.confirm_hint')">
         <ChoiceField :choices="guards" :value="guard" :aria-label="t('editor.tile.guard.label')" @pick="(v) => setTileOption(tile, 'guard', v)" />
       </PropRow>
