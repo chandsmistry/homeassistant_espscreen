@@ -135,11 +135,14 @@ def runs(text):
     return out
 
 
-def symbol_font(px):
+def symbol_font(px, text=''):
     from PIL import ImageFont
-    key = ('sym', round(px * SCALE))
+    hexagram = any(0x4DC0 <= ord(ch) <= 0x4DFF for ch in text)
+    key = ('hexagram' if hexagram else 'sym', round(px * SCALE))
     if key not in _fonts:
-        for path in SYMBOL_FONTS:
+        # Symbols2 covers the hexagrams but not ordinary arrows; DejaVu covers the latter.
+        paths = SYMBOL_FONTS if hexagram else SYMBOL_FONTS[1:] + SYMBOL_FONTS[:1]
+        for path in paths:
             if Path(path).exists():
                 _fonts[key] = ImageFont.truetype(path, key[1])
                 break
@@ -164,7 +167,7 @@ class Canvas:
             if kind == 'emoji':
                 total += size * 1.17 * self.s
             else:
-                total += (symbol_font(size) if kind == 'symbol' else font(size, weight)).getlength(piece)
+                total += (symbol_font(size, piece) if kind == 'symbol' else font(size, weight)).getlength(piece)
         return total / self.s
 
     def text(self, x, baseline_top, text, size, weight=400, fill=(33, 33, 33), anchor='l', opacity=1.0):
@@ -194,7 +197,7 @@ class Canvas:
                     layer.alpha_composite(pic, (round(cx + (edge - pic.width) / 2), round(top * self.s + ascent - height * 0.86)))
                 cx += size * 1.17 * self.s
             else:
-                f = symbol_font(size) if kind == 'symbol' else face
+                f = symbol_font(size, piece) if kind == 'symbol' else face
                 a2, _ = f.getmetrics()
                 d.text((cx, top * self.s + ascent - a2), piece, font=f, fill=fill + (round(255 * opacity),))
                 cx += f.getlength(piece)
