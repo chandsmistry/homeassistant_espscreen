@@ -13,6 +13,21 @@ STATES = json.loads((ROOT / 'tests/fixtures/pd_cards_states.json').read_text())
 
 
 class PdCards(unittest.TestCase):
+    def test_control_mode_and_choices_travel_without_changing_any_entity(self):
+        import copy
+        from core import extras
+        states = copy.deepcopy(STATES)
+        states['input_select.pd_control_mode'] = {'state': 'Stream Weighted', 'attributes': {'options': ['Master Distribution', 'Stream Weighted', 'Off']}}
+        before = copy.deepcopy(states)
+        for entity in ('screen.pd_header', 'screen.pd_batteries'):
+            value = extras({'entity': entity, 'options': {'display': 'map'}}, states)
+            self.assertEqual(value['pm'], 'Stream Weighted')
+            self.assertEqual(value['po'], ['Master Distribution', 'Stream Weighted', 'Off'])
+        self.assertEqual(states, before)
+        del states['input_select.pd_control_mode']
+        value = extras({'entity': 'screen.pd_header', 'options': {'display': 'map'}}, states)
+        self.assertEqual((value['pm'], value['po']), ('unavailable', []))
+
     def test_composite_card_follows_each_battery(self):
         import copy
         initial = pd_cards.render('batteries', STATES)

@@ -242,6 +242,7 @@ export function controlHint(tile: Tile, panel: TilePanel, controls: string): Hin
  * plugin that left the screen stays listed under its own name until it is changed. */
 export function tapChoices(tile: Tile, panel: TilePanel, tap: string, plugins: [string, string][]) {
   const domain = domainOf(tile);
+  if (isPdCard(tile.entity)) return [["auto", t("editor.tile.pd.open_mode")], ["none", t("editor.tile.tap.none")]] as [string, string][];
   if (domain === "automation") {
     const keys = ["auto", "run", "none", "action"];
     if (!keys.includes(tap)) keys.splice(2, 0, tap);
@@ -257,6 +258,7 @@ export function tapChoices(tile: Tile, panel: TilePanel, tap: string, plugins: [
 }
 /** What the panel says of the tap: what holding the tile does, or what a firmware or Home Assistant lacks for it. */
 export function tapHint(tile: Tile, panel: TilePanel, tap: string): Hint | null {
+  if (isPdCard(tile.entity)) return tap === "none" ? null : { text: t("editor.tile.pd.tap_hint"), warn: false };
   const domain = domainOf(tile), supports = panel.supports;
   if (domain === "automation" && !supports(0, 7, 0)) return { text: t("editor.tile.tap.automation_needs_firmware"), warn: true };
   if (domain === "automation" && ["auto", "toggle", "run"].includes(tap))

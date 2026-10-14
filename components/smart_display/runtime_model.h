@@ -311,6 +311,7 @@ struct Extra {
   // are, their states, the zones and the card's own choices (map_card.fingerprint). The screen never sees a place; it
   // folds this into the picture it asks for, so a map is drawn again when something moved and never on a clock.
   std::string map_mark;
+  std::string pd_mode;  // current value of input_select.pd_control_mode; options uses the existing select list
   // The energy card's moment (firmware 0.47.0+): its own block, so no other tile's extras grow by it.
   std::shared_ptr<const energy_card::Data> energy;
   uint32_t media_duration = 0, media_position = 0, media_position_at = 0;
@@ -380,7 +381,7 @@ struct Extra {
            std::isnan(feels) && wind_unit.empty() && std::isnan(bearing) && std::isnan(pressure) && std::isnan(visibility) &&
            pressure_unit.empty() && visibility_unit.empty() && rain_unit.empty() && sunrise.empty() && sunset.empty() && duration.empty() &&
            remaining.empty() && !timer_end && media_title.empty() && media_artist.empty() && media_album.empty() &&
-           media_picture.empty() && map_mark.empty() && !media_duration && !media_position && !media_position_at && fan_speeds.empty() && fan_speed.empty() &&
+           media_picture.empty() && map_mark.empty() && pd_mode.empty() && !media_duration && !media_position && !media_position_at && fan_speeds.empty() && fan_speed.empty() &&
            choices.empty() && room.empty() && !charging && std::isnan(tilt) && action.empty() && action_data.empty() &&
            action_templates.empty() && state_word.empty() && subtitle.empty() && !subtitle_at && effect.empty() &&
            option_rows.empty() && number_rows.empty() && lamps.empty() && code_format.empty() && changed_by.empty() && !arm_code_free &&
@@ -496,7 +497,7 @@ struct Tile {
   // card, its name included, and sends it in the page's strip like a live camera, so no map arithmetic lives here.
   // The map tile of the screen's own cards (firmware 0.21.0+) is the same picture, following whom the app is told to.
   bool is_map() const { return display == "map" && (domain() == "person" || entity == "screen.map" || is_pd_entity(entity)); }
-  // The Power Distribution cards of the fork's Library (screen.pd_*): pictures the app draws, shown like the map; a tap does nothing.
+  // The Power Distribution cards of the fork's Library (screen.pd_*): pictures the app draws, using the picture transport; a tap opens PD control mode.
   bool is_pd() const { return is_pd_entity(entity); }
   // The energy card (firmware 0.47.0+): the house's power, drawn from the numbers the app sends (energy_card.h).
   bool is_energy() const { return entity == "screen.energy"; }

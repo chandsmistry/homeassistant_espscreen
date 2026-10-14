@@ -1579,6 +1579,16 @@ inline void detail_command(int cmd){
     remote_key(t.entity,keys[i]);
     return;
   }
+  // The PD selector is a transient card, not an extra tile or a changed layout.
+  if (detail_index == SENSOR_DETAIL && detail_sensor.entity == "input_select.pd_control_mode") {
+    if (!fresh() || !detail_sensor.available() || cmd < SELECT_OPTION_FIRST ||
+        cmd >= SELECT_OPTION_FIRST + static_cast<int>(detail_sensor.extra().options.size()) ||
+        !allowed(esphome::millis(), 300 + cmd, detail_sensor.entity)) return;
+    const auto &option = detail_sensor.extra().options[cmd - SELECT_OPTION_FIRST];
+    if (option != detail_sensor.state)
+      action("input_select.select_option", detail_sensor.entity, "option", option, true);
+    return;
+  }
   if(!fresh()||detail_index>=model.count)return;
   {
     const std::string what="card button "+model.tiles[detail_index].entity;
@@ -5354,6 +5364,24 @@ inline void open_sensor_detail(const std::string &entity,const std::string &name
   detail_sensor.received=true;
   show_detail(SENSOR_DETAIL);
 }
+inline void pd_control_update(const Tile &card) {
+  if (detail_index != SENSOR_DETAIL || detail_sensor.entity != "input_select.pd_control_mode") return;
+  if (detail_sensor.state == card.extra().pd_mode && detail_sensor.extra().options == card.extra().options) return;
+  detail_sensor.state = card.extra().pd_mode;
+  Extra extra; extra.options = card.extra().options; detail_sensor.set_extra(std::move(extra), true);
+  refresh_detail(SENSOR_DETAIL);
+}
+inline void open_pd_control(const Tile &card) {
+  detail_sensor = Tile{};
+  detail_sensor.entity = "input_select.pd_control_mode";
+  detail_sensor.name = "PD control mode";
+  detail_sensor.state = card.extra().pd_mode.empty() ? "unavailable" : card.extra().pd_mode;
+  detail_sensor.received = true;
+  Extra extra; extra.options = card.extra().options; detail_sensor.set_extra(std::move(extra), true);
+  select_page = 0;
+  show_detail(SENSOR_DETAIL);
+  ESP_LOGI("pd_cards", "opened input_select.pd_control_mode selector (%u options)", (unsigned)card.extra().options.size());
+}
 inline void sensor_detail_update(const std::string &entity,const std::string &state){
   if(detail_index!=SENSOR_DETAIL||detail_sensor.entity!=entity||detail_sensor.state==state)return;
   detail_sensor.state=state;refresh_detail(SENSOR_DETAIL);
@@ -5687,6 +5715,11 @@ inline void event(lv_event_t *event) {
       // A navigation tile goes to its page on a short tap, with the link down too; holding does nothing.
       if (code != LV_EVENT_SHORT_CLICKED || card.tap == "none" || card.page_target() < 1) return;
       if (allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity)) go_to_page(card.page_target() - 1);
+      return;
+    }
+    if (card.is_pd()) {
+      if (code == LV_EVENT_SHORT_CLICKED && card.tap != "none" &&
+          allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity)) open_pd_control(card);
       return;
     }
     // The map tile opens full screen as any map does (firmware 0.21.0+).

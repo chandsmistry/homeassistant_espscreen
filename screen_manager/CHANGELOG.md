@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **PD tap controls.** PD cards have their own inspector with Controls → On tap, and no Map settings. A short tap opens the PD control mode selector; swipes and holds cannot open it. Requires updated firmware.
+
 - **PD picture caching.** Each download link pins the already-rendered image, avoiding a second render after sensor changes. Add-on preparation and HTTP timings are logged. Legacy PNG export is opt-in via SCREEN_PD_PNG_EXPORT=1.
 - **Picture-card resizing.** Resizing PD, Map or Energy cards no longer adds unsupported controls that blocked saving.
 

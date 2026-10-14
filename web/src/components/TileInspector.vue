@@ -94,7 +94,8 @@ const shownHint = computed(() => displayHint(props.tile, panel.value));
 // A live camera fills its card on every size, whole or cut to fill it, its name on it or nothing.
 const pictureCard = computed(() => display.value === "live");
 // A map card (app 0.4.33) and the map tile of the screen's own cards (app 0.4.36): its own section.
-const mapCard = computed(() => display.value === "map");
+const pdCard = computed(() => props.tile.entity.startsWith("screen.pd_"));
+const mapCard = computed(() => display.value === "map" && !pdCard.value);
 const mapTile = computed(() => props.tile.entity === "screen.map");
 // The energy card (app 0.4.77) is its diagram: no face and no second line to choose, its sensors are Home Assistant's.
 const energyTile = computed(() => props.tile.entity === "screen.energy");
@@ -181,7 +182,7 @@ const crumbs = computed(() => [
   { text: props.tile.entity, mono: true },
 ]);
 const lookShown = computed(() => !goesTo.value && !bedside.value && !key.value && (props.tile.entity !== "screen.settings" || display.value === "live" || domain.value === "sensor"));
-const controlsShown = computed(() => (domain.value !== "screen" && !goesTo.value) || Boolean(catalogue.value && size.value !== "single" && !goesTo.value) || (showSlider.value && !goesTo.value));
+const controlsShown = computed(() => pdCard.value || (domain.value !== "screen" && !goesTo.value) || Boolean(catalogue.value && size.value !== "single" && !goesTo.value) || (showSlider.value && !goesTo.value));
 // What the pointer rests on is drawn on the tile before it is picked (ChoiceField does the same for its lists).
 const subSample = (kind: string) => kind === "attr" ? `attr:${subAttribute.value || "state"}` : kind === "text" ? `text:${subText.value || t("editor.tile.sub.text_placeholder")}` : kind;
 const controlSample = (key: string) => domain.value === "cover" ? withCoverTilt(key, tiltSelected.value) : key;
@@ -224,16 +225,17 @@ const backgroundName = computed(() => inv.inventory.backgrounds?.[props.tile.opt
     <!-- What the card shows first, then where it stands, what a finger does to it, and last its icon and colour. -->
     <template v-if="!ui.phone || more">
     <Section v-if="lookShown || (!bedside && !key)" :title="t('editor.tile.sections.look')">
+      <p v-if="pdCard" class="hint">{{ t("editor.tile.pd.hint") }}</p>
       <p v-if="energyTile" class="hint">{{ t(scr.supports(0, 47, 0) ? "editor.tile.energy.hint" : "editor.tile.energy.needs_firmware") }}</p>
       <PropRow v-if="energyTile" :label="t('editor.tile.energy.flow.label')" icon="flash" :hint="t('editor.tile.energy.flow.hint')">
         <ChoiceField :choices="flowChoices" :value="current('flow', rules.energyFlow[0])" :tile="tile" preview-key="flow" :aria-label="t('editor.tile.energy.flow.label')" @pick="(v) => setTileOption(tile, 'flow', v)" />
       </PropRow>
-      <PropRow v-if="lookShown && tile.entity !== 'screen.settings' && !mapTile && !energyTile" :label="t('editor.tile.display.label')" icon="eye-outline" :hint="shownHint && !shownHint.warn ? shownHint.text : undefined">
+      <PropRow v-if="lookShown && tile.entity !== 'screen.settings' && !mapTile && !energyTile && !pdCard" :label="t('editor.tile.display.label')" icon="eye-outline" :hint="shownHint && !shownHint.warn ? shownHint.text : undefined">
         <ChoiceField :choices="displays" :value="display" :tile="tile" preview-key="display" :aria-label="t('editor.tile.display.label')" @pick="(v) => setTileOption(tile, 'display', v)" />
         <template v-if="shownHint?.warn" #note><small class="help warn">{{ shownHint.text }}</small></template>
       </PropRow>
       <!-- A bedside clock and its keys have no second line: the clock draws the time, a key its name alone. -->
-      <PropRow v-if="!bedside && !key && !mapCard && !energyTile" :label="t('editor.tile.sub.label')" icon="text-short" :hint="t(`editor.tile.sub.hint_${subKind}`)">
+      <PropRow v-if="!bedside && !key && !mapCard && !energyTile && !pdCard" :label="t('editor.tile.sub.label')" icon="text-short" :hint="t(`editor.tile.sub.hint_${subKind}`)">
         <ChoiceField :choices="subList" :value="subKind" :tile="tile" preview-key="sub" :sample="subSample" :aria-label="t('editor.tile.sub.label')" @pick="pickSubKind" />
         <template v-if="subKind === 'attr' || subKind === 'text'" #note>
           <UiSelect v-if="subKind === 'attr'" class="sub-value" :model-value="subAttribute" :options="subValues.map((value) => [value.key, value.name] as [string, string])"
@@ -271,7 +273,7 @@ const backgroundName = computed(() => inv.inventory.backgrounds?.[props.tile.opt
         <ChoiceField :choices="pages" :value="goesTo" :aria-label="t('editor.tile.goes_to.label')" @pick="(v) => retargetPageTile(tile, Number(v))" />
         <template v-if="goesHint.warn" #note><small class="help warn">{{ goesHint.text }}</small></template>
       </PropRow>
-      <PropRow v-if="domain !== 'screen' && !goesTo" :label="t('editor.tile.tap.label')" icon="gesture-tap">
+      <PropRow v-if="(domain !== 'screen' || pdCard) && !goesTo" :label="t('editor.tile.tap.label')" icon="gesture-tap">
         <ChoiceField :choices="taps" :value="tap" :aria-label="t('editor.tile.tap.label')" @pick="pickTap" />
         <template v-if="tapNote" #note>
           <small v-if="tapNote.warn" class="help warn">{{ tapNote.text }}</small>

@@ -950,6 +950,13 @@ std::string receive(const std::string &payload) {
     next.subtitle_at = extra["sm"].is<unsigned>() ? extra["sm"].as<unsigned>() : 0;
     // A map card's movement mark (app 0.4.33): a hash, never a place. A changed mark is a changed picture.
     next.map_mark = string(extra["mk"], 16);
+    if (tile.is_pd()) {
+      next.pd_mode = string(extra["pm"], 48);
+      if (extra["po"].is<JsonArray>()) for (JsonVariant option : extra["po"].as<JsonArray>()) {
+        if (next.options.size() == 16) break;
+        next.options.push_back(string(option, 48));
+      }
+    }
     // The energy card (app 0.4.77, firmware 0.47.0): the house now, split as Home Assistant's own live view splits it
     // (screen_manager/app/energy_flow.py): which sources it has, their power, the flows between them, the batteries'
     // charge, the sensor behind each source and the devices drawing power, biggest first.
@@ -1036,6 +1043,7 @@ std::string receive(const std::string &payload) {
     if (tile.domain() == "alarm_control_panel") alarm_state_arrived(index, before);
     if (tile.domain() == "lock") lock_state_arrived(index, before);
     refresh_detail(index);
+    if (tile.is_pd()) pd_control_update(tile);
     result = model.ready() ? "Synced" : "Loading tiles";
     return true;
   });

@@ -2326,7 +2326,11 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
     if (tile.get('options') or {}).get('display') == 'map':
         if tile['entity'].startswith('screen.pd_'):
             import pd_cards
-            return {'mk': pd_cards.screen_fingerprint(tile, states)}
+            mode = states.get('input_select.pd_control_mode') or {}
+            choices = (mode.get('attributes') or {}).get('options') or []
+            return {'mk': pd_cards.screen_fingerprint(tile, states),
+                    'pm': mode.get('state', 'unavailable'),
+                    'po': [str(option)[:48] for option in choices[:16]]}
         import map_card
         return {'mk': map_card.fingerprint(tile, states, entries)}
     if domain == 'light':

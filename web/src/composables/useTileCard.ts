@@ -103,7 +103,7 @@ export function useTileCard(props: TileCardProps) {
 
   // ---- What it writes ----
   const name = computed(() => props.tile.name || favoritePlay.value?.title || (domain.value === "screen" && region.screenBuiltinName(props.tile.entity)) || entities.entityName(props.tile.entity));
-  const note = computed(() => (face.value.display !== "standard" ? displayName(face.value.display) : ""));
+  const note = computed(() => props.tile.entity.startsWith("screen.pd_") ? t("editor.tile.pd.name") : (face.value.display !== "standard" ? displayName(face.value.display) : ""));
   const status = computed(() => stateText(props.tile.entity, current.value, { runs: runs.value, note: note.value,
     controlled: Boolean(face.value.controls && face.value.controls !== "none") }, words.value));
   const line = computed(() => subLine(String(props.tile.options?.sub ?? "auto"), current.value, status.value, words.value));
