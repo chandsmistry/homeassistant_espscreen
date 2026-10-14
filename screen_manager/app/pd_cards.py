@@ -14,6 +14,7 @@ import io
 import logging
 import json
 import re
+import time
 from pathlib import Path
 
 LOG = logging.getLogger(__name__)
@@ -519,6 +520,21 @@ def fingerprint(tile, states, dark=False):
     keys = [HEADER, ACTIVE_COLOR, BURST, 'input_select.pd_control_mode'] if name == 'header' else [BATTERIES, ACTIVE_COLOR, ELIGIBILITY[name]]
     seen = [(k, (states.get(k) or {}).get('state'), json.dumps((states.get(k) or {}).get('attributes'), sort_keys=True, default=str)) for k in keys]
     return hashlib.sha1(json.dumps(seen, default=str).encode()).hexdigest()[:10]
+
+
+_screen_marks = {}
+SCREEN_REFRESH_SECONDS = 15
+
+
+def screen_fingerprint(tile, states, *, now=None, cache=None):
+    """Let an in-flight picture finish before sensor updates invalidate its download."""
+    now = time.monotonic() if now is None else now
+    cache = _screen_marks if cache is None else cache
+    key = tile['entity']
+    previous = cache.get(key)
+    if previous is None or now - previous[0] >= SCREEN_REFRESH_SECONDS:
+        cache[key] = (now, fingerprint(tile, states))
+    return cache[key][1]
 
 
 def render_tile(tile, states, size, dark=False):

@@ -2326,7 +2326,7 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
     if (tile.get('options') or {}).get('display') == 'map':
         if tile['entity'].startswith('screen.pd_'):
             import pd_cards
-            return {'mk': pd_cards.fingerprint(tile, states)}
+            return {'mk': pd_cards.screen_fingerprint(tile, states)}
         import map_card
         return {'mk': map_card.fingerprint(tile, states, entries)}
     if domain == 'light':

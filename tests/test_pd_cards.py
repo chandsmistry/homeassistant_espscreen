@@ -13,6 +13,17 @@ STATES = json.loads((ROOT / 'tests/fixtures/pd_cards_states.json').read_text())
 
 
 class PdCards(unittest.TestCase):
+    def test_screen_mark_waits_for_download_then_follows_latest_data(self):
+        import copy
+        tile, cache = {'entity': 'screen.pd_header'}, {}
+        initial = pd_cards.screen_fingerprint(tile, STATES, now=0, cache=cache)
+        changed = copy.deepcopy(STATES)
+        changed[pd_cards.HEADER]['attributes']['grid_w'] = 12345
+        self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=1, cache=cache), initial)
+        self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=15, cache=cache),
+                         pd_cards.fingerprint(tile, changed))
+        self.assertNotEqual(pd_cards.fingerprint(tile, changed), initial)
+
     def test_header_collapses_template_whitespace_like_html(self):
         import copy
         multiline = copy.deepcopy(STATES)
