@@ -6,6 +6,7 @@ namespace pd_view {
 namespace rt=runtime_tiles;
 using pd_card::Data;
 using pd_card::Battery;
+static int line_height(const lv_font_t *font) { return static_cast<int>(lv_font_get_line_height(font)); }
 struct View {std::shared_ptr<const Data> data; int width=0,height=0; bool header=false;};
 struct Run {std::string text; const pd_decorations::Asset *asset=nullptr;};
 static std::vector<Run> runs(const std::string &text) {
@@ -26,18 +27,18 @@ static std::vector<Run> runs(const std::string &text) {
   return result;
 }
 static int rich_width(const std::string &text,const lv_font_t *font) {
-  int width=0, h=lv_font_get_line_height(font);
+  int width=0, h=line_height(font);
   for(const auto &r:runs(text))width+=r.asset?h:rt::text_width(r.text,font);
   return width;
 }
 static const lv_font_t *face(const std::string &text,int width,int height,bool title=false) {
   const lv_font_t *fonts[]={title?rt::label_font:rt::control_font,rt::small_font,nullptr};
-  for(auto *font:fonts)if(font && lv_font_get_line_height(font)<=height && rich_width(text,font)<=width)return font;
+  for(auto *font:fonts)if(font && line_height(font)<=height && rich_width(text,font)<=width)return font;
   return rt::small_font?rt::small_font:rt::label_font;
 }
 static void text(lv_layer_t *layer,int x,int y,int width,const std::string &value,const lv_font_t *font,lv_color_t ink,bool center=true) {
   if(!font || width<=0)return;
-  const int h=lv_font_get_line_height(font),total=rich_width(value,font);
+  const int h=line_height(font),total=rich_width(value,font);
   int cursor=x+(center?std::max(0,(width-total)/2):0);
   for(const auto &r:runs(value)) {
     const int w=r.asset?h:rt::text_width(r.text,font);
@@ -73,7 +74,7 @@ static std::string fixed(float v,int decimals=0){return screen_text::decimal(v,d
 static void pill(lv_layer_t *layer,int x,int y,int width,int height,const std::string &value,lv_color_t bg,lv_color_t ink) {
   auto *f=face(value,width-12,height-6);
   rect(layer,x,y,width,height,height/2,bg);
-  text(layer,x+6,y+(height-lv_font_get_line_height(f))/2,width-12,value,f,ink);
+  text(layer,x+6,y+(height-line_height(f))/2,width-12,value,f,ink);
 }
 static void header(lv_layer_t *layer,const View &view,int x,int y) {
   const Data &d=*view.data; const int width=view.width,height=view.height;
@@ -83,7 +84,7 @@ static void header(lv_layer_t *layer,const View &view,int x,int y) {
     "⚡ Grid: "+fixed(d.power[0])+" W  |  🎯 Target: "+fixed(d.power[1])+" W  |  Σ "+fixed(d.power[2])+" W",
     d.mode,d.story,d.glance};
   for(int i=0;i<5;++i) {
-    const auto *f=face(lines[i],inner,row-6,i==0 || i==2);const int fh=lv_font_get_line_height(f);
+    const auto *f=face(lines[i],inner,row-6,i==0 || i==2);const int fh=line_height(f);
     const int row_index=i+(d.burst && i>2?1:0),top=y+pad+row_index*row+(row-fh)/2;
     if(i==2) {
       const int pw=std::min(inner,rich_width(lines[i],f)+24),ph=std::min(row-4,fh+10);
@@ -92,7 +93,7 @@ static void header(lv_layer_t *layer,const View &view,int x,int y) {
   }
   if(d.burst) {
     const std::string label="🚀 Burst Enabled 🚀";const auto *f=face(label,inner,row-6);
-    const int pw=std::min(inner,rich_width(label,f)+24),ph=std::min(row-4,lv_font_get_line_height(f)+10);
+    const int pw=std::min(inner,rich_width(label,f)+24),ph=std::min(row-4,line_height(f)+10);
     pill(layer,x+(width-pw)/2,y+pad+3*row+(row-ph)/2,pw,ph,label,theme::color(theme::PD_BAD),theme::color(theme::PD_BAD_INK));
   }
 }
@@ -103,21 +104,21 @@ static void battery(lv_layer_t *layer,const Battery &b,const Data &data,int x,in
   const auto accent=charging?theme::color(theme::PD_SOC_2):lv_color_hex(data.color);
   rect(layer,x,y,width,height,std::max(6,width/40),ground,active?2:1,active?accent:theme::color(theme::LINE),active?std::max(4,pad):0);
   const auto *name=face(b.name,width/2,top-6,true),*small=face("Eligible",width/3,top-8);
-  const int ph=std::min(top-2,lv_font_get_line_height(small)+6);
+  const int ph=std::min(top-2,line_height(small)+6);
   const std::string eligibility=b.eligible?"✓ Eligible":"✗ Ineligible",connection=b.online?"● "+b.connection:"○ Offline";
   const int left=std::min(width/3,rich_width(eligibility,small)+12),right=std::min(width/4,rich_width(connection,small)+12);
   pill(layer,x+pad,y+gap,left,ph,eligibility,theme::color(b.eligible?theme::PD_OK:theme::PD_BAD),theme::color(b.eligible?theme::PD_OK_INK:theme::PD_BAD_INK));
   pill(layer,x+width-pad-right,y+gap,right,ph,connection,theme::color(b.online?theme::PD_OK:theme::PD_BAD),theme::color(b.online?theme::PD_OK_INK:theme::PD_BAD_INK));
   name=face(b.name,width-left-right-4*pad,top-4,true);
-  text(layer,x+pad+left+pad,y+gap+(ph-lv_font_get_line_height(name))/2,width-left-right-4*pad,b.name,name,theme::color(theme::INK));
+  text(layer,x+pad+left+pad,y+gap+(ph-line_height(name))/2,width-left-right-4*pad,b.name,name,theme::color(theme::INK));
   const std::string detail="SoC "+fixed(b.values[0],1)+"% · Rem "+fixed(b.values[1],2)+" kWh · "+
     (b.values[2]>10?"⚡ Charging "+fixed(b.values[2]):"Cap "+fixed(b.values[3]))+" W";
   const std::string power="Set "+fixed(b.values[4])+" W · Act "+fixed(b.values[5])+" W";
   const int bh=std::max(3,height/24),bar_gap=std::max(3,height/30),bar_top=height-3*(bh+bar_gap);
   const int line_h=std::max(8,(bar_top-top)/2),bw=width-2*pad;
   const auto *df=face(detail,bw,line_h),*pf=face(power,bw,line_h);
-  text(layer,x+pad,y+top+(line_h-lv_font_get_line_height(df))/2,bw,detail,df,theme::color(theme::INK));
-  text(layer,x+pad,y+top+line_h+(line_h-lv_font_get_line_height(pf))/2,bw,power,pf,theme::color(theme::INK));
+  text(layer,x+pad,y+top+(line_h-line_height(df))/2,bw,detail,df,theme::color(theme::INK));
+  text(layer,x+pad,y+top+line_h+(line_h-line_height(pf))/2,bw,power,pf,theme::color(theme::INK));
   for(int k=0;k<3;++k) {
     const int by=y+bar_top+k*(bh+bar_gap);const auto color=theme::color(k==2?theme::PD_ACT:static_cast<theme::Role>(theme::PD_SOC_1+b.key));
     rect(layer,x+pad,by,bw,bh,bh/2,theme::color(theme::TRACK));
@@ -136,18 +137,18 @@ static void draw(lv_event_t *event) {
   auto *layer=lv_event_get_layer(event);lv_area_t a;lv_obj_get_coords(canvas,&a);
   if(!view->data->available) {
     const std::string value="⏳ Waiting for controller data… ⏳";
-    auto *f=face(value,view->width,view->height/3);text(layer,a.x1,a.y1+(view->height-lv_font_get_line_height(f))/2,view->width,value,f,theme::color(theme::MUTED));return;
+    auto *f=face(value,view->width,view->height/3);text(layer,a.x1,a.y1+(view->height-line_height(f))/2,view->width,value,f,theme::color(theme::MUTED));return;
   }
   if(view->header){header(layer,*view,a.x1,a.y1);return;}
   const auto &d=*view->data;const int pad=std::max(6,std::min(view->width,view->height)/30),gap=std::max(5,pad);
-  const int title=d.batteries.size()>1?std::max(18,lv_font_get_line_height(rt::small_font)+gap):0;
-  const int foot=d.footer.empty()?0:lv_font_get_line_height(rt::small_font)+gap;
+  const int title=d.batteries.size()>1?std::max(18,line_height(rt::small_font)+gap):0;
+  const int foot=d.footer.empty()?0:line_height(rt::small_font)+gap;
   if(title)text(layer,a.x1+pad,a.y1+pad,view->width-2*pad,"Battery Allocations",rt::small_font,theme::color(theme::INK),false);
-  if(view->height < int(d.batteries.size())*(2*lv_font_get_line_height(rt::small_font)+18)+title+2*pad) {
+  if(view->height < int(d.batteries.size())*(2*line_height(rt::small_font)+18)+title+2*pad) {
     float total=0;for(const auto &battery:d.batteries)total+=battery.values[5];
     const std::string summary=std::to_string(d.batteries.size())+" batteries · Act "+fixed(total)+" W";
     const auto *f=face(summary,view->width-2*pad,view->height/2);
-    text(layer,a.x1+pad,a.y1+(view->height-lv_font_get_line_height(f))/2,view->width-2*pad,summary,f,theme::color(theme::INK));return;
+    text(layer,a.x1+pad,a.y1+(view->height-line_height(f))/2,view->width-2*pad,summary,f,theme::color(theme::INK));return;
   }
   const int count=std::max(1,int(d.batteries.size())),height=(view->height-2*pad-title-foot-(count-1)*gap)/count;
   for(int i=0;i<int(d.batteries.size());++i)battery(layer,d.batteries[i],d,a.x1+pad,a.y1+pad+title+i*(height+gap),view->width-2*pad,height);
