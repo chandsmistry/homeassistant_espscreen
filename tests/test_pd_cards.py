@@ -32,7 +32,7 @@ class PdCards(unittest.TestCase):
         changed = copy.deepcopy(STATES)
         changed[pd_cards.HEADER]['attributes']['grid_w'] = 12345
         self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=1, cache=cache), initial)
-        self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=15, cache=cache),
+        self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=pd_cards.SCREEN_REFRESH_SECONDS, cache=cache),
                          pd_cards.fingerprint(tile, changed))
         self.assertNotEqual(pd_cards.fingerprint(tile, changed), initial)
 

@@ -554,7 +554,7 @@ def fingerprint(tile, states, dark=False):
 
 
 _screen_marks = {}
-SCREEN_REFRESH_SECONDS = 15
+SCREEN_REFRESH_SECONDS = 45
 
 
 def screen_fingerprint(tile, states, *, now=None, cache=None):
