@@ -978,6 +978,29 @@ std::string receive(const std::string &payload) {
         }
         data->batteries.push_back(std::move(battery));
       }
+      if (pd["actions"].is<JsonArray>()) for (JsonVariant item : pd["actions"].as<JsonArray>()) {
+        if (data->actions.size() == 4 || !item.is<JsonObject>() || !item["k"].is<unsigned>()) return false;
+        const unsigned key=item["k"].as<unsigned>();
+        if (key >= std::size(tile_catalogue::pd::BLOCKS)) return false;
+        unsigned scope=0;for(const auto &item:tile_catalogue::pd::BLOCK_SCOPES)if(tile.entity==item.entity)scope=item.mask;
+        if(!(scope & (1u<<key)))return false;
+
+        for(const auto &old:data->actions)if(old.key==key)return false;
+        pd_card::Action action;action.key=key;action.none=item["n"].as<bool>();
+        if(!action.none) {
+          action.entity=string(item["e"],120);action.service=string(item["a"]["s"],64);
+          if(!valid_entity(action.entity) || action.entity.rfind("screen.",0)==0 || !valid_action(action.service))return false;
+          auto pairs=[](JsonVariant list,auto &out) {
+            if(!list.is<JsonArray>())return;
+            for(JsonVariant pair:list.as<JsonArray>()) {
+              if(out.size()==8 || !pair.is<JsonArray>() || pair.as<JsonArray>().size()!=2)continue;
+              auto key=string(pair[0],32);if(!key.empty())out.emplace_back(std::move(key),string(pair[1],400));
+            }
+          };
+          pairs(item["a"]["d"],action.data);pairs(item["a"]["t"],action.templates);
+        }
+        data->actions.push_back(std::move(action));
+      }
       next.pd = std::move(data);
     }
     // The energy card (app 0.4.77, firmware 0.47.0): the house now, split as Home Assistant's own live view splits it

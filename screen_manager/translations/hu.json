@@ -872,6 +872,12 @@
       },
       "extras": {
         "request": "Ez a módosítás ezen a kijelzőn nem lehetséges."
+      },
+      "pd_actions": {
+        "blocks": "Choose actions for this card’s battery blocks.",
+        "entity": "Choose a Home Assistant entity for the action.",
+        "legacy": "Use the card action to open its existing selector.",
+        "firmware": "Update this screen firmware before saving individual PD actions."
       }
     },
     "status": {
@@ -2409,7 +2415,10 @@
       },
       "pd": {
         "name": "Energiaelosztás",
-        "hint": "Élő energiaelosztási adatok. Az érintési művelet alább állítható be."
+        "hint": "Élő energiaelosztási adatok. Az érintési művelet alább állítható be.",
+        "use_card_action": "Use card action",
+        "action_entity": "Action entity",
+        "actions_hint": "Set an action for each block. Unset blocks use the card action above. Configuring an action does not run it."
       }
     },
     "tile_card": {

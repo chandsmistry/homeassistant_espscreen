@@ -2,7 +2,10 @@
 export type BuiltinName = "clock" | "nightstand" | "settings" | "map" | "energy" | "pd_header" | "pd_dp3" | "pd_ultra" | "pd_ac" | "pd_max" | "pd_batteries";
 export const BUILTIN_CARDS: string[] = ["screen.clock", "screen.nightstand", "screen.settings", "screen.map", "screen.energy",
   "screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"];
+export type PdBlockAction = { entity: string; action: { action: string; data?: Record<string, unknown> } };
+export type PdActions = Record<string, PdBlockAction | null>;
 export type TileOptions = {
+  pd_actions?: PdActions;
   // A plugin tile's own options (design): what its manifest lets the inspector set.
   plugin?: Record<string, string | number | boolean>;
   // The entity a plugin tile belongs to, when its manifest names a domain (`entity`).
@@ -60,7 +63,7 @@ export type PageTile = {
   appearance: { label: string; presentation?: "single" | "wide" | "tall" | "square" | "full" | `${number}x${number}`; display?: string; icon?: string; background?: string; historyHours?: number; refresh?: number; subtitle?: string; fit?: string; overlay?: string;
     mapEntities?: string[]; mapFraming?: string; mapDistance?: string; mapFollow?: string; mapMarkers?: string; mapNames?: string;
     mapZones?: string; mapStreets?: string; mapLook?: string; energyFlow?: string };
-  interaction: { tap?: string; inline?: string; controls?: string; action?: TileOptions["action"]; guard?: string; play?: FavoritePlay; speaker?: string; shuffle?: string; repeat?: string };
+  interaction: { pdActions?: PdActions; tap?: string; inline?: string; controls?: string; action?: TileOptions["action"]; guard?: string; play?: FavoritePlay; speaker?: string; shuffle?: string; repeat?: string };
   children?: ChildTile[];
 };
 export type Page = {

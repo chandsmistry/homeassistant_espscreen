@@ -20,7 +20,7 @@ inline constexpr uint16_t ACTION_BYTES = 256, LINE_BYTES = 96;
 inline constexpr uint16_t PAGE_BYTES = 48, BAR_TEXT_BYTES = 48;
 inline constexpr Memory MEMORY[] = {{"alarm_control_panel", 160, true}, {"automation", 112, false}, {"binary_sensor", 112, false}, {"button", 144, false}, {"camera", 96, false}, {"climate", 304, true}, {"cover", 96, true}, {"fan", 96, false}, {"humidifier", 192, true}, {"image", 144, false}, {"input_boolean", 112, false}, {"input_button", 144, false}, {"input_number", 112, false}, {"input_select", 1104, true}, {"light", 160, true}, {"lock", 160, true}, {"media_player", 1312, true}, {"number", 96, false}, {"person", 128, false}, {"remote", 928, true}, {"scene", 144, false}, {"screen", 32, false}, {"script", 96, false}, {"select", 1104, true}, {"sensor", 192, false}, {"sun", 32, true}, {"switch", 96, false}, {"timer", 96, true}, {"vacuum", 1088, true}, {"weather", 1152, true}};
 // The screen's own cards that keep more than their type, priced by their entity first (catalogue/screen.yaml `cards`).
-inline constexpr Memory CARDS[] = {{"screen.energy", 6144, true}, {"screen.pd_header", 6144, true}, {"screen.pd_dp3", 6144, true}, {"screen.pd_ultra", 6144, true}, {"screen.pd_ac", 6144, true}, {"screen.pd_max", 6144, true}, {"screen.pd_batteries", 6144, true}};
+inline constexpr Memory CARDS[] = {{"screen.energy", 6144, true}, {"screen.pd_header", 8192, true}, {"screen.pd_dp3", 8192, true}, {"screen.pd_ultra", 8192, true}, {"screen.pd_ac", 8192, true}, {"screen.pd_max", 8192, true}, {"screen.pd_batteries", 12288, true}};
 
 namespace pd {
 inline constexpr const char *ENTITIES[] = {"screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"};
@@ -29,6 +29,18 @@ inline constexpr const char *ENTITY_FIELD = "entity";
 inline constexpr const char *LEGACY_TARGET = "input_select.pd_control_mode";
 inline constexpr const char *SELECTOR_FEATURE = "pd_selector";
 inline constexpr const char *NATIVE_FEATURE = "pd_native";
+inline constexpr const char *ACTIONS_FEATURE = "pd_actions";
+inline constexpr const char *ACTIONS_OPTION = "pd_actions";
+inline constexpr const char *BLOCKS[] = {"header", "dp3", "ultra", "ac", "max"};
+struct BlockScope {const char *entity; unsigned mask;};
+inline constexpr BlockScope BLOCK_SCOPES[] = {
+{"screen.pd_header", 1u},
+{"screen.pd_dp3", 2u},
+{"screen.pd_ultra", 4u},
+{"screen.pd_ac", 8u},
+{"screen.pd_max", 16u},
+{"screen.pd_batteries", 30u},
+};
 inline constexpr const char *OPEN_TAP = "action";
 inline constexpr const char *SELECTOR_DOMAINS[] = {"input_select", "select"};
 }  // namespace pd

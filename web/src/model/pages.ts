@@ -245,6 +245,8 @@ export function projectLayout(layout: PageLayout, grid: PageGrid): Layout {
     ...(titles.length ? { page_titles: titles } : {}),
     tiles: layout.pages.flatMap((page, index) => page.tiles.map((tile): Tile => {
       const options: TileOptions = { ...clone(tile.interaction) }, size = footprintSize(tile, grid);
+      if (tile.interaction.pdActions) options.pd_actions = clone(tile.interaction.pdActions);
+      delete options.pdActions;
       for (const [key, wire] of Object.entries(appearanceKeys)) {
         const value = tile.appearance[key as keyof typeof appearanceKeys];
         if (value !== undefined) Object.assign(options, { [wire]: clone(value) });
@@ -423,8 +425,8 @@ export function arrangeTiles(layout: PageLayout, grid: PageGrid, entries: { tile
         if (options[wire] !== undefined) Object.assign(appearance, { [key]: clone(options[wire]) });
       }
       const interaction: PageTile["interaction"] = {};
-      for (const key of ["tap", "inline", "controls", "action", "guard", "play", "speaker", "shuffle", "repeat"] as const) {
-        if (options[key] !== undefined) Object.assign(interaction, { [key]: clone(options[key]) });
+      for (const key of ["tap", "inline", "controls", "action", "guard", "play", "speaker", "shuffle", "repeat", "pdActions"] as const) {
+        if (options[key === "pdActions" ? "pd_actions" : key] !== undefined) Object.assign(interaction, { [key]: clone(options[key === "pdActions" ? "pd_actions" : key]) });
       }
       // A key keeps its id: an edit of one key is not a new key.
       const mine = keys.filter((key) => key.in === tile.entity).sort((a, b) => (a.key ?? 0) - (b.key ?? 0));

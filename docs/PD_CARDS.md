@@ -31,4 +31,14 @@ camera:
     file_path: /config/www/pd_cards/header.png
 ```
 
-Native card data uses a shared block. Catalogue memory allowances conservatively reserve 6 KB per PD tile. Physical acceptance on one panel does not establish a flash budget or visual result for another board.
+Native card data uses a shared block. Catalogue memory allowances reserve space for PD data and bounded action configuration. Physical acceptance on one panel does not establish a flash budget or visual result for another board.
+
+## Independent block actions
+
+The Action section can configure a Home Assistant entity and one of its supported actions for the header, an individual battery card or each of the four blocks in combined Battery Allocations. Action fields come from Home Assistant. Configuration does not execute the action. Each block can instead use the card action or View only. An unset block keeps the existing selector action. The whole card's View only setting disables all taps.
+
+The catalogue defines the block keys, option name and pd_actions firmware capability. The add-on refuses to save block actions without that capability, including when HA action metadata is unavailable. Older firmware keeps the existing card action and picture fallback. Block configurations are preserved in page documents and exports. New interaction fields need a compatibility check before an add-on rollback.
+
+Native taps reuse the accepted panel geometry. One block sends only its own target/action; gaps, compact summaries, holds and drags do not send a block action. No new visible control or layout geometry is added. Local fake-transport tests cover these behaviours; physical block actions have not been tested. No real entity was operated during implementation.
+
+Catalogue allowances reserve 8 KB for the header or an individual battery card, and 12 KB for combined allocations, including bounded action data. These are conservative budgets, not measurements on another physical board.

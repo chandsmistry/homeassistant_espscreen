@@ -150,6 +150,29 @@ static void battery(lv_layer_t *layer,const Battery &b,const Data &data,int x,in
     } else rect(layer,x+pad,by,fill,bh,bh/2,color);
   }
 }
+struct PanelLayout {int pad=0,gap=0,title=0,foot=0,height=0;bool compact=false;};
+static PanelLayout panel_layout(const View &view) {
+  const auto &d=*view.data;PanelLayout result;
+  result.gap=std::max(5,view.width/40);
+  result.foot=d.footer.empty()?0:line_height(rt::small_font)+result.gap;
+  result.compact=view.height<int(d.batteries.size())*(2*line_height(rt::small_font)+18);
+  result.height=(view.height-result.foot-(std::max(1,int(d.batteries.size()))-1)*result.gap)/std::max(1,int(d.batteries.size()));
+  return result;
+}
+int action_key(const rt::Widgets &w,const lv_point_t &point) {
+  auto *canvas=w.parts[0];if(!canvas)return -1;
+  auto *view=static_cast<View *>(lv_obj_get_user_data(canvas));if(!view || !view->data || !view->data->available)return -1;
+  lv_area_t at;lv_obj_get_coords(canvas,&at);
+  const int x=point.x-at.x1,y=point.y-at.y1;
+  if(x<0 || x>=view->width || y<0 || y>=view->height)return -1;
+  if(view->header)return 0;
+  const auto layout=panel_layout(*view);if(layout.compact)return -1;
+  for(unsigned i=0;i<view->data->batteries.size();++i) {
+    const int top=int(i)*(layout.height+layout.gap);
+    if(y>=top && y<top+layout.height)return view->data->batteries[i].key+1;
+  }
+  return -1;
+}
 static void draw(lv_event_t *event) {
   auto *canvas=static_cast<lv_obj_t *>(lv_event_get_current_target(event));auto *view=static_cast<View *>(lv_obj_get_user_data(canvas));
   if(!view || !view->data)return;
@@ -160,17 +183,17 @@ static void draw(lv_event_t *event) {
   }
   if(view->header){header(layer,*view,a.x1,a.y1);return;}
   // The tile already supplies equal outer padding. Do not add a second inset.
-  const auto &d=*view->data;const int pad=0,gap=std::max(5,view->width/40);
-  const int title=0; // No heading inside the approved allocations card.
-  const int foot=d.footer.empty()?0:line_height(rt::small_font)+gap;
+  const auto &d=*view->data;const auto layout=panel_layout(*view);const int pad=layout.pad,gap=layout.gap;
+  const int title=layout.title; // No heading inside the approved allocations card.
+  const int foot=layout.foot;
   if(title)text(layer,a.x1+pad,a.y1+pad,view->width-2*pad,"Battery Allocations",rt::small_font,theme::color(theme::INK),false);
-  if(view->height < int(d.batteries.size())*(2*line_height(rt::small_font)+18)+title+2*pad) {
+  if(layout.compact) {
     float total=0;for(const auto &battery:d.batteries)total+=battery.values[5];
     const std::string summary=std::to_string(d.batteries.size())+" batteries · Act "+fixed(total)+" W";
     const auto *f=face(summary,view->width-2*pad,view->height/2);
     text(layer,a.x1+pad,a.y1+(view->height-line_height(f))/2,view->width-2*pad,summary,f,theme::color(theme::INK));return;
   }
-  const int count=std::max(1,int(d.batteries.size())),height=(view->height-2*pad-title-foot-(count-1)*gap)/count;
+  const int height=layout.height;
   for(int i=0;i<int(d.batteries.size());++i)battery(layer,d.batteries[i],d,a.x1+pad,a.y1+pad+title+i*(height+gap),view->width-2*pad,height);
   if(foot)text(layer,a.x1+pad,a.y1+view->height-pad-foot,view->width-2*pad,d.footer,face(d.footer,view->width-2*pad,foot),theme::color(theme::MUTED));
 }

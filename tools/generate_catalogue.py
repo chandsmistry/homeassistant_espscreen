@@ -241,15 +241,18 @@ def normalise(tile, types, translations, facts, commands=None):
         pd = data.get('pd')
         if pd is not None:
             check_keys(f'{where} pd', pd, {'entities', 'taps', 'action', 'action_name', 'action_description', 'entity_field',
-                                          'selector_domains', 'legacy_target', 'selector_feature', 'native_feature'})
+                                          'selector_domains', 'legacy_target', 'selector_feature', 'native_feature', 'actions_feature', 'actions_option', 'blocks', 'block_names', 'entity_blocks'})
             if domain != 'screen' or not isinstance(pd['entities'], list) or not pd['entities'] or \
                     any(not re.fullmatch(r'screen\.pd_[a-z0-9_]+', e) for e in pd['entities']) or \
                     set(pd['taps']) != {'action', 'none'} or not re.fullmatch(r'screen\.[a-z0-9_]+', pd['action']) or \
                     not re.fullmatch(r'[a-z_]+', pd['entity_field']) or \
                     any(d not in ('select', 'input_select') for d in pd['selector_domains']) or \
                     pd['legacy_target'].split('.')[0] not in pd['selector_domains'] or \
-                    any(not re.fullmatch(r'[a-z][a-z0-9_]{0,15}', pd[k]) for k in ('selector_feature', 'native_feature')):
+                    any(not re.fullmatch(r'[a-z][a-z0-9_]{0,15}', pd[k]) for k in ('selector_feature', 'native_feature', 'actions_feature')):
                 fail(f'{where} pd', 'invalid PD entities, taps or selector action')
+            if not re.fullmatch(r'[a-z_]+', pd['actions_option']) or pd['blocks'] != ['header','dp3','ultra','ac','max'] or len(pd['block_names']) != len(pd['blocks']) or set(pd['entity_blocks']) != set(pd['entities']) or any(not value or set(value)-set(pd['blocks']) for value in pd['entity_blocks'].values()):
+                fail(f'{where} pd','invalid PD block action catalogue')
+
         memory = data.get('memory')
         if memory is None:
             fail(where, 'says what one tile of it keeps in the memory inside the chip (memory: {bytes: N, extras: true or '
@@ -324,8 +327,15 @@ def header(catalogue):
     pd = catalogue['domains']['screen'].get('pd')
     if pd:
         lines += ['namespace pd {', 'inline constexpr const char *ENTITIES[] = {' + ', '.join(json.dumps(e) for e in pd['entities']) + '};']
-        for key in ('action', 'entity_field', 'legacy_target', 'selector_feature', 'native_feature'):
+        for key in ('action', 'entity_field', 'legacy_target', 'selector_feature', 'native_feature', 'actions_feature', 'actions_option'):
             lines.append(f'inline constexpr const char *{key.upper()} = {json.dumps(pd[key])};')
+        lines += ['inline constexpr const char *BLOCKS[] = {' + ', '.join(json.dumps(e) for e in pd['blocks']) + '};']
+        lines += ['struct BlockScope {const char *entity; unsigned mask;};', 'inline constexpr BlockScope BLOCK_SCOPES[] = {']
+        for entity, blocks in pd['entity_blocks'].items():
+            mask=sum(1 << pd['blocks'].index(key) for key in blocks)
+            lines.append('{' + json.dumps(entity) + ', ' + str(mask) + 'u},')
+        lines += ['};']
+
         lines += ['inline constexpr const char *OPEN_TAP = "action";',
                   'inline constexpr const char *SELECTOR_DOMAINS[] = {' + ', '.join(json.dumps(e) for e in pd['selector_domains']) + '};',
                   '}  // namespace pd', '']

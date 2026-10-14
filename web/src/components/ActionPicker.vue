@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Perform action (app 0.2.67): the actions Home Assistant offers for a tile's entity, under its own names,
 // and one field per value Home Assistant asks for (its selector). An empty field is left out.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { PD, isPdCard, pdAction } from "../model/catalogue";
 import { matchesQuery } from "../model/search";
 import { t } from "../i18n";
@@ -21,31 +21,38 @@ const scr = useScreenStore();
 const doc = useDocumentStore();
 const insp = useInspectorStore();
 
-const props = defineProps<{ tile: Tile }>();
-const list = computed(() => entities.entityActions[props.tile.entity]);
-const chosen = computed(() => props.tile.options?.action);
+const props = defineProps<{ tile: Tile; actionEntity?: string; actionConfig?: import("../types").TileOptions["action"]; controlled?: boolean }>();
+const emit=defineEmits<{ change: [action: import('../types').TileOptions['action']] }>();
+const actionEntity=computed(()=>props.actionEntity || props.tile.entity);
+const localOpen=ref(false),localSearch=ref('');
+const pickerOpen=computed({get:()=>props.controlled?localOpen.value:insp.actionPickerOpen,set:(v)=>{if(props.controlled)localOpen.value=v;else insp.actionPickerOpen=v;}});
+const search=computed({get:()=>props.controlled?localSearch.value:insp.actionSearch,set:(v)=>{if(props.controlled)localSearch.value=v;else insp.actionSearch=v;}});
+const list = computed(() => entities.entityActions[actionEntity.value]);
+const chosen = computed(() => props.controlled ? props.actionConfig : props.tile.options?.action);
 const entry = computed(() => list.value?.find((a) => a.action === chosen.value?.action));
-const open = computed(() => insp.actionPickerOpen || !chosen.value);
+const open = computed(() => pickerOpen.value || !chosen.value);
 const rows = computed(() => {
-  return (list.value || []).filter((a) => matchesQuery(insp.actionSearch, a.name, a.action, a.description));
+  return (list.value || []).filter((a) => matchesQuery(search.value, a.name, a.action, a.description));
 });
-if (list.value === undefined) entities.loadEntityActions(props.tile.entity);
+watch(actionEntity, (entity)=>{if(entities.entityActions[entity]===undefined)entities.loadEntityActions(entity);},{immediate:true});
 
 // Choosing an action stores Perform action with it (app 0.4.0): until then the tile keeps the tap choice it had, so a
 // half-made choice never reaches the document (GitHub #47). The chosen action is the tile's own, from the document.
 function pick(action: EntityAction) {
   const same = action.action === chosen.value?.action;
-  if (setTileAction(props.tile, same && chosen.value ? chosen.value : (isPdCard(props.tile.entity) && action.action === PD.action ? pdAction() : { action: action.action })) || same) insp.actionPickerOpen = false;
+  if(props.controlled){emit("change",same && chosen.value ? chosen.value : {action:action.action});pickerOpen.value=false;return;}
+  if (setTileAction(props.tile, same && chosen.value ? chosen.value : (isPdCard(props.tile.entity) && action.action === PD.action ? pdAction() : { action: action.action })) || same) pickerOpen.value = false;
 }
 function setField(key: string, value: unknown) {
-  const data: Record<string, unknown> = { ...(props.tile.options?.action?.data || {}) };
+  const data: Record<string, unknown> = { ...(chosen.value?.data || {}) };
   if (value === undefined) delete data[key];
   else data[key] = value;
-  setTileAction(props.tile, { action: chosen.value!.action, ...(Object.keys(data).length ? { data } : {}) }, `action:${props.tile.id}:${key}`);
+  const next={ action: chosen.value!.action, ...(Object.keys(data).length ? { data } : {}) };
+  if(props.controlled)emit("change",next);else setTileAction(props.tile,next,`action:${props.tile.id}:${key}`);
 }
 const missing = computed(() => {
   if (!entry.value) return [];
-  const data = props.tile.options?.action?.data || {};
+  const data = chosen.value?.data || {};
   return entry.value.fields.filter((f) => f.required && data[f.key] === undefined).map((f) => f.name);
 });
 type Field = EntityAction["fields"][number];
@@ -81,7 +88,7 @@ const unitOf = (field: Field) => configOf(field).unit_of_measurement || (kindOf(
     <small v-if="list === undefined">{{ t("editor.action.asking") }}</small>
     <small v-else-if="list === null" class="warn">{{ t("editor.action.not_answering") }}</small>
     <template v-else>
-      <button type="button" class="row" :aria-expanded="open ? 'true' : 'false'" @click="insp.actionPickerOpen = !open">
+      <button type="button" class="row" :aria-expanded="open ? 'true' : 'false'" @click="pickerOpen = !open">
         <span class="tx">
           <b>{{ entry ? entry.name : chosen ? chosen.action : t("editor.action.choose") }}</b>
           <small v-if="chosen" class="mono">{{ chosen.action }}</small>
@@ -89,7 +96,7 @@ const unitOf = (field: Field) => configOf(field).unit_of_measurement || (kindOf(
         <Icon :name="open ? 'chevron-up' : 'chevron-down'" class="row-chevron" />
       </button>
       <div v-if="open" class="picker">
-        <label class="search-field"><Icon name="magnify" /><input v-model="insp.actionSearch" type="search" :placeholder="t('editor.action.search')" :aria-label="t('editor.action.search_label')" /></label>
+        <label class="search-field"><Icon name="magnify" /><input v-model="search" type="search" :placeholder="t('editor.action.search')" :aria-label="t('editor.action.search_label')" /></label>
         <div class="action-list">
           <button v-for="action in rows" :key="action.action" type="button" class="action-choice" :aria-pressed="action.action === chosen?.action ? 'true' : 'false'" @click="pick(action)">
             <strong>{{ action.name }}</strong>

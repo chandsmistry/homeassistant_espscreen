@@ -71,7 +71,7 @@ export function validatePageShape(layout: PageLayout, plugins = false) {
       fields(tile.placement, ['row', 'column', 'columns', 'rows']);
       fields(tile.appearance, ['label', 'presentation', 'display', 'icon', 'background', 'historyHours', 'refresh', 'subtitle', 'fit', 'overlay',
         'mapEntities', 'mapFraming', 'mapDistance', 'mapFollow', 'mapMarkers', 'mapNames', 'mapZones', 'mapStreets', 'mapLook', 'energyFlow'], ['label']);
-      fields(tile.interaction, ['tap', 'inline', 'controls', 'action', 'guard', 'play', 'speaker', 'shuffle', 'repeat'], []);
+      fields(tile.interaction, ['tap', 'inline', 'controls', 'action', 'guard', 'play', 'speaker', 'shuffle', 'repeat', 'pdActions'], []);
       const content = tile.content;
       fields(content, ['kind', 'entityId', 'name', 'target', 'plugin', 'tile', 'options'], ['kind']);
       if (content.kind === 'entity') {
@@ -111,6 +111,18 @@ export function validatePageShape(layout: PageLayout, plugins = false) {
 
 export function validateCardOptions(tile: PageTile, entityId: string, size: string) {
   const a = tile.appearance, i = tile.interaction, domain = entityId.split('.')[0];
+  if (i.pdActions !== undefined) {
+    const allowed=(PD.entity_blocks as Record<string,string[]>)[entityId] || [];
+    fields(i.pdActions,allowed,[]);
+    if(!Object.keys(i.pdActions).length)fail('normalization');
+    for(const config of Object.values(i.pdActions)) {
+      if(config===null)continue;
+      fields(config,['entity','action']);
+      if(!entity(config.entity, typeof config.entity==='string'?[config.entity.split('.')[0]]:[]) || config.entity.startsWith('screen.') || config.action?.action?.startsWith('screen.'))fail();
+      validateCardOptions({...tile, appearance:{label:''}, interaction:{tap:'action',action:config.action}},config.entity,size);
+    }
+  }
+
   if ('presentation' in a && typeof a.presentation !== 'string') fail('size');
   // A name too long for the screen says so (app 0.4.1): emoji and accents count their bytes, not their letters.
   if (typeof a.label === 'string' && bytes(a.label) > 80) throw new Error(t('addon.errors.layout.tile_name'));

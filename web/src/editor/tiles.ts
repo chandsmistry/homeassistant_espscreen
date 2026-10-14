@@ -357,3 +357,14 @@ export function placeKey(tile: Tile, holder: Tile, key: number) {
     clock.children = children;
   });
 }
+
+/** An independent PD action never changes tile placement or the fallback selector. */
+export function setPdBlockAction(tile: Tile, block: string, config: import('../types').PdBlockAction | null | undefined) {
+  return useDocumentStore().editDocument((draft) => {
+    const found=draft.pages.flatMap(page=>page.tiles).find(item=>item.id===tile.id);
+    if(!found)throw new Error(t('addon.errors.pages.tile_missing'));
+    const actions={...found.interaction.pdActions};
+    if(config===undefined)delete actions[block];else actions[block]=pages.clone(config);
+    if(Object.keys(actions).length)found.interaction.pdActions=actions;else delete found.interaction.pdActions;
+  }, `pd-action:${tile.id}:${block}`);
+}

@@ -5381,6 +5381,22 @@ inline void pd_control_update(const Tile &card) {
   Extra extra; extra.options = card.extra().options; detail_sensor.set_extra(std::move(extra), true);
   refresh_detail(SENSOR_DETAIL);
 }
+inline bool finger_at(lv_point_t &point);
+inline bool perform_pd_block(Widgets &w,const Tile &card) {
+  const auto &data=card.extra().pd;
+  if(!data || data->actions.empty())return false;
+  lv_point_t point;if(!finger_at(point))return true;
+  const int key=pd_view::action_key(w,point);if(key<0)return true;
+  for(const auto &action:data->actions)if(action.key==key) {
+    if(!action.none) {
+      Tile target;target.entity=action.entity;target.received=true;
+      Extra extra;extra.action=action.service;extra.action_data=action.data;extra.action_templates=action.templates;
+      target.set_extra(std::move(extra),true);perform(target);
+    }
+    return true;
+  }
+  return false; // An unset block retains the card's existing selector action.
+}
 inline void open_pd_control(const Tile &card) {
   const auto target = pd_selector_target(card);
   if (target.empty()) return;
@@ -5732,7 +5748,9 @@ inline void event(lv_event_t *event) {
     }
     if (card.is_pd()) {
       if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap == tile_catalogue::pd::OPEN_TAP &&
-          allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity)) open_pd_control(card);
+          allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity)) {
+        if(!perform_pd_block(w,card))open_pd_control(card);
+      }
       return;
     }
     // The map tile opens full screen as any map does (firmware 0.21.0+).

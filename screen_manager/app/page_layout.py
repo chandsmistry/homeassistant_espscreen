@@ -33,7 +33,7 @@ APPEARANCE = {
 }
 # A favourite (app 0.4.42) keeps what it plays (`play`, Home Assistant's own ids) and on which speaker (`speaker`), and
 # since app 0.4.84 its own shuffle and repeat.
-INTERACTION = {"tap": "tap", "inline": "inline", "controls": "controls", "action": "action", "guard": "guard", "play": "play", "speaker": "speaker",
+INTERACTION = {"pdActions": "pd_actions", "tap": "tap", "inline": "inline", "controls": "controls", "action": "action", "guard": "guard", "play": "play", "speaker": "speaker",
                "shuffle": "shuffle", "repeat": "repeat"}
 
 
@@ -274,7 +274,7 @@ def footprint_size(columns, rows, grid, presentation=None):
 
 
 KEY_APPEARANCE = {"icon": "icon", "overlay": "overlay"}
-KEY_INTERACTION = {"tap": "tap", "action": "action", "guard": "guard"}
+KEY_INTERACTION = {"pdActions": "pd_actions", "tap": "tap", "action": "action", "guard": "guard"}
 
 
 def _keys(tile, entity, seen):

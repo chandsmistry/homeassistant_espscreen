@@ -10,6 +10,8 @@ import PluginTileInspector from "./PluginTileInspector.vue";
 import TileEntityFix from "./TileEntityFix.vue";
 import type { Tile } from "../types";
 import ActionPicker from "./ActionPicker.vue";
+import PdBlockAction from "./PdBlockAction.vue";
+import { PD } from "../model/catalogue";
 import IconPicker from "./IconPicker.vue";
 import { coverPrimary, hasCoverTilt, withCoverTilt } from "../model/tall-controls";
 import ChoiceField from "./ChoiceField.vue";
@@ -95,6 +97,7 @@ const shownHint = computed(() => displayHint(props.tile, panel.value));
 const pictureCard = computed(() => display.value === "live");
 // A map card (app 0.4.33) and the map tile of the screen's own cards (app 0.4.36): its own section.
 const pdCard = computed(() => props.tile.entity.startsWith("screen.pd_"));
+const pdBlocks=computed(()=>((PD.entity_blocks as Record<string,string[]>)[props.tile.entity] || []).map(key=>({key,name:PD.block_names[PD.blocks.indexOf(key)]!})));
 const mapCard = computed(() => display.value === "map" && !pdCard.value);
 const mapTile = computed(() => props.tile.entity === "screen.map");
 // The energy card (app 0.4.77) is its diagram: no face and no second line to choose, its sensors are Home Assistant's.
@@ -281,6 +284,10 @@ const backgroundName = computed(() => inv.inventory.backgrounds?.[props.tile.opt
         </template>
       </PropRow>
       <ActionPicker v-if="(domain !== 'screen' || pdCard) && !goesTo && tap === 'action'" :tile="tile" />
+      <template v-if="pdCard && tap==='action'">
+        <p class="hint">{{ t("editor.tile.pd.actions_hint") }}</p>
+        <PdBlockAction v-for="block in pdBlocks" :key="block.key" :tile="tile" :block="block.key" :label="block.name" />
+      </template>
       <PropRow v-if="domain === 'lock'" :label="t('editor.tile.guard.label')" icon="check-circle" :hint="t(guard === 'lock_only' ? 'editor.tile.guard.lock_only_hint' : 'editor.tile.guard.confirm_hint')">
         <ChoiceField :choices="guards" :value="guard" :aria-label="t('editor.tile.guard.label')" @pick="(v) => setTileOption(tile, 'guard', v)" />
       </PropRow>

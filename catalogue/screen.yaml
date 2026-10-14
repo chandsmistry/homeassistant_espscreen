@@ -7,12 +7,12 @@ memory: {bytes: 32, extras: false}
 cards:
   energy: {bytes: 6144, extras: true}
   # Native PD data, selector options and persistent draw canvas; a conservative bounded allowance.
-  pd_header: {bytes: 6144, extras: true}
-  pd_dp3: {bytes: 6144, extras: true}
-  pd_ultra: {bytes: 6144, extras: true}
-  pd_ac: {bytes: 6144, extras: true}
-  pd_max: {bytes: 6144, extras: true}
-  pd_batteries: {bytes: 6144, extras: true}
+  pd_header: {bytes: 8192, extras: true}
+  pd_dp3: {bytes: 8192, extras: true}
+  pd_ultra: {bytes: 8192, extras: true}
+  pd_ac: {bytes: 8192, extras: true}
+  pd_max: {bytes: 8192, extras: true}
+  pd_batteries: {bytes: 12288, extras: true}
 # How the energy card shows power along a line: running dots (power-flow-card-plus's, the default), or calm lines that
 # grow with the power and carry an arrow the way it goes. A firmware before this one keeps the dots.
 energy:
@@ -42,3 +42,14 @@ pd:
   legacy_target: input_select.pd_control_mode
   selector_feature: pd_selector
   native_feature: pd_native
+  actions_feature: pd_actions
+  actions_option: pd_actions
+  blocks: [header, dp3, ultra, ac, max]
+  block_names: [PD header, Delta Pro 3, Stream Ultra X, Stream AC, Stream MAX]
+  entity_blocks:
+    screen.pd_header: [header]
+    screen.pd_dp3: [dp3]
+    screen.pd_ultra: [ultra]
+    screen.pd_ac: [ac]
+    screen.pd_max: [max]
+    screen.pd_batteries: [dp3, ultra, ac, max]

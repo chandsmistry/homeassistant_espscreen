@@ -641,6 +641,7 @@ api:
                     features.add("climate_range");
                     features.add(tile_catalogue::pd::SELECTOR_FEATURE);
                     features.add(tile_catalogue::pd::NATIVE_FEATURE);
+                    features.add(tile_catalogue::pd::ACTIONS_FEATURE);
                     // media_library (firmware 0.24.0+, app 0.4.42+): a player's speaker menu, shuffle, repeat, seek, its
                     // cover's colours as the card's ground, and its library with covers and a tap that plays.
                     features.add("media_library");

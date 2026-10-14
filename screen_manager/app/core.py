@@ -1792,6 +1792,23 @@ def validate_tap_action(value):
         raise ValueError(t('addon.errors.tap_action.too_long'))
     return clean
 
+def validate_pd_actions(entity, value):
+    allowed = catalogue.PD['entity_blocks'].get(entity, ())
+    if not isinstance(value, dict) or not value or set(value) - set(allowed):
+        raise ValueError(t('addon.errors.pd_actions.blocks'))
+    result = {}
+    for key, config in value.items():
+        if config is None:
+            result[key] = None
+            continue
+        if not isinstance(config, dict) or set(config) != {'entity', 'action'} or not entity_id(config['entity']) or config['entity'].startswith('screen.'):
+            raise ValueError(t('addon.errors.pd_actions.entity'))
+        action = validate_tap_action(config['action'])
+        if action['action'].startswith('screen.'):
+            raise ValueError(t('addon.errors.pd_actions.legacy'))
+        result[key] = {'entity': config['entity'], 'action': action}
+    return result
+
 def validate_layout(data, stored=False, grid=DEFAULT_GRID):
     """A layout as the editor, a tile event or the storage gives it. `stored`: loaded from the app's own data, where a
     tile setting this version doesn't know (saved by a newer app) stays as it is instead of stopping the app.
@@ -1862,7 +1879,7 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
             continue
         if 'options' in tile:
             options = tile['options']
-            if not isinstance(options, dict) or set(options) - {'tap', 'display', 'inline', 'history_hours', 'background', 'size', 'icon', 'controls', 'action', 'refresh', 'sub', 'fit', 'overlay', 'guard', 'flow', *MAP_OWN, *FAVORITE_OWN}:
+            if not isinstance(options, dict) or set(options) - {'tap', 'display', 'inline', 'history_hours', 'background', 'size', 'icon', 'controls', 'action', 'pd_actions', 'refresh', 'sub', 'fit', 'overlay', 'guard', 'flow', *MAP_OWN, *FAVORITE_OWN}:
                 raise ValueError(t('addon.errors.layout.unknown_settings'))
             # A navigation tile (screen.page_<n>, firmware 0.2.62+) has a name, an icon, a colour and a width; never the page.
             if page_target(tile['entity']):
@@ -1873,6 +1890,8 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
                 raise ValueError(t('addon.errors.layout.background'))
             if 'icon' in options and not (options['icon'] == 'auto' or isinstance(options['icon'], str) and options['icon'] in tile_icons.ICONS):
                 raise ValueError(t('addon.errors.choose_icon'))
+            if 'pd_actions' in options:
+                options = {**options, 'pd_actions': validate_pd_actions(tile['entity'], options['pd_actions'])}
             domain = tile['entity'].split('.')[0]
             # The bedside clock is the whole page, always, and the only tile with keys.
             if tile['entity'] == NIGHTSTAND:
@@ -2322,7 +2341,7 @@ def media_extras(attrs):
 
 
 def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=None, entries=None, words=None, icon_of=None, device_name=None,
-           energy=None, home_name='', week=False, native_pd=False):
+           energy=None, home_name='', week=False, native_pd=False, pd_actions=False):
     """Small, pre-computed values the firmware cannot derive itself (time zones, forecasts, a vacuum's device, the rows of
     a light's effects page, the house's power split for the energy card from `energy`, Home Assistant's Energy settings)."""
     if tile['entity'] == ENERGY_TILE:
@@ -2340,6 +2359,9 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
         result = {'pm': mode.get('state', 'unavailable'), 'po': [str(option)[:48] for option in choices[:16]]}
         if native_pd:
             result['pd'] = pd_cards.native_payload(tile, states)
+            if pd_actions and (tile.get('options') or {}).get(catalogue.PD['actions_option']):
+                result['pd']['actions'] = [{'k': catalogue.PD['blocks'].index(key), **({'n': True} if config is None else {'e': config['entity'], 'a': action_for_screen(config['action'])})}
+                    for key, config in tile['options'][catalogue.PD['actions_option']].items()]
         else:
             result['mk'] = pd_cards.screen_fingerprint(tile, states)
         return result

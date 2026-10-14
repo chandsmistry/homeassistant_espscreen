@@ -31,3 +31,19 @@ describe("the Power Distribution cards (fork)", () => {
     expect(() => arrangeTiles(emptyLayout("Office"), grid, [{ tile: { entity: "screen.pd_header", name: "", slot: 0, options: { display: "standard", size: "wide" } }, slot: 0 }])).not.toThrow();
   });
 });
+
+describe('independent PD block actions',()=>{
+ it('keeps four actions and view-only independently without moving the card',()=>{
+  const actions={dp3:{entity:'switch.example',action:{action:'homeassistant.toggle'}},ultra:{entity:'script.example',action:{action:'script.turn_on'}},ac:null,max:{entity:'input_select.example',action:{action:'input_select.select_option',data:{option:'Manual'}}}};
+  const tile={entity:'screen.pd_batteries',name:'Batteries',slot:0,options:{size:'2x4',pd_actions:actions}};
+  const layout=arrangeTiles(emptyLayout('PD'),{columns:6,rows:6},[{tile,slot:0}]);
+  const valid=validatePages(layout,{columns:6,rows:6});
+  expect(valid.pages[0]!.tiles[0]!.interaction.pdActions).toEqual(actions);
+  expect(valid.pages[0]!.tiles[0]!.placement).toEqual({row:0,column:0,columns:2,rows:4});
+  expect(valid.pages[0]!.tiles[0]!.appearance).not.toHaveProperty('display');
+ });
+ it('rejects an action belonging to another card block',()=>{
+  const tile={entity:'screen.pd_header',name:'Header',slot:0,options:{size:'square',pd_actions:{dp3:null}}};
+  expect(()=>arrangeTiles(emptyLayout('PD'),{columns:6,rows:6},[{tile,slot:0}])).toThrow();
+ });
+});

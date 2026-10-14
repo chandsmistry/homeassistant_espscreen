@@ -2453,6 +2453,19 @@ class Manager:
         """Refuse a tile setting Home Assistant doesn't support for its entity, before saving (app 0.2.67): On / off on a
         speaker that can't turn on and off, a small slider on a light without brightness. A setting a tile already has
         stays, and nothing is refused while Home Assistant can't say."""
+        # Capability negotiation is required even when HA action metadata is unavailable.
+        candidate = data.get('layout', {}) if isinstance(data, dict) and data.get('format') == PAGE_FORMAT else data
+        requested = False
+        if isinstance(candidate, dict):
+            if 'pages' in candidate:
+                requested = any(isinstance(tile, dict) and isinstance(tile.get('interaction'), dict) and tile['interaction'].get('pdActions')
+                    for page in (candidate.get('pages') if isinstance(candidate.get('pages'), list) else []) if isinstance(page, dict)
+                    for tile in (page.get('tiles') if isinstance(page.get('tiles'), list) else []))
+            else:
+                requested = any(isinstance(tile, dict) and isinstance(tile.get('options'), dict) and tile['options'].get(catalogue.PD['actions_option'])
+                    for tile in (candidate.get('tiles') if isinstance(candidate.get('tiles'), list) else []))
+        if requested and catalogue.PD['actions_feature'] not in (getattr(self.page_senders.get(self.aliases.get(inbox, inbox)), 'features', set()) or set()):
+            raise ValueError(t('addon.errors.pd_actions.firmware'))
         capabilities = getattr(self.ha, 'capabilities', None)
         if capabilities is None:
             return
@@ -2470,6 +2483,16 @@ class Manager:
             before.setdefault(tile['entity'], []).append(tile)
         for tile in layout['tiles']:
             if pd_cards.is_tile(tile['entity']):
+                block_actions = (tile.get('options') or {}).get(catalogue.PD['actions_option'])
+                if block_actions:
+                    for config in block_actions.values():
+                        if config is None: continue
+                        target_entity = config['entity']
+                        if self.ha.states and target_entity not in self.ha.states:
+                            raise ValueError(t('addon.errors.layout.entity_gone'))
+                        problem = ha_catalogue.action_problem(target_entity, target_entity, config['action'], self.ha.states.get(target_entity),
+                            await self.ha.entity_actions(target_entity), self.ha.services)
+                        if problem: raise ValueError(problem)
                 target = catalogue.selector_target(tile)
                 if target and target != catalogue.PD['legacy_target'] and catalogue.PD['selector_feature'] not in (getattr(self.page_senders.get(inbox), 'features', set()) or set()):
                     raise ValueError('Update this screen firmware before configuring another selector entity.')
@@ -2663,7 +2686,8 @@ class Manager:
                      home_name=getattr(self.ha,'location_name','') if tile['entity'] == ENERGY_TILE else '',
                      entries=self.registry_index() if light or (tile.get('options') or {}).get('display') == 'map' else None,words=getattr(self.ha,'state_words',None) if light else None,
                      icon_of=row_icon if light else None,device_name=self.device_name_of(tile['entity']) if light else None,week=week,
-                     native_pd=features is None or catalogue.PD['native_feature'] in features)
+                     native_pd=features is None or catalogue.PD['native_feature'] in features,
+                     pd_actions=features is None or catalogue.PD['actions_feature'] in features)
         if tile['entity'].startswith('vacuum.'):
             ha_catalogue.chip_words(extra,tile['entity'],self.ha.states,device,getattr(self.ha,'state_words',None))
         message=state_message(index,tile,states,extra,
