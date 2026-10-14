@@ -47,9 +47,29 @@ class PdCards(unittest.TestCase):
         changed = copy.deepcopy(STATES)
         changed[pd_cards.HEADER]['attributes']['grid_w'] = 12345
         self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=1, cache=cache), initial)
-        self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=pd_cards.SCREEN_REFRESH_SECONDS, cache=cache),
-                         pd_cards.fingerprint(tile, changed))
+        self.assertNotEqual(pd_cards.screen_fingerprint(tile, changed, now=pd_cards.SCREEN_REFRESH_SECONDS, cache=cache), initial)
         self.assertNotEqual(pd_cards.fingerprint(tile, changed), initial)
+
+    def test_confirmed_mode_refreshes_both_cards_before_telemetry_interval(self):
+        import copy
+        changed = copy.deepcopy(STATES)
+        changed[pd_cards.HEADER]['attributes']['mode'] = 'New confirmed mode'
+        for entity in ('screen.pd_header', 'screen.pd_batteries'):
+            tile, cache = {'entity': entity}, {}
+            initial = pd_cards.screen_fingerprint(tile, STATES, now=0, cache=cache)
+            latest = pd_cards.screen_fingerprint(tile, changed, now=1, cache=cache)
+            self.assertNotEqual(latest, initial, entity)
+            telemetry = copy.deepcopy(changed)
+            telemetry[pd_cards.HEADER]['attributes']['grid_w'] = 12345
+            self.assertEqual(pd_cards.screen_fingerprint(tile, telemetry, now=2, cache=cache), latest)
+
+    def test_selector_change_waits_for_rendered_sensor_confirmation(self):
+        import copy
+        tile, cache = {'entity': 'screen.pd_header'}, {}
+        initial = pd_cards.screen_fingerprint(tile, STATES, now=0, cache=cache)
+        changed = copy.deepcopy(STATES)
+        changed['input_select.pd_control_mode'] = {'state': 'New requested mode', 'attributes': {}}
+        self.assertEqual(pd_cards.screen_fingerprint(tile, changed, now=1, cache=cache), initial)
 
     def test_header_collapses_template_whitespace_like_html(self):
         import copy

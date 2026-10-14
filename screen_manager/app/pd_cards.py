@@ -558,13 +558,20 @@ SCREEN_REFRESH_SECONDS = 45
 
 
 def screen_fingerprint(tile, states, *, now=None, cache=None):
-    """Let an in-flight picture finish before sensor updates invalidate its download."""
+    """Pace telemetry, but publish a confirmed mode change without the telemetry delay."""
     now = time.monotonic() if now is None else now
     cache = _screen_marks if cache is None else cache
     key = tile['entity']
+    # Use the rendered sensor's confirmed mode, rather than the selector alone:
+    # its template can update after the selector, so requesting earlier draws
+    # the old label. Include it in both cards' marks even when their own source
+    # values have not changed yet.
+    mode = ((states.get(HEADER) or {}).get('attributes') or {}).get('mode')
     previous = cache.get(key)
-    if previous is None or now - previous[0] >= SCREEN_REFRESH_SECONDS:
-        cache[key] = (now, fingerprint(tile, states))
+    if previous is None or mode != previous[2] or now - previous[0] >= SCREEN_REFRESH_SECONDS:
+        import hashlib
+        mark = hashlib.sha1(json.dumps([fingerprint(tile, states), mode], default=str).encode()).hexdigest()[:10]
+        cache[key] = (now, mark, mode)
     return cache[key][1]
 
 
