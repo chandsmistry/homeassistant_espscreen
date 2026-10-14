@@ -476,6 +476,10 @@ def validate_document(data, grid):
             content = tile.get('content') or {}
             if content.get('kind') == 'builtin' and catalogue.is_pd('screen.' + content.get('name', '')):
                 tile['interaction'] = catalogue.pd_options(tile['interaction'])
+                tile['interaction'].pop('controls', None); tile['interaction'].pop('inline', None)
+                for key in ('display', 'mapEntities', 'mapFraming', 'mapDistance', 'mapFollow', 'mapMarkers', 'mapNames',
+                            'mapZones', 'mapStreets', 'mapLook', 'overlay', 'fit', 'refresh', 'subtitle', 'historyHours'):
+                    tile['appearance'].pop(key, None)
     flat['tiles'] = compile_tiles(data, grid)
     checked = validate_layout(flat, grid=grid)
     # The legacy validator sorts by slot and normalizes documented defaults.

@@ -279,7 +279,7 @@ def live_request(request, atlas=False):
 
 def map_supported(entity):
     """Whether an entity's tile may be a map: a person's (app 0.4.33), and the screen's own map tile (app 0.4.36)."""
-    return isinstance(entity, str) and (entity.startswith('person.') or entity == 'screen.map' or entity.startswith('screen.pd_'))
+    return isinstance(entity, str) and (entity.startswith('person.') or entity == 'screen.map' or __import__('pd_cards').is_tile(entity))
 
 
 def live_dark(request):
@@ -677,7 +677,7 @@ class CameraFeed:
         `mark()` names what it would draw right now and stands where a camera's digest stands, `draw(width, height)` is
         an awaitable of that picture at exactly its frame's size. The mark is asked on every load, so a link loaded
         again after someone moved draws where they are then."""
-        measured = all(e.startswith('screen.pd_') for e in entities)
+        measured = all(__import__('pd_cards').is_tile(e) for e in entities)
         started = time.monotonic()
         render_ms = encode_ms = 0.0
         renders = renders or [None] * len(entities)

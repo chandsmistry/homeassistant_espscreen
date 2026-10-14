@@ -1,3 +1,4 @@
+import { PD, isPdCard, pdAction } from "./catalogue";
 // ---- Grid positions ----
 // A screen's page is a grid of cells: two columns and three rows on the boards that shipped first, and
 // whatever a newer screen reports for itself (firmware 0.2.80 says "800x480 3x2"). A tile's `slot` is its
@@ -260,7 +261,7 @@ export function defaultOptions(id: string, covers = false): Partial<Tile> {
   if (id === "screen.nightstand") return { options: { size: "full", background: "none" } };
   // The map tile (app 0.4.36) starts double width, following everyone Home Assistant knows the place of.
   // The Power Distribution cards (fork): the header is a wide picture, a battery card too.
-  if (id.startsWith("screen.pd_")) return { options: { display: "map", size: "wide" } };
+  if (isPdCard(id)) return { options: { size: "wide", tap: PD.taps[0], action: pdAction() } };
   if (id === "screen.map") return { options: { display: "map", size: "wide" } };
   // The energy card (app 0.4.77) starts 2 x 2, the least power-flow-card-plus takes; the store takes a larger size where
   // the glass is too low for that (startTile).

@@ -198,7 +198,7 @@ export function resizeChoices(tile: Tile, axis: "columns" | "rows"): Size[] {
     // tile there grows into the page and a page shrinks back into a tile.
     const start = size === "full" ? current.slot - (current.slot % grid.slots) : current.slot;
     if (!owned || dimensions(size, grid)[other] !== before[other] || start !== current.slot || !fits(taken, current.slot, size)) return false;
-    try { validateCardOptions(owned, current.entity, size); return true; }
+    try { validateCardOptions(pages.normalizePdCard(owned), current.entity, size); return true; }
     catch { return false; }
   });
 }

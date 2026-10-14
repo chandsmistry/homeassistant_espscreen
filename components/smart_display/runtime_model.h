@@ -11,6 +11,7 @@
 #include "page_protocol.h"
 #include "optimistic.h"
 #include "energy_card.h"
+#include "pd_card.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -313,6 +314,7 @@ struct Extra {
   std::string map_mark;
   // The energy card's moment (firmware 0.47.0+): its own block, so no other tile's extras grow by it.
   std::shared_ptr<const energy_card::Data> energy;
+  std::shared_ptr<const pd_card::Data> pd;
   uint32_t media_duration = 0, media_position = 0, media_position_at = 0;
   // More of a media player (firmware 0.24.0+, app 0.4.42+): the speaker it plays on and the ones it may (source_list,
   // sixteen at most), shuffle (-1 for a player without it) and repeat ("" without it), the features it reported at its
@@ -388,7 +390,7 @@ struct Extra {
            media_source.empty() && media_repeat.empty() && media_sources.empty() && media_shuffle < 0 && !media_features &&
            speaker_flags.empty() && speaker_volumes.empty() && media_inputs.empty() && media_input.empty() && media_target.empty() &&
            !has_ground && !ground_known && !media_library && fav_kind.empty() && fav_source.empty() && fav_mark.empty() &&
-           fav_glyph.empty() && !fav_playing && !energy && plugin_options.empty() && plugin_state.empty() && plugin_entity.empty();
+           fav_glyph.empty() && !fav_playing && !energy && !pd && plugin_options.empty() && plugin_state.empty() && plugin_entity.empty();
   }
 };
 // The numbers of a clock text ("0:05:00", "07:45"), at most `max` of them, each after optional white space, up to the
@@ -495,7 +497,7 @@ struct Tile {
   // A map of where this person and the people with them are (firmware 0.20.0+, app 0.4.33): the app draws the whole
   // card, its name included, and sends it in the page's strip like a live camera, so no map arithmetic lives here.
   // The map tile of the screen's own cards (firmware 0.21.0+) is the same picture, following whom the app is told to.
-  bool is_map() const { return display == "map" && (domain() == "person" || entity == "screen.map" || is_pd_entity(entity)); }
+  bool is_map() const { return (is_pd() && !extra().pd) || (display == "map" && (domain() == "person" || entity == "screen.map")); }
   // The Power Distribution cards of the fork's Library (screen.pd_*): pictures the app draws, using the picture transport; a tap opens PD control mode.
   bool is_pd() const { return is_pd_entity(entity); }
   // The energy card (firmware 0.47.0+): the house's power, drawn from the numbers the app sends (energy_card.h).

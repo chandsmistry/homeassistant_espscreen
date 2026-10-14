@@ -357,6 +357,8 @@ static void test_map_tile() {
     pd.state = "Stream Weighted"; Extra selector; selector.options = {"Master Distribution", "Stream Weighted", "Off"};
     pd.set_extra(std::move(selector));
     assert(pd.state == "Stream Weighted" && pd.extra().options.size() == 3);
+    pd.edit_extra().pd = std::make_shared<pd_card::Data>();
+    assert(!pd.is_map() && !pd.pictured());
   }
   Tile camera;
   camera.entity = "camera.door";

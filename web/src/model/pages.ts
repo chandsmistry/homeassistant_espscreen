@@ -13,6 +13,7 @@ import { spanOf, spanOffered } from "./sizes";
 import { STORE_MAX_BAR_ITEMS, STORE_MAX_PAGES, dimensions, type Size } from "./layout";
 import { isSize } from "./sizes";
 import { validateCardOptions, validatePageShape } from './page-validation';
+import { PD, isPdCard, pdAction } from "./catalogue";
 import rules from './page-rules.json';
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -260,8 +261,23 @@ export function projectLayout(layout: PageLayout, grid: PageGrid): Layout {
   };
 }
 
+const PD_OLD_APPEARANCE = ['display','mapEntities','mapFraming','mapDistance','mapFollow','mapMarkers','mapNames','mapZones','mapStreets','mapLook','overlay','fit','refresh','subtitle','historyHours'];
+export function normalizePdCard(tile: PageTile): PageTile {
+  if (tile.content.kind !== 'builtin' || !isPdCard(`screen.${tile.content.name}`)) return tile;
+  const out = clone(tile);
+  for (const key of PD_OLD_APPEARANCE) delete (out.appearance as any)[key];
+  delete out.interaction.controls; delete out.interaction.inline;
+  if ((out.interaction.tap ?? 'auto') === 'auto') {out.interaction.tap=PD.taps[0];out.interaction.action=pdAction();}
+  return out;
+}
 export function validatePages(layout: PageLayout, grid: PageGrid): PageLayout {
   validatePageShape(layout, grid.plugins === true);
+  if (layout.pages.some(page => page.tiles.some(tile => tile.content.kind === 'builtin' && isPdCard(`screen.${tile.content.name}`) &&
+      (Object.keys(tile.appearance).some(key => PD_OLD_APPEARANCE.includes(key)) || (tile.interaction.tap ?? 'auto') === 'auto' ||
+       tile.interaction.controls !== undefined || tile.interaction.inline !== undefined)))) {
+    layout = clone(layout);
+    for (const page of layout.pages) page.tiles = page.tiles.map(normalizePdCard);
+  }
   if (![grid.columns, grid.rows].every((n) => Number.isInteger(n) && n > 0) || grid.columns * grid.rows > 64)
     throw new Error(t("editor.pages.wait_grid"));
   if (!layout.pages.length || layout.pages.length > pageLimit(grid)) throw new Error(t("addon.errors.pages.pages_full"));

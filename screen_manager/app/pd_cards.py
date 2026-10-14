@@ -589,3 +589,33 @@ def render_tile(tile, states, size, dark=False):
     out = Image.new('RGB', (width, height), THEMES[theme]['card'])
     out.paste(card, ((width - card.width) // 2, (height - card.height) // 2))
     return out
+
+
+def native_payload(tile, states):
+    """Small live data for negotiated native drawing; no picture mark or throttle."""
+    name = TILES[tile['entity']]
+    source = states.get(HEADER if name == 'header' else BATTERIES) or {}
+    attrs = source.get('attributes') or {}
+    valid = bool(source) and source.get('state') not in ('unknown', 'unavailable', 'none', '')
+    color = hex_rgb((states.get(HEADER) or {}).get('attributes', {}).get('active_color') or state_of(states, ACTIVE_COLOR))
+    result = {'ok': valid, 'color': (color[0] << 16) | (color[1] << 8) | color[2]}
+    if name == 'header':
+        result.update(mode=inline_text(attrs.get('mode') or 'Controller Disabled')[:96],
+                      story=inline_text(attrs.get('story') or 'Waiting for controller state…')[:160],
+                      glance=inline_text(attrs.get('glance') or '')[:160],
+                      p=[trunc(attrs.get('grid_w')), trunc(attrs.get('tgt_w', -100)), trunc(attrs.get('total_w'))],
+                      ctrl=truthy(attrs.get('ctrl')), burst=truthy(attrs.get('burst')))
+    else:
+        data = parse_batteries(states) or {}
+        keys = ['dp3', 'ultra', 'ac', 'max'] if name == 'batteries' else [name]
+        rows = []
+        for key in keys:
+            d = data.get(key) or {}
+            rows.append({'key': keys.index(key) if name == 'batteries' else ['dp3','ultra','ac','max'].index(key),
+                         'name': str(d.get('name') or {'dp3':'Delta Pro 3','ultra':'Stream Ultra X','ac':'Stream AC','max':'Stream MAX'}[key])[:48],
+                         'eligible': eligible_of(states, key, d), 'online': truthy(d.get('online')),
+                         'conn': str(d.get('conn_type') or '')[:16], 'glow': str(d.get('glow_class') or 'glow-off')[:24], 'solar': truthy(d.get('has_solar')),
+                         'v': [number(d.get(k)) for k in ('soc','kwh','charge','cap','set','act','bar_soc','bar_set','bar_act','bar_act_solar','bar_act_batt')]})
+        result['rows'] = rows
+        result['footer'] = ' · '.join(footer(states))[:160]
+    return result

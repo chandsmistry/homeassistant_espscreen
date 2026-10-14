@@ -115,6 +115,8 @@ enum Role : uint8_t {
   // Assistant's own weather pictures draw them; a sun, drops and flakes keep their condition colours
   WEATHER_CLOUD,
   WEATHER_CLOUD_BACK,
+  PD_SOC_1, PD_SOC_2, PD_SOC_3, PD_SOC_4, PD_ACT, PD_SOLAR,
+  PD_OK, PD_OK_INK, PD_BAD, PD_BAD_INK, PD_PILL_INK,
   ROLE_COUNT
 };
 
@@ -204,6 +206,17 @@ inline constexpr Pair ROLES[ROLE_COUNT] = {
   /* ENERGY_REST */              {0xBDBDBD, 0x707070},  // dark: #6F6F6F on the panel's grey step
   /* WEATHER_CLOUD */            {0xB0BEC5, 0xCFD8DC},
   /* WEATHER_CLOUD_BACK */       {0x90A4AE, 0x78909C},
+  /* PD_SOC_1 */ {0xF59E0B, 0xFBBF24},
+  /* PD_SOC_2 */ {0x22C55E, 0x4ADE80},
+  /* PD_SOC_3 */ {0x3B82F6, 0x60A5FA},
+  /* PD_SOC_4 */ {0x8B5CF6, 0xA78BFA},
+  /* PD_ACT */ {0x60A0C4, 0x60A0C4},
+  /* PD_SOLAR */ {0xFDE047, 0xFDE047},
+  /* PD_OK */ {0xDCFCE7, 0x14382A},
+  /* PD_OK_INK */ {0x065F46, 0xA7F3D0},
+  /* PD_BAD */ {0xFEE2E2, 0x451A1A},
+  /* PD_BAD_INK */ {0x7F1D1D, 0xFECACA},
+  /* PD_PILL_INK */ {0x111111, 0x111111},
 };
 
 // The look on screen. The board sets it through set_dark() (below) from the Dark mode setting; the table and the

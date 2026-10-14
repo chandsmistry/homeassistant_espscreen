@@ -57,6 +57,7 @@
 #include "media_card.h"
 #include "saver_view.h"
 #include "energy_view.h"
+#include "pd_view.h"
 #include "plugin_api.h"
 #include "plugin_host.h"
 #include "screen_hooks.h"
@@ -5730,20 +5731,20 @@ inline void event(lv_event_t *event) {
       return;
     }
     if (card.is_pd()) {
-      if (code == LV_EVENT_SHORT_CLICKED && card.tap == tile_catalogue::pd::OPEN_TAP &&
+      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap == tile_catalogue::pd::OPEN_TAP &&
           allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity)) open_pd_control(card);
       return;
     }
     // The map tile opens full screen as any map does (firmware 0.21.0+).
     if (card.is_map()) {
-      if (code == LV_EVENT_SHORT_CLICKED && card.tap == tile_catalogue::pd::OPEN_TAP && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap == tile_catalogue::pd::OPEN_TAP && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         camera_open(card.entity, card.name, (int)w.index);  // its name comes with its state ("Map")
       return;
     }
     // The energy card: a circle with a sensor behind it opens that sensor's history (firmware 0.47.0+).
     if (card.is_energy()) {
       lv_point_t at;
-      if (code == LV_EVENT_SHORT_CLICKED && card.tap == tile_catalogue::pd::OPEN_TAP && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap == tile_catalogue::pd::OPEN_TAP && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         energy_view::tap(w, card, at);
       return;
     }
@@ -8354,7 +8355,8 @@ inline void render_slot(size_t slot) {
   bool energy=t.is_energy();
   // A plugin's tile (docs/PLUGINS.md) draws itself too, when this screen has its plugin; else it is a plain card.
   bool plugin=t.is_plugin() && plugin_host::known(t);
-  bool custom=clock||forecast||sunpath||bedside||energy||plugin;
+  bool pd=t.is_pd() && t.extra().pd;
+  bool custom=clock||forecast||sunpath||bedside||energy||plugin||pd;
   if(!large_tile)pad_vertical(w.tile,watch||custom||graph?2:4);
   // A big value that stepped up to the setpoint's digits (the watch block below) keeps them until that block
   // decides again, so a card is not restyled twice a render.
@@ -8394,6 +8396,9 @@ inline void render_slot(size_t slot) {
     lap(swipe_profile::GEOMETRY);
     energy_view::render(w,t,content_w,content_h);
     lap(swipe_profile::CUSTOM);
+  }else if(pd){
+    lv_obj_add_flag(w.slider,LV_OBJ_FLAG_HIDDEN);hide_panel(w);lv_obj_add_flag(w.progress,LV_OBJ_FLAG_HIDDEN);
+    pd_view::render(w,t,content_w,content_h);
   }else if(plugin){
     lv_obj_add_flag(w.slider,LV_OBJ_FLAG_HIDDEN);hide_panel(w);lv_obj_add_flag(w.progress,LV_OBJ_FLAG_HIDDEN);
     if(w.picture)lv_obj_add_flag(w.picture,LV_OBJ_FLAG_HIDDEN);
@@ -8668,7 +8673,7 @@ inline void render_slot(size_t slot) {
   // in the media colours, not the card's.
   if(w.extra_mode=="bedside"){}  // render_bedside paints its own parts
   else if(w.extra_mode=="calm"||w.extra_mode=="flip")paint_face(w,title_color,value_color,icon_color);
-  else for(unsigned i=0;i<w.parts.size() && w.extra_mode!="media" && w.extra_mode!="tall" && w.extra_mode!="cover_tilt" && w.extra_mode!="forecast" && w.extra_mode!="forecast_rows" && w.extra_mode!="week" && w.extra_mode!="favorite" && w.extra_mode!="energy";++i){
+  else for(unsigned i=0;i<w.parts.size() && w.extra_mode!="media" && w.extra_mode!="tall" && w.extra_mode!="cover_tilt" && w.extra_mode!="forecast" && w.extra_mode!="forecast_rows" && w.extra_mode!="week" && w.extra_mode!="favorite" && w.extra_mode!="energy" && w.extra_mode!="pd";++i){
     auto *p=w.parts[i];if(!p)continue;
     bool muted=w.extra_mode=="sunpath" ? i>=1 : w.extra_mode=="calendar" ? i==15||i==17 : w.extra_mode=="digital" ? i==16||i==17 : i==16;
     if(lv_obj_check_type(p,&lv_label_class))set_color(p,LV_STYLE_TEXT_COLOR,muted?value_color:title_color);

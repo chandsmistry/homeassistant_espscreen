@@ -1883,11 +1883,14 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
                 raise ValueError(t('addon.errors.layout.unknown_settings'))
             displays = DISPLAYS.get(domain, ('standard', 'watch'))
             # The map tile (app 0.4.36) is a map and nothing else, and has no slider or controls of its own.
-            if tile['entity'] == MAP_TILE or tile['entity'].startswith('screen.pd_'):
+            if tile['entity'] == MAP_TILE or catalogue.is_pd(tile['entity']):
                 if catalogue.is_pd(tile['entity']):
                     options = catalogue.pd_options(options)
-                displays = ('map',)
-                options = {**{k: v for k, v in options.items() if k not in ('inline', 'controls', 'history_hours', 'sub')}, 'display': 'map'}
+                displays = ('map',) if tile['entity'] == MAP_TILE else ()
+                options = {k: v for k, v in options.items() if k not in ('inline', 'controls', 'history_hours', 'sub',
+                           *(() if tile['entity'] == MAP_TILE else ('display', *MAP_OWN, 'overlay', 'fit', 'refresh')))}
+                if tile['entity'] == MAP_TILE:
+                    options['display'] = 'map'
             # The energy card draws its diagram on every size it takes, with no face, slider or second line of its own.
             if tile['entity'] == ENERGY_TILE:
                 options = {k: v for k, v in options.items() if k not in ('display', 'inline', 'controls', 'history_hours', 'sub')}
@@ -2319,7 +2322,7 @@ def media_extras(attrs):
 
 
 def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=None, entries=None, words=None, icon_of=None, device_name=None,
-           energy=None, home_name='', week=False):
+           energy=None, home_name='', week=False, native_pd=False):
     """Small, pre-computed values the firmware cannot derive itself (time zones, forecasts, a vacuum's device, the rows of
     a light's effects page, the house's power split for the energy card from `energy`, Home Assistant's Energy settings)."""
     if tile['entity'] == ENERGY_TILE:
@@ -2330,14 +2333,17 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
     attrs = states.get(tile['entity'], {}).get('attributes', {})
     # A map card carries only its movement mark (app 0.4.33): the screen asks for a new picture when it changes, so
     # nothing polls and no place goes out (map_card.fingerprint).
+    if catalogue.is_pd(tile['entity']):
+        import pd_cards
+        mode = states.get(catalogue.selector_target(tile)) or {}
+        choices = (mode.get('attributes') or {}).get('options') or []
+        result = {'pm': mode.get('state', 'unavailable'), 'po': [str(option)[:48] for option in choices[:16]]}
+        if native_pd:
+            result['pd'] = pd_cards.native_payload(tile, states)
+        else:
+            result['mk'] = pd_cards.screen_fingerprint(tile, states)
+        return result
     if (tile.get('options') or {}).get('display') == 'map':
-        if tile['entity'].startswith('screen.pd_'):
-            import pd_cards
-            mode = states.get(catalogue.selector_target(tile)) or {}
-            choices = (mode.get('attributes') or {}).get('options') or []
-            return {'mk': pd_cards.screen_fingerprint(tile, states),
-                    'pm': mode.get('state', 'unavailable'),
-                    'po': [str(option)[:48] for option in choices[:16]]}
         import map_card
         return {'mk': map_card.fingerprint(tile, states, entries)}
     if domain == 'light':

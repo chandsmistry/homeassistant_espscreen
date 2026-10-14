@@ -27,7 +27,7 @@ describe("the Power Distribution cards (fork)", () => {
     const layout = arrangeTiles(emptyLayout("Office"), { columns: 4, rows: 4 }, [{ tile, slot: 2 }]);
     expect(() => validatePages(layout, { columns: 4, rows: 4 })).not.toThrow();
   });
-  it("are not accepted with another display", () => {
-    expect(() => arrangeTiles(emptyLayout("Office"), grid, [{ tile: { entity: "screen.pd_header", name: "", slot: 0, options: { display: "standard", size: "wide" } }, slot: 0 }])).toThrow();
+  it("normalizes legacy picture classification without changing the placement", () => {
+    expect(() => arrangeTiles(emptyLayout("Office"), grid, [{ tile: { entity: "screen.pd_header", name: "", slot: 0, options: { display: "standard", size: "wide" } }, slot: 0 }])).not.toThrow();
   });
 });

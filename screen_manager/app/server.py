@@ -2662,12 +2662,21 @@ class Manager:
         extra=extras(tile,states,forecast,getattr(self.ha,'time_zone',None),hourly,device=device,energy=self.energy_prefs() if tile['entity'] == ENERGY_TILE else None,
                      home_name=getattr(self.ha,'location_name','') if tile['entity'] == ENERGY_TILE else '',
                      entries=self.registry_index() if light or (tile.get('options') or {}).get('display') == 'map' else None,words=getattr(self.ha,'state_words',None) if light else None,
-                     icon_of=row_icon if light else None,device_name=self.device_name_of(tile['entity']) if light else None,week=week)
+                     icon_of=row_icon if light else None,device_name=self.device_name_of(tile['entity']) if light else None,week=week,
+                     native_pd=features is None or catalogue.PD['native_feature'] in features)
         if tile['entity'].startswith('vacuum.'):
             ha_catalogue.chip_words(extra,tile['entity'],self.ha.states,device,getattr(self.ha,'state_words',None))
         message=state_message(index,tile,states,extra,
                               precision=header_bar.precision_of(entry) if tile['entity'].startswith('sensor.') else None,entry=entry,
                               units=getattr(self.ha,'units',None),week=week)
+        if pd_cards.is_tile(tile['entity']) and extra and 'pd' in extra:
+            logged = getattr(self, '_pd_native_logged', set())
+            if tile['entity'] not in logged:
+                LOG.info('pd_cards native %s: %d bytes of live data; bitmap downloads disabled', tile['entity'],
+                         len(json.dumps(extra, ensure_ascii=False).encode()))
+                logged.add(tile['entity']); self._pd_native_logged = logged
+        if pd_cards.is_tile(tile['entity']) and features is not None and catalogue.PD['native_feature'] not in features:
+            message.setdefault('o', {})['display'] = 'map'
         # A media player at rest keeps the controls it had while it played (GitHub #88): what it draws is cut to the
         # widest features it reported, and the screen fades what it lacks right now.
         player=tile['entity'].startswith('media_player.')

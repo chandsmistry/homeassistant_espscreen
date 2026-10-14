@@ -1792,6 +1792,30 @@
     "screen.energy": {
      "bytes": 6144,
      "extras": true
+    },
+    "screen.pd_header": {
+     "bytes": 6144,
+     "extras": true
+    },
+    "screen.pd_dp3": {
+     "bytes": 6144,
+     "extras": true
+    },
+    "screen.pd_ultra": {
+     "bytes": 6144,
+     "extras": true
+    },
+    "screen.pd_ac": {
+     "bytes": 6144,
+     "extras": true
+    },
+    "screen.pd_max": {
+     "bytes": 6144,
+     "extras": true
+    },
+    "screen.pd_batteries": {
+     "bytes": 6144,
+     "extras": true
     }
    },
    "key": false,

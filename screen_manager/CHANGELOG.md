@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **Native PD cards.** Updated firmware draws PD text, pills, battery bars and small embedded decorations locally from live data, like Energy. No bitmap download or 45-second telemetry throttle; older firmware keeps the picture fallback. Legacy map classification is removed from saved PD layouts. PDC has no internal border and fills its tile with equal padding. Internal drags do not open its configurable selector action; edge-swipe handling is unchanged.
+
 - **PD mode refresh.** Both PD picture cards refresh when the header sensor confirms a changed control mode, without waiting for the 45-second telemetry interval.
 
 - **PD tap controls.** PD cards have their own inspector with Controls → On tap, and no Map settings. Controls → On tap offers Perform action; the Action section chooses the selector entity. A short tap opens its selector. Holds and consumed edge swipes do not open it. Requires updated firmware.

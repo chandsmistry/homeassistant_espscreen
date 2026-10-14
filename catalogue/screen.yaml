@@ -6,6 +6,13 @@ memory: {bytes: 32, extras: false}
 # with a small picture of each running dot: its own price, measured as docs/TILE_MEMORY.md says.
 cards:
   energy: {bytes: 6144, extras: true}
+  # Native PD data, selector options and persistent draw canvas; a conservative bounded allowance.
+  pd_header: {bytes: 6144, extras: true}
+  pd_dp3: {bytes: 6144, extras: true}
+  pd_ultra: {bytes: 6144, extras: true}
+  pd_ac: {bytes: 6144, extras: true}
+  pd_max: {bytes: 6144, extras: true}
+  pd_batteries: {bytes: 6144, extras: true}
 # How the energy card shows power along a line: running dots (power-flow-card-plus's, the default), or calm lines that
 # grow with the power and carry an arrow the way it goes. A firmware before this one keeps the dots.
 energy:

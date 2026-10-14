@@ -184,7 +184,7 @@ export const useDocumentStore = defineStore("document", () => {
   // when anything changed. A change of a page's top bar is the top bar store's (stores/topbar.ts).
   function applyDocument(next: PageLayout, remember = true, nextGrid = documentGrid.value, said?: ChangeLabel) {
     if (!document.value || !documentGrid.value || !nextGrid) return false;
-    pages.validatePages(next, screenGridOf(nextGrid));
+    next = pages.validatePages(next, screenGridOf(nextGrid));
     if (pages.sameValue(next, document.value) && pages.sameGrid(nextGrid, documentGrid.value)) return false;
     if (remember) {
       history.remember(snapshot(), "document", said ?? describeChange(document.value, next, documentGrid.value, nextGrid, nameOf));

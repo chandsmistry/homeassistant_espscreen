@@ -957,6 +957,29 @@ std::string receive(const std::string &payload) {
         next.options.push_back(string(option, 48));
       }
     }
+    if (tile.is_pd() && extra["pd"].is<JsonObject>()) {
+      auto data = std::make_shared<pd_card::Data>();
+      auto pd = extra["pd"];
+      data->available = pd["ok"].as<bool>();
+      data->controller = pd["ctrl"].as<bool>(); data->burst = pd["burst"].as<bool>();
+      data->color = pd["color"].as<uint32_t>() & 0xFFFFFF;
+      data->mode = string(pd["mode"], 192); data->story = string(pd["story"], 384);
+      data->glance = string(pd["glance"], 384); data->footer = string(pd["footer"], 384);
+      for (unsigned k = 0; k < 3; ++k) data->power[k] = number(pd["p"][k], 0);
+      if (pd["rows"].is<JsonArray>()) for (JsonVariant row : pd["rows"].as<JsonArray>()) {
+        if (data->batteries.size() == 4) break;
+        pd_card::Battery battery;
+        battery.name = string(row["name"], 96); battery.connection = string(row["conn"], 32);
+        battery.glow = string(row["glow"], 24); battery.key = std::min(3u, row["key"] | 0u);
+        battery.solar = row["solar"].as<bool>(); battery.eligible = row["eligible"].as<bool>(); battery.online = row["online"].as<bool>();
+        for (unsigned k=0; k<11; ++k) {
+          const float value=number(row["v"][k], 0);
+          battery.values[k]=std::isfinite(value) ? value : 0;
+        }
+        data->batteries.push_back(std::move(battery));
+      }
+      next.pd = std::move(data);
+    }
     // The energy card (app 0.4.77, firmware 0.47.0): the house now, split as Home Assistant's own live view splits it
     // (screen_manager/app/energy_flow.py): which sources it has, their power, the flows between them, the batteries'
     // charge, the sensor behind each source and the devices drawing power, biggest first.

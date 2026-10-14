@@ -130,3 +130,40 @@ class PdCards(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class NativePd(unittest.TestCase):
+    def test_native_data_is_small_and_has_no_picture_marker_or_telemetry_throttle(self):
+        import copy
+        from core import extras
+        for entity in ('screen.pd_header', 'screen.pd_batteries'):
+            tile = {'entity': entity, 'options': {}}
+            first = extras(tile, STATES, native_pd=True)
+            self.assertIn('pd', first)
+            self.assertNotIn('mk', first)
+            self.assertLess(len(json.dumps(first).encode()), 4096)
+            changed = copy.deepcopy(STATES)
+            if entity.endswith('header'):
+                changed[pd_cards.HEADER]['attributes']['grid_w'] = 4567
+            else:
+                data = json.loads(changed[pd_cards.BATTERIES]['attributes']['batteries'])
+                data['dp3']['soc'] = 87.6
+                changed[pd_cards.BATTERIES]['attributes']['batteries'] = json.dumps(data)
+            self.assertNotEqual(extras(tile, changed, native_pd=True)['pd'], first['pd'])
+
+    def test_missing_source_is_explicitly_unavailable(self):
+        for entity in ('screen.pd_header', 'screen.pd_batteries'):
+            self.assertFalse(pd_cards.native_payload({'entity':entity}, {})['ok'])
+
+    def test_legacy_map_layout_migrates_without_changing_geometry(self):
+        from core import Grid
+        from page_layout import validate_document
+        from layout_migrations import migrate_legacy
+        old = {'title':'PD','tiles':[{'entity':'screen.pd_header','name':'PD','slot':2,'options':{'display':'map','size':'square'}}]}
+        record = migrate_legacy(old, Grid(6,6))
+        tile = record['layout']['pages'][0]['tiles'][0]
+        tile['appearance']['display']='map'
+        before = dict(tile['placement'])
+        clean = validate_document(record['layout'], Grid(6,6))['pages'][0]['tiles'][0]
+        self.assertNotIn('display',clean['appearance'])
+        self.assertEqual(clean['placement'],before)
+        self.assertEqual(clean['interaction']['action']['data']['entity'],'input_select.pd_control_mode')
