@@ -1,23 +1,11 @@
 ## Unreleased
 
-- **PD visual fidelity.** The header supports the HA glance hexagram. Battery Allocations follows the reference panel spacing, smaller badges, regular labels and bold values, with three visible bars and no extra heading. PD-only fonts preserve other cards’ typography.
-
-- **Native PD cards.** Updated firmware draws PD text, pills, battery bars and small embedded decorations locally from live data, like Energy. No bitmap download or 45-second telemetry throttle; older firmware keeps the picture fallback. Legacy map classification is removed from saved PD layouts. PDC has no internal border and fills its tile with equal padding. Internal drags do not open its configurable selector action; edge-swipe handling is unchanged.
-
-- **PD mode refresh.** Both PD picture cards refresh when the header sensor confirms a changed control mode, without waiting for the 45-second telemetry interval.
-
-- **PD tap controls.** PD cards have their own inspector with Controls → On tap, and no Map settings. Controls → On tap offers Perform action; the Action section chooses the selector entity. A short tap opens its selector. Holds and consumed edge swipes do not open it. Requires updated firmware.
-
-- **PD picture caching.** Each download link pins the already-rendered image, avoiding a second render after sensor changes. Add-on preparation and HTTP timings are logged. Legacy PNG export is opt-in via SCREEN_PD_PNG_EXPORT=1.
+- **Native PD cards.** Firmware negotiating pd_native draws the header, individual battery panels and combined allocations from live data using a persistent LVGL draw object. Embedded decorations and PD-only Roboto fonts provide symbols, regular labels, bold values, badges and bars. No full-card download or picture throttle is used on this path.
+- **PD appearance.** The header and combined allocations at 58765a31 were visually accepted on a physical panel. Allocations use the tile padding once and have no duplicate heading. This does not claim native touch, drag or speed acceptance, or other-board testing.
+- **PD controls.** The catalogue defines On tap choices and the configurable Open selector action. The Action section chooses a select or input_select target; Home Assistant confirms the chosen value. PD is saved without map display. An internal drag beyond 3 mm is rejected by the native short-click handler; shared edge navigation is unchanged. Interaction checks are automated, with earlier-stage user confirmations recorded separately.
+- **Older PD firmware.** The add-on adds map-compatible picture classification only to outgoing messages. Pinned render-once downloads, negotiated RLE8 and the original selector target remain supported. Picture telemetry is paced at 45 seconds except confirmed mode changes. Optional PNG export is off by default and is not used by built-in PD tiles.
 - **Picture-card resizing.** Resizing PD, Map or Energy cards no longer adds unsupported controls that blocked saving.
 
-- **Faster PD cards.** Lossless RLE8 picture transfer for the header and combined batteries, negotiated by updated firmware; older screens keep plain BMPs. Layout and picture resolution are unchanged.
-
-- **PD Battery Allocations card.** A single picture card stacks all four battery panels, including eligibility, connection pills, charge state and three bars, like the dashboard's battery management card.
-- **PD header rendering.** Collapse template whitespace like the dashboard, fit long handover lines, and include the symbol font needed by the header's hexagrams.
-- **PD picture delivery.** Hold each screen picture's change mark for 45 seconds so frequent sensor updates do not repeatedly cancel a download, including the combined battery card.
-- **PD cards in Library → Screen (fork).** The Power Distribution header and the four battery cards (Delta Pro 3, Stream Ultra X, Stream AC, Stream MAX) are cards of the screen's own, drawn by the add-on like the map and shown as pictures; they follow the PD sensors. Firmware change: the five `screen.pd_*` entities.
-- **PD console cards as pictures (fork).** The add-on draws the Power Distribution header and the four battery cards exactly as the dashboard cards look (Roboto, emoji, glow, pills, bars) and saves them as pictures in `/config/www/pd_cards/`, redrawn when the PD sensors change. Needs the fonts added to the add-on image; no firmware change. See docs/PD_CARDS.md.
 - **Photos screensaver.** Photos is a step of its own in the screensaver, beside Music, Camera and Clock. It shows the
   pictures in `/media/screensaver` (a local folder or a network share added in Home Assistant), shuffled, each for
   15 seconds to 5 minutes, with a limit on the size of a file so a change is quick. The add-on reads `/media` read
