@@ -116,7 +116,9 @@ export function validateCardOptions(tile: PageTile, entityId: string, size: stri
   if (typeof a.label === 'string' && bytes(a.label) > 80) throw new Error(t('addon.errors.layout.tile_name'));
   if (typeof a.label !== 'string' || a.label !== a.label.trim()) fail('normalization');
   // The map tile (app 0.4.36) is a map and nothing else.
-  const displays = entityId === 'screen.map' ? ['map'] : (rules.displays as Record<string, string[]>)[domain] || ['standard', 'watch'];
+  // The fork's Power Distribution cards (Library, Screen) are pictures drawn like a map, and nothing else.
+  const pdCard = entityId.startsWith('screen.pd_');
+  const displays = entityId === 'screen.map' || pdCard ? ['map'] : (rules.displays as Record<string, string[]>)[domain] || ['standard', 'watch'];
   const controls = ['none', ...((rules.controls as Record<string, string[]>)[domain] || [])];
   // Every choice from the tile catalogue (model/catalogue.ts): a type's taps, its guards, the hours a graph shows.
   for (const [value, choices] of [[a.display, displays], [a.background, rules.backgrounds], [a.historyHours, TILE.history_hours],
@@ -152,7 +154,7 @@ export function validateCardOptions(tile: PageTile, entityId: string, size: stri
   if (i.speaker !== undefined && (typeof i.speaker !== 'string' || !i.speaker.trim() || bytes(i.speaker) > 48)) fail();
   // The map tile (app 0.4.36) is a map, follows everyone or whom it lists, and alone has the choice.
   const mapTile = entityId === 'screen.map';
-  if (mapTile && a.display !== 'map') fail('normalization');
+  if ((mapTile || pdCard) && a.display !== 'map') fail('normalization');
   if (a.mapFollow !== undefined && !mapTile) fail('normalization');
   if (a.mapEntities !== undefined) {
     const list = a.mapEntities;
