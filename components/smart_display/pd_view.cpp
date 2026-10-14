@@ -1,6 +1,7 @@
 // Native PD cards: one persistent LVGL canvas, numeric/text updates, no picture fetch.
 #include "runtime_tiles.h"
 #include "pd_decorations.h"
+#include "pd_fonts.h"
 #include "pd_view.h"
 namespace pd_view {
 namespace rt=runtime_tiles;
@@ -26,9 +27,14 @@ static std::vector<Run> runs(const std::string &text) {
   }
   return result;
 }
+static int asset_width(const pd_decorations::Asset &a,int h) {
+  if(a.codepoint==0x25CF || a.codepoint==0x25CB)return std::max(3,h/3);
+  if(a.codepoint==0x2713 || a.codepoint==0x2717)return h*3/4;
+  return h;
+}
 static int rich_width(const std::string &text,const lv_font_t *font) {
   int width=0, h=line_height(font);
-  for(const auto &r:runs(text))width+=r.asset?h:rt::text_width(r.text,font);
+  for(const auto &r:runs(text))width+=r.asset?asset_width(*r.asset,h):rt::text_width(r.text,font);
   return width;
 }
 static const lv_font_t *face(const std::string &text,int width,int height,bool title=false) {
@@ -41,8 +47,13 @@ static void text(lv_layer_t *layer,int x,int y,int width,const std::string &valu
   const int h=line_height(font),total=rich_width(value,font);
   int cursor=x+(center?std::max(0,(width-total)/2):0);
   for(const auto &r:runs(value)) {
-    const int w=r.asset?h:rt::text_width(r.text,font);
-    if(r.asset) {
+    const int w=r.asset?asset_width(*r.asset,h):rt::text_width(r.text,font);
+    if(r.asset && (r.asset->codepoint==0x25CF || r.asset->codepoint==0x25CB)) {
+      lv_draw_rect_dsc_t d;lv_draw_rect_dsc_init(&d);d.radius=LV_RADIUS_CIRCLE;d.bg_color=ink;
+      d.bg_opa=r.asset->codepoint==0x25CF?LV_OPA_COVER:LV_OPA_TRANSP;
+      d.border_width=r.asset->codepoint==0x25CB?1:0;d.border_color=ink;
+      const int by=y+(h-w)/2;lv_area_t box{cursor,by,cursor+w-1,by+w-1};lv_draw_rect(layer,&d,&box);
+    } else if(r.asset) {
       static const auto images=[] {
         std::array<lv_image_dsc_t,std::size(pd_decorations::ASSETS)> result{};
         for(size_t i=0;i<result.size();++i) {
@@ -52,9 +63,10 @@ static void text(lv_layer_t *layer,int x,int y,int width,const std::string &valu
         }
         return result;
       }();
-      lv_draw_image_dsc_t d;lv_draw_image_dsc_init(&d);d.src=&images[r.asset-pd_decorations::ASSETS];d.scale_x=d.scale_y=h*256/pd_decorations::SIDE;
+      lv_draw_image_dsc_t d;lv_draw_image_dsc_init(&d);d.src=&images[r.asset-pd_decorations::ASSETS];d.scale_x=d.scale_y=w*256/pd_decorations::SIDE;
       d.pivot={0,0};if(r.asset->ink){d.recolor=ink;d.recolor_opa=LV_OPA_COVER;}
-      lv_area_t box{cursor,y,cursor+pd_decorations::SIDE-1,y+pd_decorations::SIDE-1};
+      const int ay=y+(h-w)/2;
+      lv_area_t box{cursor,ay,cursor+pd_decorations::SIDE-1,ay+pd_decorations::SIDE-1};
       lv_draw_image(layer,&d,&box);
     } else {
       lv_draw_label_dsc_t d;lv_draw_label_dsc_init(&d);d.font=font;d.color=ink;d.text=r.text.c_str();d.text_local=1;
@@ -71,9 +83,9 @@ static void rect(lv_layer_t *layer,int x,int y,int w,int h,int radius,lv_color_t
   lv_area_t a{x,y,x+w-1,y+h-1};lv_draw_rect(layer,&d,&a);
 }
 static std::string fixed(float v,int decimals=0){return screen_text::decimal(v,decimals);}
-static void pill(lv_layer_t *layer,int x,int y,int width,int height,const std::string &value,lv_color_t bg,lv_color_t ink) {
-  auto *f=face(value,width-12,height-6);
-  rect(layer,x,y,width,height,height/2,bg);
+static void pill(lv_layer_t *layer,int x,int y,int width,int height,const std::string &value,lv_color_t bg,lv_color_t ink,const lv_font_t *font=nullptr) {
+  auto *f=font?font:face(value,width-12,height-6);
+  rect(layer,x,y,width,height,height/2,bg,font?1:0,lv_color_mix(ink,bg,32));
   text(layer,x+6,y+(height-line_height(f))/2,width-12,value,f,ink);
 }
 static void header(lv_layer_t *layer,const View &view,int x,int y) {
@@ -98,30 +110,37 @@ static void header(lv_layer_t *layer,const View &view,int x,int y) {
   }
 }
 static void battery(lv_layer_t *layer,const Battery &b,const Data &data,int x,int y,int width,int height) {
-  const int pad=std::max(6,width/36),gap=std::max(3,height/30),top=height/4;
+  // Match the approved 834 x 230 device panel, scaled into its tile.
+  const int pad=std::max(6,int(std::lround(width*22.f/834))),gap=std::max(2,int(std::lround(height*20.f/230)));
   const auto ground=theme::color(theme::CARD);
   const bool charging=b.glow=="glow-charge",active=b.glow!="glow-off";
   const auto accent=charging?theme::color(theme::PD_SOC_2):lv_color_hex(data.color);
-  rect(layer,x,y,width,height,std::max(6,width/40),ground,active?2:1,active?accent:theme::color(theme::LINE),active?std::max(4,pad):0);
-  const auto *name=face(b.name,width/2,top-6,true),*small=face("Eligible",width/3,top-8);
-  const int ph=std::min(top-2,line_height(small)+6);
+  rect(layer,x,y,width,height,std::max(6,int(width*18.f/834)),ground,active?2:1,active?accent:theme::color(theme::LINE),active?std::max(8,pad*2):0);
+  const auto *body=pd_fonts::body;
+  const int fh=line_height(body),ph=std::max(fh+4,int(height*42.f/230));
   const std::string eligibility=b.eligible?"✓ Eligible":"✗ Ineligible",connection=b.online?"● "+b.connection:"○ Offline";
-  const int left=std::min(width/3,rich_width(eligibility,small)+12),right=std::min(width/4,rich_width(connection,small)+12);
-  pill(layer,x+pad,y+gap,left,ph,eligibility,theme::color(b.eligible?theme::PD_OK:theme::PD_BAD),theme::color(b.eligible?theme::PD_OK_INK:theme::PD_BAD_INK));
-  pill(layer,x+width-pad-right,y+gap,right,ph,connection,theme::color(b.online?theme::PD_OK:theme::PD_BAD),theme::color(b.online?theme::PD_OK_INK:theme::PD_BAD_INK));
-  name=face(b.name,width-left-right-4*pad,top-4,true);
-  text(layer,x+pad+left+pad,y+gap+(ph-line_height(name))/2,width-left-right-4*pad,b.name,name,theme::color(theme::INK));
-  const std::string detail="SoC "+fixed(b.values[0],1)+"% · Rem "+fixed(b.values[1],2)+" kWh · "+
-    (b.values[2]>10?"⚡ Charging "+fixed(b.values[2]):"Cap "+fixed(b.values[3]))+" W";
-  const std::string power="Set "+fixed(b.values[4])+" W · Act "+fixed(b.values[5])+" W";
-  const int bh=std::max(3,height/24),bar_gap=std::max(3,height/30),bar_top=height-3*(bh+bar_gap);
-  const int line_h=std::max(8,(bar_top-top)/2),bw=width-2*pad;
-  const auto *df=face(detail,bw,line_h),*pf=face(power,bw,line_h);
-  text(layer,x+pad,y+top+(line_h-line_height(df))/2,bw,detail,df,theme::color(theme::INK));
-  text(layer,x+pad,y+top+line_h+(line_h-line_height(pf))/2,bw,power,pf,theme::color(theme::INK));
+  const int left=std::min(width/3,rich_width(eligibility,pd_fonts::badge)+16),right=std::min(width/4,rich_width(connection,pd_fonts::badge)+16);
+  const int py=y+int(height*20.f/230);
+  pill(layer,x+pad,py,left,ph,eligibility,theme::color(b.eligible?theme::PD_OK:theme::PD_BAD),theme::color(b.eligible?theme::PD_OK_INK:theme::PD_BAD_INK),pd_fonts::badge);
+  pill(layer,x+width-pad-right,py,right,ph,connection,theme::color(b.online?theme::PD_OK:theme::PD_BAD),theme::color(b.online?theme::PD_OK_INK:theme::PD_BAD_INK),pd_fonts::badge);
+  const auto *name=pd_fonts::name;
+  text(layer,x+pad+left+pad,py+(ph-line_height(name))/2,width-left-right-4*pad,b.name,name,theme::color(theme::INK));
+  using Segment=std::pair<std::string,bool>;
+  const std::vector<Segment> detail={{"SoC ",false},{fixed(b.values[0],1)+"%",true},{" · Rem ",false},{fixed(b.values[1],2)+" kWh",true},{" · ",false},
+    {b.values[2]>10?"⚡ Charging ":"Cap ",false},{fixed(b.values[2]>10?b.values[2]:b.values[3])+" W",true}};
+  const std::vector<Segment> power={{"Set ",false},{fixed(b.values[4])+" W",true},{" · Act ",false},{fixed(b.values[5])+" W",true}};
+  const int bw=width-2*pad,bh=std::max(4,int(std::lround(height*13.f/230))),bar_gap=std::max(3,int(std::lround(height*9.f/230)));
+  const int bar_top=height-int(std::lround(height*29.f/230))-3*bh-2*bar_gap;
+  const int first=py+ph+std::max(2,int(height*8.f/230)),second=first+fh;
+  auto segments=[&](int by,const std::vector<Segment> &parts) {
+    int total=0;for(const auto &part:parts)total+=rich_width(part.first,part.second?pd_fonts::bold:body);
+    int cursor=x+(width-total)/2;
+    for(const auto &part:parts){auto *font=part.second?pd_fonts::bold:body;const int w=rich_width(part.first,font);text(layer,cursor,by,w,part.first,font,theme::color(theme::INK),false);cursor+=w;}
+  };
+  segments(first,detail);segments(second,power);
   for(int k=0;k<3;++k) {
     const int by=y+bar_top+k*(bh+bar_gap);const auto color=theme::color(k==2?theme::PD_ACT:static_cast<theme::Role>(theme::PD_SOC_1+b.key));
-    rect(layer,x+pad,by,bw,bh,bh/2,theme::color(theme::TRACK));
+    rect(layer,x+pad,by,bw,bh,bh/2,theme::color(theme::PD_TRACK),1,theme::color(theme::LINE));
     const int fill=std::lround(bw*std::clamp(b.values[6+k],0.f,100.f)/100);
     if(k==2 && b.solar) {
       const int solar=std::lround(bw*std::clamp(b.values[9],0.f,100.f)/100);
@@ -141,7 +160,7 @@ static void draw(lv_event_t *event) {
   }
   if(view->header){header(layer,*view,a.x1,a.y1);return;}
   const auto &d=*view->data;const int pad=std::max(6,std::min(view->width,view->height)/30),gap=std::max(5,pad);
-  const int title=d.batteries.size()>1?std::max(18,line_height(rt::small_font)+gap):0;
+  const int title=0; // No heading inside the approved allocations card.
   const int foot=d.footer.empty()?0:line_height(rt::small_font)+gap;
   if(title)text(layer,a.x1+pad,a.y1+pad,view->width-2*pad,"Battery Allocations",rt::small_font,theme::color(theme::INK),false);
   if(view->height < int(d.batteries.size())*(2*line_height(rt::small_font)+18)+title+2*pad) {

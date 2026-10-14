@@ -4,7 +4,7 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import createModule from '../src/wasm/firmware_preview.js';
 import {connection,configure} from './test_protocol.mjs';
 const m=await createModule({wasmBinary:readFileSync(new URL('../src/wasm/firmware_preview.wasm',import.meta.url))});
-const fixtures=JSON.parse(readFileSync(new URL('../../tests/fixtures/pd_native.json',import.meta.url)));
+const fixtures=JSON.parse(readFileSync(process.env.PD_FIXTURE || new URL('../../tests/fixtures/pd_native.json',import.meta.url)));
 const policy=JSON.parse(readFileSync(new URL('../src/model/catalogue.json',import.meta.url))).domains.screen.pd;
 assert.equal(m._preview_init(1280,800,149,6,6),1);
 let ms=0;const tick=(delta=32)=>{ms+=delta;m._preview_time(ms,1789401840,720);m._preview_render();};
@@ -27,6 +27,7 @@ tick(400);m._preview_touch(x,y,1);tick(80);m._preview_touch(x+60,y,1);tick(80);m
 assert.ok(!layout().objects.some(o=>o.type==='label'&&o.text==='First'),'an internal drag must not open the selector');
 assert.equal(m.ccall('preview_next_action','string',[],[]),'');
 if(process.env.PD_RENDER_OUT) {
+ receive({op:'state',i:0,entity:tiles[0].entity,name:tiles[0].name,state:'First',a:{},x:tiles[0].x});tick();
  writeFileSync(process.env.PD_RENDER_OUT+'.rgba',frame());writeFileSync(process.env.PD_RENDER_OUT+'.json',JSON.stringify(info(),null,2));
  m._preview_dark(1);tick();writeFileSync(process.env.PD_RENDER_OUT+'-dark.rgba',frame());
 }
