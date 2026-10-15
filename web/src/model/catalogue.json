@@ -1925,6 +1925,7 @@
     "feature": "photo_effects",
     "clock_feature": "photo_clock_position",
     "packed_feature": "photo_rle",
+    "jpeg_feature": "photo_jpeg",
     "clock_positions": [
      "top_left",
      "top_center",

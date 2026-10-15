@@ -9,6 +9,7 @@
 // while nobody stopped the stream, so once close() returns nothing of it writes the glass any more and LVGL may draw
 // there at once. Buffers live in PSRAM and go when the task has ended (tick()).
 #include "live_view.h"
+#include "still_jpeg.h"
 #if defined(USE_LIVE_VIEW) && defined(SCREEN_PICTURES)
 #include <atomic>
 #include <cerrno>
@@ -107,7 +108,72 @@ struct Stream {
 };
 static Stream *streams[MAX_STREAMS] = {};
 static SemaphoreHandle_t glass = nullptr;
-static jpeg_decoder_handle_t decoder = nullptr;
+// Initialization must also be safe with ESP-IDF's -fno-threadsafe-statics. Allocate outside the spinlock,
+// publish exactly one mutex under it, then serialize engine creation and every hardware decode.
+static portMUX_TYPE jpeg_init_lock = portMUX_INITIALIZER_UNLOCKED;
+static SemaphoreHandle_t jpeg_lock = nullptr;
+static jpeg_decoder_handle_t jpeg_decoder = nullptr;
+static SemaphoreHandle_t jpeg_mutex() {
+  taskENTER_CRITICAL(&jpeg_init_lock);
+  SemaphoreHandle_t result = jpeg_lock;
+  taskEXIT_CRITICAL(&jpeg_init_lock);
+  if (result) return result;
+  auto candidate = xSemaphoreCreateMutex();
+  if (!candidate) return nullptr;
+  taskENTER_CRITICAL(&jpeg_init_lock);
+  if (!jpeg_lock) { jpeg_lock = candidate; candidate = nullptr; }
+  result = jpeg_lock;
+  taskEXIT_CRITICAL(&jpeg_init_lock);
+  if (candidate) vSemaphoreDelete(candidate);
+  return result;
+}
+static bool process_jpeg(jpeg_decode_cfg_t cfg, uint8_t *input, size_t length,
+                         uint8_t *output, size_t capacity, uint32_t &written) {
+  auto lock = jpeg_mutex();
+  if (!lock || xSemaphoreTake(lock, pdMS_TO_TICKS(1000)) != pdTRUE) return false;
+  if (!jpeg_decoder) {
+    jpeg_decode_engine_cfg_t engine{.intr_priority = 0, .timeout_ms = 200};
+    if (jpeg_new_decoder_engine(&engine, &jpeg_decoder) != ESP_OK) jpeg_decoder = nullptr;
+  }
+  const bool ok = jpeg_decoder && jpeg_decoder_process(jpeg_decoder, &cfg, input, length, output,
+                                                        capacity, &written) == ESP_OK;
+  xSemaphoreGive(lock);
+  return ok;
+}
+bool decode_still_jpeg(const uint8_t *data, size_t length, uint16_t *pixels, unsigned width, unsigned height) {
+  const auto checked = still_jpeg::inspect(data, length);
+  if (!checked.ok || checked.width != width || checked.height != height || !pixels) return false;
+  jpeg_decode_memory_alloc_cfg_t in{.buffer_direction = JPEG_DEC_ALLOC_INPUT_BUFFER};
+  size_t input_capacity = 0;
+  auto *input = static_cast<uint8_t *>(jpeg_alloc_decoder_mem(length, &in, &input_capacity));
+  if (!input) return false;
+  std::memcpy(input, data, length);
+  jpeg_decode_picture_info_t info{};
+  if (jpeg_decoder_get_info(input, length, &info) != ESP_OK || info.width != checked.encoded_width || info.height != checked.encoded_height) {
+    free(input); return false;
+  }
+  if (info.sample_method != JPEG_DOWN_SAMPLING_YUV420 && info.sample_method != JPEG_DOWN_SAMPLING_YUV422 &&
+      info.sample_method != JPEG_DOWN_SAMPLING_YUV444) { free(input); return false; }
+  const bool wide = info.sample_method == JPEG_DOWN_SAMPLING_YUV420 || info.sample_method == JPEG_DOWN_SAMPLING_YUV422;
+  const bool tall = wide;  // conservatively reserve whole 16-row MCUs for 4:2:2 too
+  const unsigned stride = (checked.encoded_width + (wide ? 15 : 7)) & ~(wide ? 15 : 7);
+  const unsigned rows = (checked.encoded_height + (tall ? 15 : 7)) & ~(tall ? 15 : 7);
+  const size_t need = size_t(stride) * rows * 2;
+  jpeg_decode_memory_alloc_cfg_t out{.buffer_direction = JPEG_DEC_ALLOC_OUTPUT_BUFFER};
+  size_t capacity = 0;
+  auto *output = static_cast<uint8_t *>(jpeg_alloc_decoder_mem(need, &out, &capacity));
+  if (!output) { free(input); return false; }
+  jpeg_decode_cfg_t cfg{};
+  cfg.output_format = JPEG_DECODE_OUT_FORMAT_RGB565;
+  cfg.rgb_order = JPEG_DEC_RGB_ELEMENT_ORDER_BGR;
+  cfg.conv_std = JPEG_YUV_RGB_CONV_STD_BT601;
+  uint32_t written = 0;
+  const bool ok = process_jpeg(cfg, input, length, output, capacity, written) && written >= size_t(stride) * height * 2 &&
+    still_jpeg::copy_rows(pixels, size_t(width) * height, reinterpret_cast<uint16_t *>(output), written / 2,
+                          width, height, stride);
+  free(output); free(input);
+  return ok;
+}
 static void *frame_buffer = nullptr;
 
 // ---- LVGL stays out of a live picture's room ----
@@ -317,7 +383,7 @@ static void show(Stream &s, size_t length) {
   cfg.conv_std = JPEG_YUV_RGB_CONV_STD_BT601;
   uint32_t written = 0;
   const int64_t t0 = esp_timer_get_time();
-  if (jpeg_decoder_process(decoder, &cfg, s.input, length, s.picture, s.picture_size, &written) != ESP_OK) {
+  if (!process_jpeg(cfg, s.input, length, s.picture, s.picture_size, written)) {
     s.skipped++;
     return;
   }
@@ -459,12 +525,8 @@ Handle open(const std::string &url, const Rect &area, const Look &look, bool sou
     if (!streams[i]) slot = i;
   if (slot < 0) return -1;
   if (!glass) glass = xSemaphoreCreateMutex();
-  if (!decoder) {
-    jpeg_decode_engine_cfg_t engine{.intr_priority = 0, .timeout_ms = 200};
-    if (jpeg_new_decoder_engine(&engine, &decoder) != ESP_OK) decoder = nullptr;
-  }
   if (!frame_buffer && esp_lcd_dpi_panel_get_frame_buffer(panel, 1, &frame_buffer) != ESP_OK) frame_buffer = nullptr;
-  if (!glass || !decoder || !frame_buffer) {
+  if (!glass || !frame_buffer) {
     ESP_LOGW(TAG, "cannot stream on this panel");
     return -1;
   }

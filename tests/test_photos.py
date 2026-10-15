@@ -102,7 +102,7 @@ class ChoiceTest(unittest.TestCase):
     def test_photo_settings_are_kept_and_checked(self):
         choice = screen_saver.validate({'show': True, 'photo_seconds': 45, 'photo_mb': 4})
         self.assertEqual((choice['photo_seconds'], choice['photo_mb']), (45, 4))
-        for bad in ({'photo_seconds': 5}, {'photo_seconds': 'x'}, {'photo_mb': 0}, {'photo_mb': 99}, {'photo_mb': True}):
+        for bad in ({'photo_seconds': 4}, {'photo_seconds': 'x'}, {'photo_mb': 0}, {'photo_mb': 99}, {'photo_mb': True}):
             with self.assertRaises(ValueError):
                 screen_saver.validate(bad)
 

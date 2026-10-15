@@ -4,8 +4,9 @@ The folder is /media/screensaver. Home Assistant's own Network storage (Settings
 share under /media, so a folder on a NAS works the same as a local one. Pictures are shown in a shuffled round, each for
 `seconds`; a round ends when every picture has been shown, and the next one starts in another order.
 
-The screen needs nothing new: a Photos step is the camera step with a pseudo camera, PHOTOS. The camera feed asks
-`image()` for its snapshot the way it asks Home Assistant for a camera's, and encodes it for the glass (camera_feed.py).
+Photos uses a pseudo camera, PHOTOS. Legacy screens receive BMP/RLE; screens advertising photo_jpeg receive a
+bounded baseline JPEG through the same still-picture path. PhotoShow keeps per-screen finished frames and prepares
+the next frame without writing original files.
 
 Faster changes. A photo is made small before it goes anywhere: a file above `max_mb` is skipped, a JPEG is read at a
 reduced size by the decoder itself (a camera's 12 megapixel file costs a fraction of a full read), and the picture is cut
@@ -16,6 +17,7 @@ import logging
 import os
 import random
 import time
+from pathlib import Path
 
 LOG = logging.getLogger(__name__)
 
@@ -166,6 +168,78 @@ class Photos:
         raise ValueError('no readable photo')
 
 
+MAX_JPEG_BYTES = 1024 * 1024
+
+
+def baseline_jpeg(data, logical_box=None):
+    """Match still_jpeg::inspect before retaining source bytes for the P4 decoder."""
+    size = len(data)
+    if size < 4 or size > MAX_JPEG_BYTES or data[:2] != b'\xff\xd8':
+        return False
+    at, frame, scan, crop = 2, False, False, None
+    width = height = 0
+    while at < size:
+        if data[at] != 255:
+            return False
+        at += 1
+        while at < size and data[at] == 255:
+            at += 1
+        if at >= size:
+            return False
+        marker = data[at]
+        at += 1
+        if marker == 217:
+            logical = crop or (width, height)
+            return bool(frame and scan and at == size and (not crop or (0 < crop[0] <= width and 0 < crop[1] <= height and ((crop[0] + 7) // 8 * 8, (crop[1] + 7) // 8 * 8) == (width, height)))
+                        and (logical_box is None or logical == logical_box))
+        if marker in (0, 216) or 208 <= marker <= 215 or at + 2 > size:
+            return False
+        length = int.from_bytes(data[at:at + 2], 'big')
+        if length < 2 or length > size - at:
+            return False
+        if marker == 239 and length >= 10 and data[at + 2:at + 10] == b'MNETCROP':
+            if length != 14 or crop is not None or scan:
+                return False
+            crop = (int.from_bytes(data[at + 10:at + 12], 'big'), int.from_bytes(data[at + 12:at + 14], 'big'))
+        if marker == 238 and length >= 14 and data[at + 2:at + 7] == b'Adobe' and data[at + 13] != 1:
+            return False
+        if 192 <= marker <= 207 and marker not in (196, 200, 204):
+            if marker != 192 or frame or length != 17 or data[at + 2] != 8 or data[at + 7] != 3:
+                return False
+            height = int.from_bytes(data[at + 3:at + 5], 'big')
+            width = int.from_bytes(data[at + 5:at + 7], 'big')
+            if not width or not height or max(width, height) > 4096 or width * height > 2048 * 2048 or (width * height) % 8:
+                return False
+            if data[at + 8] != 1 or data[at + 9] not in (0x11, 0x21, 0x22) or data[at + 11] != 2 or data[at + 12] != 0x11 or data[at + 14] != 3 or data[at + 15] != 0x11:
+                return False
+            frame = True
+        if marker == 218:
+            if not frame or scan or length != 12 or data[at + 2] != 3 or data[at + 3:at + 8:2] != b'\x01\x02\x03' or data[at + length - 3:at + length] != b'\x00\x3f\x00':
+                return False
+            if any(data[at + offset] >> 4 > 3 or data[at + offset] & 15 > 3 for offset in (4, 6, 8)):
+                return False
+            scan = True
+            at += length
+            while at < size:
+                if data[at] != 255:
+                    at += 1
+                    continue
+                start = at
+                at += 1
+                while at < size and data[at] == 255:
+                    at += 1
+                if at >= size:
+                    return False
+                if data[at] == 0 or 208 <= data[at] <= 215:
+                    at += 1
+                    continue
+                at = start
+                break
+            continue
+        at += length
+    return False
+
+
 class PhotoShow:
     """Per-screen playback and bounded, finished-frame cache. Originals are only read."""
     def __init__(self, folder=FOLDER, clock=time.monotonic, rng=None):
@@ -260,20 +334,39 @@ class PhotoShow:
                 selected.append(path)
         return tuple(selected)
 
-    def render(self, paths, box, fit, rle=False):
+    def render(self, paths, box, fit, rle=False, jpeg=False):
         with self.render_lock:
-            return self._render(paths, box, fit, rle)
+            return self._render(paths, box, fit, rle, jpeg)
 
-    def _render(self, paths, box, fit, rle=False):
+    def _render(self, paths, box, fit, rle=False, jpeg=False):
         from PIL import Image, ImageOps
         import tile_art
         if not paths:
             raise FileNotFoundError('no readable photos')
         signatures = tuple((p, os.stat(p).st_mtime_ns, os.stat(p).st_size) for p in paths)
-        key = (signatures, box, fit, rle)
+        key = (signatures, box, fit, rle, jpeg)
         if key in self.frames:
             self.frames.move_to_end(key)
             return self.frames[key]
+        # Retain an already suitable RGB baseline JPEG, including its original quality.
+        # Orientation and colour profiles require conversion, and pair/letterbox/crop require composition.
+        if jpeg and len(paths) == 1:
+            with Image.open(paths[0]) as source:
+                if source.format == 'JPEG' and source.mode == 'RGB' and source.size == box \
+                        and not source.info.get('progressive') and not source.info.get('progression') \
+                        and source.getexif().get(274, 1) == 1 and not source.info.get('icc_profile') \
+                        and getattr(source, 'bits', 8) == 8:
+                    try:
+                        source.load()  # Do not pass through a truncated or otherwise unreadable JPEG.
+                    except (OSError, ValueError):
+                        with self.state_lock:
+                            self.album.skipped.add(paths[0])
+                        raise ValueError('unreadable photo') from None
+                    data = Path(paths[0]).read_bytes()
+                    if baseline_jpeg(data, box):
+                        result = (data, data)
+                        self._cache(key, result)
+                        return result
         canvas = Image.new('RGB', box)
         width, height = box
         gap = max(2, round(width / 160)) if len(paths) == 2 else 0
@@ -297,20 +390,41 @@ class PhotoShow:
                     self.album.skipped.add(path)
                 raise ValueError('unreadable photo') from None
         out = io.BytesIO()
-        canvas.save(out, 'JPEG', quality=85)
-        result = (tile_art.bmp(canvas, compact=True, rle=rle), out.getvalue())
+        encoded = canvas
+        padded_box = tuple((n + 7) // 8 * 8 for n in box) if jpeg else box
+        if padded_box != box:
+            # Hardware requires an aligned encoded frame. Preserve every logical pixel and replicate only
+            # the final row/column into padding which the native decoder excludes from the LVGL picture.
+            encoded = Image.new('RGB', padded_box)
+            encoded.paste(canvas, (0, 0))
+            if padded_box[0] > width:
+                encoded.paste(canvas.crop((width - 1, 0, width, height)).resize((padded_box[0] - width, height)), (width, 0))
+            if padded_box[1] > height:
+                encoded.paste(encoded.crop((0, height - 1, padded_box[0], height)).resize((padded_box[0], padded_box[1] - height)), (0, height))
+        encoded.save(out, 'JPEG', quality=95 if jpeg else 85, subsampling=0 if jpeg else 2, progressive=False, optimize=True)
+        data = out.getvalue()
+        if padded_box != box:
+            payload = b'MNETCROP' + width.to_bytes(2, 'big') + height.to_bytes(2, 'big')
+            data = data[:2] + b'\xff\xef' + (len(payload) + 2).to_bytes(2, 'big') + payload + data[2:]
+        use_jpeg = jpeg and baseline_jpeg(data, box)
+        if jpeg and not use_jpeg:
+            LOG.info('photos JPEG outside decoder bounds (%d bytes); using BMP at the same resolution', len(data))
+        result = (data if use_jpeg else tile_art.bmp(canvas, compact=True, rle=rle), data)
+        self._cache(key, result)
+        return result
+
+    def _cache(self, key, result):
         self.frames[key] = result
         # Full-screen frames can be large. Keep at most four and at most 16 MB per active screen.
         while len(self.frames) > 4 or sum(len(a) + len(b) for a, b in self.frames.values()) > 16 * 1024 * 1024:
             self.frames.popitem(last=False)
-        return result
 
-    async def warm(self, settings, box, rle=False):
+    async def warm(self, settings, box, rle=False, jpeg=False):
         """Prepare the first frame while the ordinary page is showing, without starting its display interval."""
         import asyncio
         loop=asyncio.get_running_loop()
         async with self.lock:
-            signature=(settings.get('photo_fit','fill'),settings.get('photo_order','shuffle'),settings.get('photo_mb',8),box,rle)
+            signature=(settings.get('photo_fit','fill'),settings.get('photo_order','shuffle'),settings.get('photo_mb',8),box,rle,jpeg)
             if self.settings == signature and (self.current_paths or self.ahead):
                 return
             if self.prefetch:
@@ -320,16 +434,16 @@ class PhotoShow:
             self.album.order=[]
             self.ahead=await loop.run_in_executor(None,self.next_paths,settings)
             if self.ahead:
-                await loop.run_in_executor(None,self.render,self.ahead,box,signature[0],rle)
+                await loop.run_in_executor(None,self.render,self.ahead,box,signature[0],rle,jpeg)
 
-    async def frame(self, settings, box, preview=False, rle=False):
+    async def frame(self, settings, box, preview=False, rle=False, jpeg=False):
         import asyncio
         loop = asyncio.get_running_loop()
         async with self.lock:
             if preview:
                 paths = tuple((await loop.run_in_executor(None, self.candidates, settings))[:2 if settings.get('photo_fit') == 'pair' else 1])
                 return await loop.run_in_executor(None, self.render, paths, box, settings.get('photo_fit', 'fill'))
-            signature = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'), settings.get('photo_mb', 8), box, rle)
+            signature = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'), settings.get('photo_mb', 8), box, rle, jpeg)
             if signature != self.settings:
                 self.settings, self.current_paths, self.since, self.ahead = signature, (), None, None
                 self.album.order = []
@@ -345,16 +459,16 @@ class PhotoShow:
                 self.ahead = None
                 self.since = self.album.clock()
             try:
-                result = await loop.run_in_executor(None, self.render, self.current_paths, box, signature[0], rle)
+                result = await loop.run_in_executor(None, self.render, self.current_paths, box, signature[0], rle, jpeg)
             except (OSError, ValueError):
                 self.since, self.ahead = None, None
                 raise
             if self.ahead is None:
                 self.ahead = await loop.run_in_executor(None, self.next_paths, settings)
                 if self.ahead:
-                    async def prepare(paths=self.ahead, bounds=box, fit=signature[0], packed=rle):
+                    async def prepare(paths=self.ahead, bounds=box, fit=signature[0], packed=rle, compressed=jpeg):
                         try:
-                            await loop.run_in_executor(None, self.render, paths, bounds, fit, packed)
+                            await loop.run_in_executor(None, self.render, paths, bounds, fit, packed, compressed)
                         except (OSError, ValueError):
                             pass  # describe reports the failed file; the next request can choose another
                     self.prefetch = asyncio.create_task(prepare())

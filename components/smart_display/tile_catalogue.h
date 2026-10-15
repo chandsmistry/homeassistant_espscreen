@@ -26,6 +26,7 @@ namespace photos {
 inline constexpr const char *FEATURE = "photo_effects";
 inline constexpr const char *CLOCK_FEATURE = "photo_clock_position";
 inline constexpr const char *PACKED_FEATURE = "photo_rle";
+inline constexpr const char *JPEG_FEATURE = "photo_jpeg";
 inline constexpr const char *CLOCK_POSITIONS[] = {"top_left", "top_center", "top_right", "center", "bottom_left", "bottom_center", "bottom_right"};
 inline constexpr const char *TRANSITIONS[] = {"none", "fade", "wipe_left", "wipe_right", "wipe_up", "wipe_down", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out", "pan_left", "pan_right", "diamond", "checker", "spiral", "blocks", "blinds", "random"};
 }

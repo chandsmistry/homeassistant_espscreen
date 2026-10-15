@@ -489,11 +489,12 @@ class Watch:
 
 
 class Link:
-    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared', 'issued', 'changes', 'refresh')
+    __slots__ = ('entity', 'box', 'still', 'etag', 'used', 'lifetime', 'cover', 'live', 'saver', 'prepared', 'issued', 'changes', 'refresh', 'content_type')
 
-    def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None, prepared=None, refresh=None):
+    def __init__(self, entity, box, now, still=None, cover=None, live=None, saver=None, prepared=None, refresh=None, content_type=CONTENT_TYPE):
         self.entity, self.box, self.used = entity, box, now
         self.issued, self.changes = now, None  # when the link was made, and the PD sensor change count then (timing logs)
+        self.content_type = content_type
         self.refresh = refresh  # optional async provider for a slideshow on a stable URL
         self.prepared = prepared  # (etag, bytes) pinned when the link is issued; GET never renders again
         self.still = still
@@ -863,12 +864,12 @@ class CameraFeed:
         while len(self.links) >= MAX_LINKS:
             del self.links[min(self.links, key=lambda token: self.links[token].used)]
 
-    def link(self, entity, box, still=None, cover=None, live=None, saver=None, prepared=None, refresh=None):
+    def link(self, entity, box, still=None, cover=None, live=None, saver=None, prepared=None, refresh=None, content_type=CONTENT_TYPE):
         """A new random token for one camera at one size; `still` makes it one fixed image (an alert's), `cover`
         (size, background) a media player's cover, `live` (entities, size, grounds, paces) a page's live tiles."""
         self.prune()
         token = secrets.token_urlsafe(18)
-        self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver, prepared, refresh)
+        self.links[token] = Link(entity, box, self.clock(), still, cover, live, saver, prepared, refresh, content_type)
         if prepared is not None and self.changes:
             self.links[token].changes = self.changes()
         return token
@@ -946,13 +947,17 @@ def web_app(feed, live=None):
                          outcome, first_byte_ms, (time.monotonic()-started)*1000, len(body))
             return response
         if status == 200:
-            return web.Response(body=body, content_type=CONTENT_TYPE, headers=headers)
+            content_type = link.content_type if link is not None else CONTENT_TYPE
+            if link is not None and link.entity == 'image.screensaver_photos':
+                content_type = 'image/jpeg' if body.startswith(b'\xff\xd8') else CONTENT_TYPE
+            return web.Response(body=body, content_type=content_type, headers=headers)
         if status == 304:
             return web.Response(status=304, headers=headers)
         return web.Response(status=status, text='No image' if status == 503 else 'Unknown link', headers=headers)
 
     app = web.Application(client_max_size=1024)
     app.router.add_get(r'/camera/{token:[A-Za-z0-9_-]{16,64}}.bmp', image)
+    app.router.add_get(r'/camera/{token:[A-Za-z0-9_-]{16,64}}.jpg', image)
     if live is not None:
         async def stream(request):
             return await live.serve(request, request.match_info['token'])

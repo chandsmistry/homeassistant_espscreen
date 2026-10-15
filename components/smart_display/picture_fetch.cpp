@@ -2,15 +2,17 @@
 //
 // One task per download, made when a load starts and gone when it ends; the main loop never waits for it. The task
 // talks to the add-on over a plain socket (lwIP on the ESP32, the system's on a host render): a GET, the answer's head,
-// then the BMP's bytes straight into the pixels LVGL draws. Everything the main loop reads of a slot it reads in tick(),
+// then BMP pixels or a bounded JPEG decoded into the pixels LVGL draws. Everything the main loop reads of a slot it reads in tick(),
 // after the task has written `state` DONE (release/acquire), and everything the task reads was written before the
 // task was made. The picture's buffer is written in place when the size is the one on the glass (a camera's next
 // frame, as online_image did it), and into a new one otherwise, which tick() swaps in: a widget that drew the old one
 // is told about the new size by the slot's `done`, as it always was.
 #include "picture_fetch.h"
+#include "still_jpeg.h"
 // Only a board with pictures builds this (SCREEN_PICTURES, packages/features/camera.yaml): the CYD keeps its flash.
 #ifdef SCREEN_PICTURES
 #include "esphome/core/hal.h"
+#include "live_view.h"
 #include "esphome/core/log.h"
 #include <atomic>
 #include <cerrno>
@@ -150,7 +152,7 @@ static void download(Slot &slot) {
   slot.connect_us = esphome::micros() - connect_at;
   if (fd < 0) { ESP_LOGW(TAG, "%s: no connection to %s:%u", slot.name, a.host.c_str(), a.port); return; }
   std::string request = "GET " + a.path + " HTTP/1.1\r\nHost: " + a.host + ":" + std::to_string(a.port) +
-                        "\r\nAccept: image/bmp,*/*;q=0.8\r\nConnection: close\r\n";
+                        "\r\nAccept: image/jpeg,image/bmp,*/*;q=0.8\r\nConnection: close\r\n";
   if (!slot.task_etag.empty()) request += "If-None-Match: " + slot.task_etag + "\r\n";
   request += "\r\n";
   if (!send_all(fd, request)) { ESP_LOGW(TAG, "%s: the request did not go out", slot.name); close(fd); return; }
@@ -160,6 +162,7 @@ static void download(Slot &slot) {
   std::string head;
   Head answer;
   size_t body = 0;
+  uint8_t *jpeg = nullptr;
   Decoder decoder([&](int width, int height) -> uint16_t * {
     const size_t needed = static_cast<size_t>(width) * height * 2;
     if (slot.pixels && slot.bytes == needed) return slot.pixels;  // in place, the size on the glass
@@ -199,9 +202,27 @@ static void download(Slot &slot) {
       slot.status = answer.status;
       if (answer.status == 304) { slot.cached = true; slot.ok = true; break; }
       if (answer.status != 200) { ESP_LOGW(TAG, "%s: HTTP %d", slot.name, answer.status); failed = true; break; }
+      if (answer.jpeg) {
+#ifdef USE_LIVE_VIEW
+        if (!answer.has_length || !answer.content_length || answer.content_length > still_jpeg::MAX_JPEG_BYTES) {
+          ESP_LOGW(TAG, "%s: JPEG length missing or over limit", slot.name); failed = true; break;
+        }
+        jpeg = static_cast<uint8_t *>(allocate_chunk(answer.content_length));
+        if (!jpeg) { failed = true; break; }
+#else
+        ESP_LOGW(TAG, "%s: JPEG unsupported on this board", slot.name); failed = true; break;
+#endif
+      }
       slot.fresh_etag = answer.etag;
       data = reinterpret_cast<const uint8_t *>(head.data()) + answer.length;
       size = head.size() - answer.length;
+    }
+    if (answer.jpeg) {
+      if (size > answer.content_length - body) { failed = true; break; }
+      if (size) std::memcpy(jpeg + body, data, size);
+      body += size;
+      if (body == answer.content_length) break;
+      continue;
     }
     body += size;
     const uint32_t decode_at = esphome::micros();
@@ -212,6 +233,28 @@ static void download(Slot &slot) {
   }
   close(fd);
   release_memory(chunk);
+  if (answer.jpeg) {
+#ifdef USE_LIVE_VIEW
+    if (!failed && !slot.cancel.load(std::memory_order_relaxed) && body == answer.content_length) {
+      const uint32_t decode_at = esphome::micros();
+      const auto info = still_jpeg::inspect(jpeg, body);
+      if (info.ok) {
+        // A separate packed buffer preserves the old frame on failure/cancellation and retains the existing
+        // main-loop picture-store swap, clock and transition ownership.
+        slot.fresh_bytes = size_t(info.width) * info.height * 2;
+        slot.fresh = allocate(slot.fresh_bytes);
+        slot.fresh_w = info.width; slot.fresh_h = info.height;
+        slot.ok = slot.fresh && live_view::decode_still_jpeg(jpeg, body, slot.fresh, info.width, info.height);
+        if (slot.cancel.load(std::memory_order_relaxed)) slot.ok = false;
+      }
+      slot.decode_us += esphome::micros() - decode_at;
+    }
+#endif
+    release_memory(jpeg);
+    if (!slot.ok && !slot.cancel.load(std::memory_order_relaxed))
+      ESP_LOGW(TAG, "%s: invalid, incomplete or undecodable JPEG (%u bytes)", slot.name, (unsigned) body);
+    return;
+  }
   if (!slot.cached && !failed && decoder.done()) slot.ok = true;
   else if (!slot.cached && !failed && !slot.cancel.load(std::memory_order_relaxed))
     ESP_LOGW(TAG, "%s: the picture ended early (%d of %d rows)", slot.name, decoder.rows(), decoder.bmp().height);

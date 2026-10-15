@@ -310,6 +310,9 @@ class LvglComponent;
 namespace live_view {
 // LVGL, which says how the glass is turned (smart_display/__init__.py binds it at boot).
 void bind(esphome::lvgl::LvglComponent *lvgl);
+// Worker-thread still decode into packed LVGL RGB565, sharing the live stream hardware engine safely.
+bool decode_still_jpeg(const uint8_t *data, size_t length, uint16_t *pixels, unsigned width, unsigned height);
+
 // Whether this screen streams: a P4 whose panel ESP-IDF made with an RGB565 frame buffer, and LVGL bound.
 bool available();
 // Streams `url` into `area`, the screen as LVGL lays it out, looking as `look` says. -1 when it cannot start (no room

@@ -655,6 +655,9 @@ api:
                     features.add(tile_catalogue::photos::FEATURE);
                     features.add(tile_catalogue::photos::CLOCK_FEATURE);
                     features.add(tile_catalogue::photos::PACKED_FEATURE);
+                    #if defined(USE_LIVE_VIEW) && defined(SCREEN_PICTURES)
+                    features.add(tile_catalogue::photos::JPEG_FEATURE);
+                    #endif
                     // speaker_groups (firmware 0.26.0+, app speakers.py): a player's speakers with a key to join or leave
                     // the group and each one's volume, its inputs behind a key of their own, and the speaker it follows.
                     features.add("speaker_groups");

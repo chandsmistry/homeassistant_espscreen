@@ -3203,12 +3203,13 @@ class Manager:
             box=camera_feed.box(screen,'full')
             if box: box=self.photo_box(box,choice)
             packed=catalogue.PHOTOS['packed_feature'] in (getattr(sender,'features',None) or ())
-            warm_key=json.dumps([choice.get('photo_fit','fill'),choice.get('photo_order','shuffle'),choice.get('photo_mb',8),box,packed])
+            jpeg=catalogue.PHOTOS['jpeg_feature'] in (getattr(sender,'features',None) or ())
+            warm_key=json.dumps([choice.get('photo_fit','fill'),choice.get('photo_order','shuffle'),choice.get('photo_mb',8),box,packed,jpeg])
             prior=self.photo_warming.get(inbox)
             if box and (not prior or prior[0] != warm_key) and (not prior or prior[1].done()):
                 async def warm_photo():
                     try:
-                        await self.photo_show(inbox).warm(choice,box,rle=packed)
+                        await self.photo_show(inbox).warm(choice,box,rle=packed,jpeg=jpeg)
                     except (OSError,ValueError) as error:
                         LOG.info('Photos preparation: %s',error)
                 self.photo_warming[inbox]=(warm_key,asyncio.create_task(warm_photo()))
@@ -3328,21 +3329,22 @@ class Manager:
             try:
                 sender = self.page_senders.get(inbox)
                 packed = catalogue.PHOTOS['packed_feature'] in (getattr(sender, 'features', None) or ())
+                jpeg = catalogue.PHOTOS['jpeg_feature'] in (getattr(sender, 'features', None) or ())
                 async def photo_frame():
                     # The screen polls the same URL. Resolve the settled frame on each GET,
                     # reusing the prepared cache until the photo's display interval expires.
                     import hashlib
                     current_choice = self.savers.get(screen.get('device_id'))
-                    image, _ = await self.photo_show(inbox).frame(current_choice, self.photo_box(box,current_choice), rle=packed)
+                    image, _ = await self.photo_show(inbox).frame(current_choice, self.photo_box(box,current_choice), rle=packed, jpeg=jpeg)
                     return '"' + hashlib.sha256(image).hexdigest()[:16] + '"', image
                 tag, image = await photo_frame()
                 old = self.photo_links.get(inbox)
-                token = old[1] if old and old[0] == tag and old[1] in self.camera.links else self.camera.link(entity, box, prepared=(tag, image), refresh=photo_frame)
+                token = old[1] if old and old[0] == tag and old[1] in self.camera.links and self.camera.links[old[1]].content_type == ('image/jpeg' if jpeg else camera_feed.CONTENT_TYPE) else self.camera.link(entity, box, prepared=(tag, image), refresh=photo_frame, content_type='image/jpeg' if jpeg else camera_feed.CONTENT_TYPE)
                 self.photo_links[inbox] = (tag, token)
                 if len(self.photo_links) > 32:
                     self.photo_links.pop(next(iter(self.photo_links)))
-                url = f'{base}/camera/{token}.bmp'
-                LOG.info('photos prepared screen=%s bytes=%d', screen['name'], len(image))
+                url = f'{base}/camera/{token}.{"jpg" if jpeg else "bmp"}'
+                LOG.info('photos prepared screen=%s encoding=%s bytes=%d', screen['name'], 'jpeg' if image.startswith(b'\xff\xd8') else 'bmp', len(image))
             except (OSError, ValueError) as error:
                 LOG.info('Photos screensaver: %s', error)
         elif base and await self.camera.saver(entity, box, kind, ground):

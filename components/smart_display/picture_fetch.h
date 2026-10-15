@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,7 @@ struct Head {
   bool has_length = false;
   size_t content_length = 0;
   std::string etag;
+  bool jpeg = false;
   bool audio = false;  // Content-Type audio/... (a live camera's sound between its pictures, live_view.h)
 };
 inline bool same_ignoring_case(const char *a, const char *b, size_t n) {
@@ -129,12 +131,15 @@ inline Head parse_head(const char *data, size_t size) {
           bool digits = v < ve;
           for (size_t i = v; i < ve; ++i) {
             if (line[i] < '0' || line[i] > '9') { digits = false; break; }
-            n = n * 10 + (line[i] - '0');
+            const unsigned digit = line[i] - '0';
+            if (n > (std::numeric_limits<size_t>::max() - digit) / 10) { digits = false; break; }
+            n = n * 10 + digit;
           }
           if (digits) { h.has_length = true; h.content_length = n; }
         } else if (colon == 4 && same_ignoring_case(line, "etag", 4)) {
           h.etag.assign(line + v, ve - v);
         } else if (colon == 12 && same_ignoring_case(line, "content-type", 12)) {
+          h.jpeg = ve - v >= 10 && same_ignoring_case(line + v, "image/jpeg", 10) && (ve - v == 10 || line[v + 10] == ';');
           h.audio = ve - v >= 6 && same_ignoring_case(line + v, "audio/", 6);
         }
       }
