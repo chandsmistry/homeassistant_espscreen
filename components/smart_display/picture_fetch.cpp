@@ -63,6 +63,8 @@ struct Slot {
   bool ok = false, cached = false;
   int status = 0;
   size_t received = 0;
+  uint32_t connect_us = 0, receive_us = 0, decode_us = 0, task_ms = 0, first_byte_ms = 0, max_receive_us = 0;
+  unsigned chunks = 0;
   uint16_t *fresh = nullptr;      // a buffer of a new size, or null when the task wrote in place
   size_t fresh_bytes = 0;
   int fresh_w = 0, fresh_h = 0;
@@ -143,7 +145,9 @@ bool send_all(int fd, const std::string &text) {
 static void download(Slot &slot) {
   const Address a = split(slot.task_url);
   if (!a.ok) { ESP_LOGW(TAG, "%s: not a link: %s", slot.name, slot.task_url.c_str()); return; }
+  const uint32_t connect_at = esphome::micros();
   const int fd = connect_to(a, RECV_MS);
+  slot.connect_us = esphome::micros() - connect_at;
   if (fd < 0) { ESP_LOGW(TAG, "%s: no connection to %s:%u", slot.name, a.host.c_str(), a.port); return; }
   std::string request = "GET " + a.path + " HTTP/1.1\r\nHost: " + a.host + ":" + std::to_string(a.port) +
                         "\r\nAccept: image/bmp,*/*;q=0.8\r\nConnection: close\r\n";
@@ -169,7 +173,11 @@ static void download(Slot &slot) {
   bool closed = false, failed = false;
   while (!closed && !failed && !slot.cancel.load(std::memory_order_relaxed)) {
     if (esphome::millis() - slot.started > WHOLE_MS) { ESP_LOGW(TAG, "%s: took too long", slot.name); failed = true; break; }
+    const uint32_t receive_at = esphome::micros();
     const auto n = recv(fd, chunk, CHUNK, 0);
+    const uint32_t waited = esphome::micros() - receive_at;
+    slot.receive_us += waited;
+    slot.max_receive_us = std::max(slot.max_receive_us, waited);
     if (n < 0) {
       if (errno == EINTR) continue;
       ESP_LOGW(TAG, "%s: the download stopped (%d)", slot.name, errno);
@@ -177,6 +185,7 @@ static void download(Slot &slot) {
       break;
     }
     if (n == 0) { closed = true; break; }
+    if (!slot.chunks++) slot.first_byte_ms = esphome::millis() - slot.started;
     slot.received += static_cast<size_t>(n);
     const uint8_t *data = chunk;
     size_t size = static_cast<size_t>(n);
@@ -195,7 +204,10 @@ static void download(Slot &slot) {
       size = head.size() - answer.length;
     }
     body += size;
-    if (size && !decoder.feed(data, size)) { ESP_LOGW(TAG, "%s: not a picture this screen shows", slot.name); failed = true; break; }
+    const uint32_t decode_at = esphome::micros();
+    const bool decoded = !size || decoder.feed(data, size);
+    slot.decode_us += esphome::micros() - decode_at;
+    if (!decoded) { ESP_LOGW(TAG, "%s: not a picture this screen shows", slot.name); failed = true; break; }
     if (decoder.done() || (answer.has_length && body >= answer.content_length)) break;
   }
   close(fd);
@@ -208,6 +220,7 @@ static void download(Slot &slot) {
 static void task_main(void *arg) {
   auto &slot = *static_cast<Slot *>(arg);
   download(slot);
+  slot.task_ms = esphome::millis() - slot.started;
 #ifdef USE_ESP32
   ESP_LOGD(TAG, "%s: task stack left %u", slot.name, (unsigned) uxTaskGetStackHighWaterMark(nullptr));
 #endif
@@ -223,6 +236,8 @@ static void start(Slot &slot) {
   slot.ok = slot.cached = false;
   slot.status = 0;
   slot.received = 0;
+  slot.connect_us = slot.receive_us = slot.decode_us = slot.task_ms = slot.first_byte_ms = slot.max_receive_us = 0;
+  slot.chunks = 0;
   slot.fresh = nullptr;
   slot.fresh_bytes = 0;
   slot.fresh_w = slot.fresh_h = 0;
@@ -305,6 +320,11 @@ static void take_over(Slot &slot) {
   if (slot.ok)
     ESP_LOGI(TAG, "%s: %s, %u bytes in %u ms%s", slot.name, slot.cached ? "unchanged" : "loaded", (unsigned) slot.received,
              (unsigned) (esphome::millis() - slot.started), cancelled ? " (no longer wanted)" : "");
+  ESP_LOGI(TAG, "%s timing: ok=%d cancelled=%d bytes=%u chunks=%u connect_us=%u first_byte_ms=%u receive_us=%u max_receive_us=%u decode_us=%u task_ms=%u dispatch_ms=%u",
+           slot.name, slot.ok, cancelled, (unsigned) slot.received, slot.chunks,
+           (unsigned) slot.connect_us, (unsigned) slot.first_byte_ms, (unsigned) slot.receive_us,
+           (unsigned) slot.max_receive_us, (unsigned) slot.decode_us, (unsigned) slot.task_ms,
+           (unsigned) (esphome::millis() - slot.started - slot.task_ms));
   slot.state.store(IDLE, std::memory_order_release);
   if (cancelled) {
     slot.cancel.store(false);
