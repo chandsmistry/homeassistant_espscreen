@@ -180,3 +180,7 @@ has.
 Photos offers a Size control under Show clock over photos. The time line height is 4% to 40% of the screen height, with a 12% default and a reset button. The date follows at 35% of the time line height. Both stay inside the screen at every anchor, with large or long text clamped to fit. The settings preview runs the same C++ renderer, existing font selection and LVGL scaling as the panel. Scaling beyond the largest existing complete font can soften glyph edges; no font is added.
 
 The optional photo_clock_size setting is validated and stored with the screensaver choice. Its generated wire key is sent only after the screen advertises the generated photo_clock_size capability. Older saved choices keep their existing fields unchanged.
+
+## Portrait pairs
+
+The side-by-side option keeps landscapes in the album. Two adjacent portrait photos share equal frames, fitted without cropping. A landscape uses the whole screen frame, and a portrait without an adjacent portrait is shown alone and centred. Pairing follows filename or shuffle order without moving images past a landscape, dropping images, or pairing across the end of a round. Orientation includes the photo's EXIF rotation. The preview uses the same pairing rule without advancing playback.

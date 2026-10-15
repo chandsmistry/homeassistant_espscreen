@@ -313,10 +313,6 @@ class PhotoShow:
         report = self.describe(settings.get('photo_mb', 8))
         bad = {e['name'] for e in report['skipped']}
         paths = [p for p in self.album.files if os.path.relpath(p, self.album.folder) not in bad]
-        if settings.get('photo_fit', 'fill') == 'pair':
-            portraits = [p for p in paths if self.metadata.get(p, (None, '', False))[2]]
-            if portraits:
-                paths = portraits
         return sorted(paths, key=lambda p: os.path.relpath(p, self.album.folder).casefold())
 
     def next_paths(self, settings):
@@ -326,20 +322,28 @@ class PhotoShow:
     def _next_paths(self, settings):
         available = self.candidates(settings)
         self.album.order = [p for p in self.album.order if p in available]
-        count = min(2 if settings.get('photo_fit') == 'pair' else 1, len(available))
-        selected = []
-        for _ in range(count):
-            if not self.album.order:
-                self.album.order = list(available)
-                if settings.get('photo_order', 'shuffle') == 'shuffle':
-                    self.album.rng.shuffle(self.album.order)
-                    if len(available) > count and self.album.order[0] in self.current_paths:
-                        self.album.order = self.album.order[1:] + self.album.order[:1]
-            path = next((p for p in self.album.order if p not in selected), '')
-            if path:
-                self.album.order.remove(path)
-                selected.append(path)
-        return tuple(selected)
+        if not self.album.order:
+            self.album.order = list(available)
+            if settings.get('photo_order', 'shuffle') == 'shuffle':
+                self.album.rng.shuffle(self.album.order)
+                if len(available) > 1 and self.album.order[0] in self.current_paths:
+                    self.album.order = self.album.order[1:] + self.album.order[:1]
+        selected = self._frame_paths(self.album.order, settings)
+        del self.album.order[:len(selected)]
+        return selected
+
+    def _frame_paths(self, ordered, settings):
+        """Use adjacent portraits only, without dropping landscapes or crossing a round."""
+        count = 1
+        if settings.get('photo_fit') == 'pair' and len(ordered) > 1:
+            if all(self.metadata.get(p, (None, '', False))[2] for p in ordered[:2]):
+                count = 2
+        return tuple(ordered[:count])
+
+    def preview_paths(self, settings):
+        with self.state_lock:
+            # Share the grouping rule without consuming the live queue or its RNG.
+            return self._frame_paths(self._candidates(settings), settings)
 
     def render(self, paths, box, fit, rle=False, jpeg=False):
         with self.render_lock:
@@ -544,7 +548,7 @@ class PhotoShow:
         loop = asyncio.get_running_loop()
         async with self.lock:
             if preview:
-                paths = tuple((await loop.run_in_executor(None, self.candidates, settings))[:2 if settings.get('photo_fit') == 'pair' else 1])
+                paths = await loop.run_in_executor(None, self.preview_paths, settings)
                 return await loop.run_in_executor(None, self.render, paths, box, settings.get('photo_fit', 'fill'))
             signature = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'), settings.get('photo_mb', 8), box, rle, jpeg)
             if signature != self.settings:
