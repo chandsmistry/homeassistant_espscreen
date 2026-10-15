@@ -7,7 +7,7 @@ import { t } from "../../i18n";
 import type { EnergySources, Tile } from "../../types";
 import PropRow from "../ui/PropRow.vue";
 import Section from "../ui/Section.vue";
-import UiSelect from "../ui/UiSelect.vue";
+import EnergySensorField from "./EnergySensorField.vue";
 import { setTileOption } from "../../editor/tiles";
 import { useEntitiesStore } from "../../stores/entities";
 import { useInventoryStore } from "../../stores/inventory";
@@ -18,10 +18,7 @@ const inv = useInventoryStore();
 const props = defineProps<{ tile: Tile }>();
 
 const mapping = computed<EnergySources>(() => (props.tile.options?.energy_sources as EnergySources | undefined) ?? {});
-const sensors = computed(() => (inv.inventory.entities || []).filter((item) => item.id.startsWith("sensor."))
-  .map((item) => [item.id, item.name || item.id] as [string, string]).sort((a, b) => a[1].localeCompare(b[1])));
-const options = (current?: string) => [["", t("editor.tile.energy.sources.none")] as [string, string],
-  ...(current && !sensors.value.some(([id]) => id === current) ? [[current, current] as [string, string]] : []), ...sensors.value];
+const sensorIds = computed(() => (inv.inventory.entities || []).map((item) => item.id).filter((id) => id.startsWith("sensor.")));
 const KEYS = ["grid", "grid_import", "grid_export", "solar", "battery", "battery_out", "battery_in", "soc", "home"] as const;
 type Key = (typeof KEYS)[number];
 
@@ -53,13 +50,11 @@ const reset = () => save({});
   <Section :title="t('editor.tile.energy.sources.title')">
     <p class="hint">{{ t(used ? "editor.tile.energy.sources.hint_own" : "editor.tile.energy.sources.hint") }}</p>
     <PropRow v-for="key in KEYS" :key="key" :label="t(`editor.tile.energy.sources.${key}.label`)" icon="flash" :hint="t(`editor.tile.energy.sources.${key}.hint`)">
-      <UiSelect :model-value="mapping[key] ?? ''" :options="options(mapping[key])" :aria-label="t(`editor.tile.energy.sources.${key}.label`)"
-        @update:model-value="(v: string) => pick(key, v)" />
+      <EnergySensorField :value="mapping[key] ?? ''" :sensors="sensorIds" :label="t(`editor.tile.energy.sources.${key}.label`)" @commit="(v) => pick(key, v)" />
     </PropRow>
     <PropRow v-for="index in Math.min(devices.length + 1, MAX_DEVICES)" :key="`d${index}`" :label="t('editor.tile.energy.sources.device', { n: index })" icon="flash"
       :hint="index === 1 ? t('editor.tile.energy.sources.device_hint') : undefined">
-      <UiSelect :model-value="devices[index - 1]?.entity ?? ''" :options="options(devices[index - 1]?.entity)" :aria-label="t('editor.tile.energy.sources.device', { n: index })"
-        @update:model-value="(v: string) => device(index - 1, v)" />
+      <EnergySensorField :value="devices[index - 1]?.entity ?? ''" :sensors="sensorIds" :label="t('editor.tile.energy.sources.device', { n: index })" @commit="(v) => device(index - 1, v)" />
       <input v-if="devices[index - 1]?.entity" class="energy-device-name" type="text" maxlength="48" :value="devices[index - 1]?.name ?? ''"
         :placeholder="entities.entityName(devices[index - 1].entity)" :aria-label="t('editor.tile.energy.sources.device_name')"
         @change="(e) => deviceName(index - 1, (e.target as HTMLInputElement).value)" />
