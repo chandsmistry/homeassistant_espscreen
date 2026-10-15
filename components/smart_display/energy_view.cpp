@@ -48,6 +48,8 @@ static lv_timer_t *timer = nullptr;
 static int views = 0;
 constexpr uint32_t FRAME_MS = 40;  // 25 frames a second: a dot moves at most a few pixels a frame
 
+constexpr lv_opa_t FAINT_OPA = 13;  // 5 % opaque: power-flow-card-plus's zero lines at a transparency of 95
+
 static lv_color_t paint(ec::Paint p) {
   switch (p) {
     case ec::Paint::SOLAR: return theme::color(theme::ENERGY_SOLAR);
@@ -60,6 +62,11 @@ static lv_color_t paint(ec::Paint p) {
     case ec::Paint::DEVICE2: return theme::color(theme::ENERGY_DEVICE_3);
     case ec::Paint::DEVICE3: return theme::color(theme::ENERGY_DEVICE_4);
     case ec::Paint::REST: return theme::color(theme::ENERGY_REST);
+    case ec::Paint::CARD_GRID_IN: return theme::color(theme::ENERGY_CARD_GRID_IN);
+    case ec::Paint::CARD_GRID_OUT: return theme::color(theme::ENERGY_CARD_GRID_OUT);
+    case ec::Paint::CARD_BATTERY_OUT: return theme::color(theme::ENERGY_CARD_BATTERY_OUT);
+    case ec::Paint::CARD_BATTERY_IN: return theme::color(theme::ENERGY_CARD_BATTERY_IN);
+    case ec::Paint::FAINT: return theme::color(theme::ENERGY_ZERO_LINE);
     case ec::Paint::MUTED: return theme::color(theme::MUTED);
     case ec::Paint::IDLE: return theme::color(theme::LINE);
     case ec::Paint::ACCENT: return theme::color(theme::ACCENT);
@@ -122,6 +129,7 @@ static void draw(lv_event_t *e) {
     lv_draw_line_dsc_t dsc;
     lv_draw_line_dsc_init(&dsc);
     dsc.color = paint(l.paint); dsc.width = l.width;
+    if (l.paint == ec::Paint::FAINT) dsc.opa = FAINT_OPA;
     dsc.p1.x = a.x1 + int(l.a.x); dsc.p1.y = a.y1 + int(l.a.y); dsc.p2.x = a.x1 + int(l.b.x); dsc.p2.y = a.y1 + int(l.b.y);
     lv_draw_line(layer, &dsc);
   }
@@ -132,6 +140,7 @@ static void draw(lv_event_t *e) {
       lv_draw_arc_dsc_t dsc;
       lv_draw_arc_dsc_init(&dsc);
       dsc.color = paint(arc.paint); dsc.width = arc.width; dsc.rounded = 0;
+      if (arc.paint == ec::Paint::FAINT) dsc.opa = FAINT_OPA;
       dsc.center.x = cx; dsc.center.y = cy; dsc.radius = arc.radius;
       dsc.start_angle = int(std::lround(arc.a0)); dsc.end_angle = int(std::lround(arc.a1 >= 360 ? 360 : arc.a1));
       lv_draw_arc(layer, &dsc);

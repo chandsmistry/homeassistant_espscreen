@@ -77,6 +77,11 @@ static Data night_car() {  // 11.4 kW from the grid, the widest number a house s
   d.devices = {{"EV", "sensor.wallbox_charging_power", 0xF0B6C, 11000}, {"Heat Pump Power", "sensor.heat_pump_power", 0xF1A43, 200}};
   return d;
 }
+static Data one_device() {  // a device and the rest of the house unmeasured
+  Data d = night_car();
+  d.from_grid = 3500; d.home = 3500; d.g2h = 3500; d.devices = {{"EV", "", 0xF0B6C, 3000}};
+  return d;
+}
 static Data busy() {  // seven devices at once
   Data d = night_car();
   d.from_grid = 6345; d.from_battery = 3000; d.home = 9345; d.g2h = 6345; d.b2h = 3000; d.soc = 58;
@@ -345,6 +350,58 @@ int main() {
         ++checks;
       }
     }
+  }
+  // A card of a person's own sensors: no Untracked circle, a second line under the sun's and the grid's number, the
+  // card's colours for the grid and the battery, idle lines kept faintly.
+  {
+    auto has_text = [](const Scene &sc, const std::string &t) {
+      for (auto &x : sc.texts) if (x.s == t) return true;
+      return false;
+    };
+    int subs = 0, untracked = 0;
+    for (auto &b : BOARDS) {
+      const Measure m = measure(b);
+      for (auto &size : b.sizes) {
+        if (!size.name || !size.fits) continue;
+        ui::configure(b.dpi, b.standard ? "standard" : "compact");
+        const Scene plain = build(noon(), m, size.w, size.h, W());
+        Data d = noon();
+        d.hide_untracked = true; d.card_palette = true; d.faint_zero = true;
+        d.solar_sub = "12.34 kWh"; d.grid_sub = "3.20 kWh"; d.fossil_sub = "34 % fossil";
+        ui::configure(b.dpi, b.standard ? "standard" : "compact");
+        const Scene sc = build(d, m, size.w, size.h, W());
+        check(sc.ok, "the card with a person's look fits", b, size.name);
+        audit(sc, m, b, size.name, size.w, size.h);
+        check(!has_text(sc, "Untracked"), "Untracked consumption stays unsaid", b, size.name);
+        check(sc.circles.size() <= plain.circles.size(), "hiding Untracked never adds a circle", b, size.name);
+        for (auto &c : sc.circles) check(c.paint != Paint::GRID_IN && c.paint != Paint::GRID_OUT && c.paint != Paint::BATTERY_IN && c.paint != Paint::BATTERY_OUT,
+                                         "the card's colours replace the grid's and the battery's", b, size.name);
+        if (has_text(sc, "12.34 kWh")) ++subs;
+        {
+          const Scene car = build(one_device(), m, size.w, size.h, W());
+          Data hidden = one_device();
+          hidden.hide_untracked = true;
+          ui::configure(b.dpi, b.standard ? "standard" : "compact");
+          const Scene gone = build(hidden, m, size.w, size.h, W());
+          if (has_text(car, "Untracked")) { ++untracked; check(!has_text(gone, "Untracked"), "Untracked consumption stays unsaid", b, size.name); }
+        }
+      }
+    }
+    assert(subs > 0);  // at least the bigger glasses have the room
+    // An idle line is faint; with power it keeps its colour.
+    ui::configure(170, "standard");
+    const Board big{"guition", 170, true, {}};
+    const Measure m = measure(big);
+    Data idle = noon();
+    idle.faint_zero = true; idle.s2b = 0; idle.to_battery = 0;
+    const Scene sc = build(idle, m, 424, 353, W());
+    bool faint = false, coloured = false;
+    for (auto &l : sc.lines) { faint |= l.paint == Paint::FAINT; coloured |= l.paint != Paint::FAINT; }
+    for (auto &a : sc.arcs) { faint |= a.paint == Paint::FAINT; coloured |= a.paint != Paint::FAINT; }
+    assert(faint && coloured);
+    checks += 2;
+    assert(untracked > 0);  // without the flag the card does say Untracked on some glass, so the check above means something
+    ++checks;
   }
   std::printf("energy card: %d checks passed\n", checks);
   return 0;

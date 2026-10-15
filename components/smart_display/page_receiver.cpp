@@ -1055,6 +1055,14 @@ std::string receive(const std::string &payload) {
         e->devices.push_back(std::move(d));
       }
       e->rest = std::max(0.f, number(extra["o"], 0));
+      // A card of a person's own sensors (app 0.4.88+): q hides Untracked consumption, v the card's colours, z keeps
+      // idle lines faintly, k the lines under the sun's and the grid's number and the grid's fossil share.
+      e->hide_untracked = extra["q"].is<int>() && extra["q"].as<int>() == 1;
+      e->card_palette = extra["v"].is<int>() && extra["v"].as<int>() == 1;
+      e->faint_zero = extra["z"].is<int>() && extra["z"].as<int>() == 1;
+      if (extra["k"].is<JsonArray>()) {
+        e->solar_sub = string(extra["k"][0], 24); e->grid_sub = string(extra["k"][1], 24); e->fossil_sub = string(extra["k"][2], 24);
+      }
       e->home_name = string(extra["n"], 32);
       next.energy = std::move(e);
     }

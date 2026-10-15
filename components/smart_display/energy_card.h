@@ -59,6 +59,11 @@ struct Data {
   std::vector<Device> devices;  // drawing power now, in the order of Home Assistant's Energy settings
   std::string home_name;        // the home's name in Home Assistant, for the house's circle
   float rest = 0;               // devices drawing power beyond the ones sent
+  // The card as a person's own sensors draw it (app 0.4.87+, payload keys q, k, v, z; absent = the calm default look).
+  bool hide_untracked = false;  // no Untracked consumption circle: the house less its devices stays unsaid
+  bool card_palette = false;    // power-flow-card-plus's colours for the grid and the battery
+  bool faint_zero = false;      // a line with no power stays on the card, almost transparent
+  std::string solar_sub, grid_sub, fossil_sub;  // a second, smaller line under the sun's and the grid's number
   bool any() const { return solar || grid || battery; }
 };
 
@@ -108,7 +113,7 @@ inline std::string power(float w, char decimal = '.') {
 inline float duration(float w) { return w > 2000 ? 0.75f : (w - 0.01f) * (0.75f - 6.f) / (2000.f - 0.01f) + 6.f; }
 
 // ---- Colours by role; the draw step asks the theme for them (theme.h, energy section).
-enum class Paint : uint8_t { SOLAR, GRID_IN, GRID_OUT, BATTERY_OUT, BATTERY_IN, DEVICE0, DEVICE1, DEVICE2, DEVICE3, REST, INK, MUTED, IDLE, ACCENT };
+enum class Paint : uint8_t { SOLAR, GRID_IN, GRID_OUT, BATTERY_OUT, BATTERY_IN, DEVICE0, DEVICE1, DEVICE2, DEVICE3, REST, INK, MUTED, IDLE, ACCENT, CARD_GRID_IN, CARD_GRID_OUT, CARD_BATTERY_OUT, CARD_BATTERY_IN, FAINT };
 
 // ---- The board's faces the card may use (its fixed font set) and what the caller measured of them.
 enum Face : uint8_t { WATCH_VALUE, HEADLINE, CONTROL, SMALL, ICON, ICON_MINI, ICON_WATCH, FACES };
@@ -401,7 +406,7 @@ inline Choice choose(const Data &data, const Measure &m, int w, int h, const Wor
   float measured = data.rest;
   for (auto &dv : data.devices) measured += dv.w;
   const float untracked = data.home - measured;
-  const bool tracks = measured > 0 && untracked > 1;
+  const bool tracks = !data.hide_untracked && measured > 0 && untracked > 1;
   if (tracks) values.push_back(power(untracked, words.decimal));
   const int listed = int(data.devices.size()) + (data.rest > 0 ? 1 : 0) + (tracks ? 1 : 0);
   std::string shape = std::to_string(w) + 'x' + std::to_string(h) + char('0' + data.solar) + char('0' + data.grid) +
@@ -575,6 +580,7 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
   const float turn = 0.55f * d;  // Home Assistant's turn spans about 42 of 80 px
   auto flow = [&](Path path, Paint paint, float watts, bool reverse = false) {
     path = stand(path);
+    if (data.faint_zero && watts <= 0) paint = Paint::FAINT;
     // Lines drawn calm grow with their power; with dots every line keeps its width.
     const int width = style == Style::LINES ? flow_width(watts, lw, o) : lw;
     for (size_t i = 0; i < path.size(); ++i) {
@@ -668,7 +674,7 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
       y += lh;
     }
   };
-  struct Value { std::string arrow, text; Paint paint; };
+  struct Value { std::string arrow, text; Paint paint; bool small = false; };
   // A number in a name's place (the compact step): arrow and number in the flow's colour, after the battery's charge.
   auto value_label = [&](P at, bool top, const Value &v, const std::string &charge) {
     const int lh = m.line[st.value];
@@ -685,7 +691,9 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
   auto inside = [&](P c, const std::string &icon, Paint icon_paint, const std::vector<Value> &rows, const std::string &charge) {
     const int vh = m.line[st.value], ih = m.line[st.icon];
     const int head = charge.empty() ? ih : std::max(ih, vh);
-    const int block = head + int(rows.size()) * vh;
+    auto row_h = [&](const Value &r) { return r.small && m.line[st.label] > 0 ? m.line[st.label] : vh; };
+    int block = head;
+    for (auto &r : rows) block += row_h(r);
     int y = int(std::lround(c.y - block / 2.f));
     if (charge.empty()) {
       sc.texts.push_back({icon, st.icon, int(std::lround(c.x - rr)) + 1, y, d - 2, true, icon_paint});
@@ -697,11 +705,49 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
     }
     y += head;
     for (auto &r : rows) {
-      const int aw = r.arrow.empty() ? 0 : m.width(st.arrow, r.arrow) + gap, tw = m.width(st.value, r.text);
+      const Face face = r.small && m.line[st.label] > 0 ? st.label : st.value;
+      const int rh = row_h(r);
+      const int aw = r.arrow.empty() ? 0 : m.width(st.arrow, r.arrow) + gap, tw = m.width(face, r.text);
       const int x = int(std::lround(c.x - (aw + tw) / 2.f));
-      if (aw) sc.texts.push_back({r.arrow, st.arrow, x, y + (vh - m.line[st.arrow]) / 2, aw, false, r.paint});
-      sc.texts.push_back({r.text, st.value, x + aw, y, tw + 2, false, r.paint});
-      y += vh;
+      if (aw) sc.texts.push_back({r.arrow, st.arrow, x, y + (rh - m.line[st.arrow]) / 2, aw, false, r.paint});
+      sc.texts.push_back({r.text, face, x + aw, y, tw + 2, false, r.paint});
+      y += rh;
+    }
+  };
+  // A person's second line under a number (kWh today, the fossil share): in the label face, and only where the circle
+  // has the room for it beside what it already holds.
+  auto add_sub = [&](std::vector<Value> &rows, const std::vector<std::string> &subs) {
+    if (ft.mode.compact || m.line[st.label] <= 0) return;
+    // The block as `inside` centres it: the glyph, then each row. Every line of it must keep its letters (18 % to
+    // 88 % of the line) within the ring's chord at its top and bottom.
+    const float r_in = d / 2.f - std::max(2.f, d / 40.f);
+    auto fits = [&](const std::vector<Value> &list) {
+      const int vh = m.line[st.value], ih = m.line[st.icon];
+      int block = ih;
+      for (auto &r : list) block += r.small ? m.line[st.label] : vh;
+      float y = -block / 2.f;
+      auto chord = [&](float top, float bottom, int width) {
+        for (float yy : {top, bottom}) {
+          const float half = std::sqrt(std::max(0.f, r_in * r_in - yy * yy));
+          if (width / 2.f > half - 1) return false;
+        }
+        return true;
+      };
+      if (!chord(y + ih * 0.18f, y + ih * 0.88f, ih)) return false;
+      y += ih;
+      for (auto &r : list) {
+        const int rh = r.small ? m.line[st.label] : vh, face = r.small ? st.label : st.value;
+        const int tw = m.width(Face(face), r.text) + (r.arrow.empty() ? 0 : m.width(st.arrow, r.arrow) + gap);
+        if (!chord(y + rh * 0.18f, y + rh * 0.88f, tw)) return false;
+        y += rh;
+      }
+      return true;
+    };
+    for (auto &t : subs) {
+      if (t.empty()) continue;
+      std::vector<Value> more = rows;
+      more.push_back({"", t, Paint::MUTED, true});
+      if (fits(more)) rows = std::move(more);
     }
   };
   auto place = [&](P c, const std::string &icon, Paint icon_paint, std::vector<Value> rows, const std::string &label,
@@ -719,7 +765,9 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
   const std::string down_a = ft.mode.arrows ? utf8(ARROW_DOWN) : "", up_a = ft.mode.arrows ? utf8(ARROW_UP) : "";
   if (data.solar) {
     circle(solar, border, Paint::SOLAR, data.solar_entity);
-    place(solar, utf8(ICON_SOLAR), Paint::INK, {{"", power(data.solar_w, words.decimal), Paint::INK}}, words.solar, !ft.vertical);
+    std::vector<Value> rows{{"", power(data.solar_w, words.decimal), Paint::INK}};
+    add_sub(rows, {data.solar_sub});
+    place(solar, utf8(ICON_SOLAR), Paint::INK, rows, words.solar, !ft.vertical);
   }
   if (data.grid) {
     circle(grid, border, grid_exports ? Paint::GRID_OUT : Paint::GRID_IN, data.grid_entity);
@@ -728,6 +776,7 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
     if (ft.mode.both || data.from_grid > 0 || data.to_grid <= 0) rows.push_back({right, power(data.from_grid, words.decimal), Paint::GRID_IN});
     if ((ft.mode.one || ft.mode.compact) && rows.size() > 1) rows.erase(rows.begin() + (grid_exports ? 1 : 0));
     if (ft.mode.one) for (auto &r : rows) r.arrow.clear();
+    add_sub(rows, {data.grid_sub, data.fossil_sub});
     place(grid, utf8(ICON_GRID), Paint::INK, rows, words.grid, ft.vertical);
   }
   if (data.battery) {
@@ -766,6 +815,24 @@ inline Scene build(const Data &data, const Measure &m, int w, int h, const Words
     circle(slot[i], border, paint_of(i), dev[i].entity);
     const bool top = !ft.vertical && (i == 0 || i == 2);
     place(slot[i], utf8(dev[i].icon ? dev[i].icon : ICON_FLASH), paint_of(i), {{"", power(dev[i].w, words.decimal), Paint::INK}}, dev[i].name, top);
+  }
+  if (data.card_palette) {  // power-flow-card-plus's colours for the grid and the battery
+    auto swap = [](Paint &p) {
+      switch (p) {
+        case Paint::GRID_IN: p = Paint::CARD_GRID_IN; break;
+        case Paint::GRID_OUT: p = Paint::CARD_GRID_OUT; break;
+        case Paint::BATTERY_OUT: p = Paint::CARD_BATTERY_OUT; break;
+        case Paint::BATTERY_IN: p = Paint::CARD_BATTERY_IN; break;
+        default: break;
+      }
+    };
+    for (auto &c : sc.circles) swap(c.paint);
+    for (auto &a : sc.arcs) swap(a.paint);
+    for (auto &a : sc.ring) swap(a.paint);
+    for (auto &l : sc.lines) swap(l.paint);
+    for (auto &f : sc.flows) swap(f.paint);
+    for (auto &a : sc.arrows) swap(a.paint);
+    for (auto &t : sc.texts) swap(t.paint);
   }
   return sc;
 }

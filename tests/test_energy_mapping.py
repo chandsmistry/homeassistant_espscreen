@@ -80,6 +80,25 @@ class Mapping(unittest.TestCase):
                     {'devices': [{'entity': 'sensor.a', 'x': 1}]}):
             self.assertIsNone(energy_flow.clean_mapping(bad))
 
+    def test_look_and_text_options(self):
+        states = {'sensor.g': st(500), 'sensor.s': st(900), 'sensor.d': st(8), 'sensor.e': st(120),
+                  'sensor.sk': st(12.3456, 'kWh'), 'sensor.gk': st(3.2, 'kWh'), 'sensor.f': st(33.6, '%')}
+        mapping = {'grid': 'sensor.g', 'solar': 'sensor.s', 'devices': [{'entity': 'sensor.d', 'tolerance': 10}, {'entity': 'sensor.e'}],
+                   'solar_kwh': 'sensor.sk', 'grid_kwh': 'sensor.gk', 'fossil': 'sensor.f',
+                   'hide_rest': True, 'card_colours': True, 'faint_zero': True}
+        self.assertEqual(energy_flow.clean_mapping(mapping), mapping)
+        x = energy_flow.payload({}, states, mapping=mapping)
+        self.assertEqual((x['q'], x['v'], x['z']), (1, 1, 1))
+        self.assertEqual(x['k'], ['12.35 kWh', '3.20 kWh', '34 % fossil'])
+        self.assertEqual([d['e'] for d in x['d']], ['sensor.e'])  # 8 W is under its tolerance of 10 W
+        self.assertNotIn('o', x)
+        plain = energy_flow.payload({}, states, mapping={'grid': 'sensor.g'})
+        for key in ('q', 'v', 'z', 'k'):
+            self.assertNotIn(key, plain)
+        for bad in ({'hide_rest': 'yes'}, {'fossil': 'light.x'}, {'devices': [{'entity': 'sensor.a', 'tolerance': -1}]}):
+            self.assertIsNone(energy_flow.clean_mapping(bad))
+        self.assertIn('sensor.sk', energy_flow.mapped_entities(mapping))
+
 
 if __name__ == '__main__':
     unittest.main()

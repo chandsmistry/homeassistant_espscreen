@@ -111,6 +111,13 @@ enum Role : uint8_t {
   ENERGY_DEVICE_3,
   ENERGY_DEVICE_4,
   ENERGY_REST,           // Other and Untracked consumption: Home Assistant's --state-unavailable-color
+  // power-flow-card-plus's colours a person chose for a card of their own sensors (the grid and the battery), and the
+  // grey of a line with no power, which the card draws at 5 % opacity
+  ENERGY_CARD_GRID_IN,
+  ENERGY_CARD_GRID_OUT,
+  ENERGY_CARD_BATTERY_OUT,
+  ENERGY_CARD_BATTERY_IN,
+  ENERGY_ZERO_LINE,
   // ---- the weather card's two-tone icons (its week, weather_chart.h): a cloud in front, a second cloud behind it, as Home
   // Assistant's own weather pictures draw them; a sun, drops and flakes keep their condition colours
   WEATHER_CLOUD,
@@ -214,6 +221,11 @@ inline constexpr Pair ROLES[ROLE_COUNT] = {
   /* ENERGY_DEVICE_3 */          {0xB54C9D, 0xB54C9D},
   /* ENERGY_DEVICE_4 */          {0x5BD0CC, 0x5BD0CC},
   /* ENERGY_REST */              {0xBDBDBD, 0x707070},  // dark: #6F6F6F on the panel's grey step
+  /* ENERGY_CARD_GRID_IN */      {0xFF0000, 0xFF0000},
+  /* ENERGY_CARD_GRID_OUT */     {0x8900FA, 0x8900FA},
+  /* ENERGY_CARD_BATTERY_OUT */  {0x96D35F, 0x96D35F},
+  /* ENERGY_CARD_BATTERY_IN */   {0x66FF00, 0x66FF00},
+  /* ENERGY_ZERO_LINE */         {0xBDBDBD, 0xBDBDBD},
   /* WEATHER_CLOUD */            {0xB0BEC5, 0xCFD8DC},
   /* WEATHER_CLOUD_BACK */       {0x90A4AE, 0x78909C},
   /* PD_SOC_1 */ {0xF59E0B, 0xFBBF24},

@@ -334,6 +334,11 @@ def _reading(state: dict | None) -> list[str]:
 # The energy card with sensors of its own (tile option `energy_sources`, the way power-flow-card-plus is configured):
 # the keys a person may set. Every value is a sensor id; `devices` is a list of {entity, name?}, at most MAPPED_DEVICES.
 MAPPED_KEYS = ('grid', 'grid_import', 'grid_export', 'solar', 'battery', 'battery_out', 'battery_in', 'soc', 'home')
+# Sensors that only add a line of text under a circle: the kWh of the sun and of the grid today, the grid's fossil share.
+TEXT_KEYS = ('solar_kwh', 'grid_kwh', 'fossil')
+# How the card looks, each on or off (absent = off): no Untracked consumption, the card's own colours for the grid and
+# the battery, and lines with no power kept faintly.
+LOOK_KEYS = ('hide_rest', 'card_colours', 'faint_zero')
 MAPPED_DEVICES = 4
 VIRTUAL_GRID = 'sensor.screen_energy_grid_net'
 VIRTUAL_BATTERY = 'sensor.screen_energy_battery_net'
@@ -348,7 +353,7 @@ def clean_mapping(mapping):
     then follows Home Assistant's Energy settings); None when it is not a mapping at all."""
     if mapping in (None, {}):
         return {}
-    if not isinstance(mapping, dict) or set(mapping) - {*MAPPED_KEYS, 'devices'}:
+    if not isinstance(mapping, dict) or set(mapping) - {*MAPPED_KEYS, *TEXT_KEYS, *LOOK_KEYS, 'devices'}:
         return None
 
     def sensor(value):
@@ -362,17 +367,35 @@ def clean_mapping(mapping):
         if not sensor(value):
             return None
         out[key] = value
+    for key in TEXT_KEYS:
+        value = mapping.get(key)
+        if value in (None, ''):
+            continue
+        if not sensor(value):
+            return None
+        out[key] = value
+    for key in LOOK_KEYS:
+        value = mapping.get(key)
+        if value in (None, False):
+            continue
+        if value is not True:
+            return None
+        out[key] = True
     if 'devices' in mapping:
         if not isinstance(mapping['devices'], list) or len(mapping['devices']) > MAPPED_DEVICES:
             return None
         devices_ = []
         for item in mapping['devices']:
-            if not isinstance(item, dict) or set(item) - {'entity', 'name'} or not sensor(item.get('entity')):
+            if not isinstance(item, dict) or set(item) - {'entity', 'name', 'tolerance'} or not sensor(item.get('entity')):
                 return None
             name = item.get('name') or ''
             if not isinstance(name, str) or len(name) > 48:
                 return None
-            devices_.append({'entity': item['entity'], **({'name': name} if name else {})})
+            tolerance = item.get('tolerance') or 0
+            if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not 0 <= tolerance <= 10000:
+                return None
+            devices_.append({'entity': item['entity'], **({'name': name} if name else {}),
+                             **({'tolerance': tolerance} if tolerance else {})})
         if devices_:
             out['devices'] = devices_
     return out
@@ -422,7 +445,7 @@ def mapped(mapping: dict, states: dict[str, dict]) -> tuple[dict, dict[str, dict
 def mapped_entities(mapping: dict) -> list[str]:
     """Every sensor a mapping reads, for the watch list and the history a tap opens."""
     out = []
-    for key in MAPPED_KEYS:
+    for key in (*MAPPED_KEYS, *TEXT_KEYS):
         if isinstance(mapping, dict) and mapping.get(key) and mapping[key] not in out:
             out.append(mapping[key])
     for item in (mapping or {}).get('devices') or []:
@@ -440,6 +463,9 @@ def payload(prefs: dict, states: dict[str, dict], glyph=None, home_name: str = '
     if not mapping_empty(mapping):
         prefs, states, home_override = mapped(mapping, states)
     m = moment(prefs, states)
+    if not mapping_empty(mapping):  # a device at or under its tolerance counts as off (display_zero_tolerance)
+        quiet = {i['entity']: i.get('tolerance') or 0 for i in (mapping.get('devices') or []) if isinstance(i, dict)}
+        m.devices = [d for d in m.devices if d.watts > quiet.get(d.entity_id, 0)]
     if home_override:
         value = power_w(states.get(home_override))
         if value is not None:
@@ -476,6 +502,39 @@ def payload(prefs: dict, states: dict[str, dict], glyph=None, home_name: str = '
     # Beyond the eight, and the devices under the sankey's threshold: Home Assistant's "Other". What is left of the
     # house after every device is its "Untracked consumption", which the card works out itself.
     rest = sum(d.watts for d in m.devices[SENT_DEVICES:]) + m.small
-    if rest > 0:
+    if rest > 0 and not (mapping or {}).get('hide_rest'):
         out['o'] = w(rest)
+    if not mapping_empty(mapping):
+        for key, flag in (('hide_rest', 'q'), ('card_colours', 'v'), ('faint_zero', 'z')):
+            if mapping.get(key):
+                out[flag] = 1
+        texts = [_kwh(states.get(mapping.get('solar_kwh', ''))), _kwh(states.get(mapping.get('grid_kwh', ''))),
+                 _fossil(states.get(mapping.get('fossil', '')))]
+        if any(texts):
+            out['k'] = texts
     return out
+
+
+def _kwh(state: dict | None) -> str:
+    """A sensor's energy as a short line, two decimals as power-flow-card-plus writes it ("12.34 kWh"); '' when unknown."""
+    state = state or {}
+    try:
+        value = float(state.get('state'))
+    except (TypeError, ValueError):
+        return ''
+    if value != value or value in (float('inf'), float('-inf')):
+        return ''
+    unit = (state.get('attributes') or {}).get('unit_of_measurement') or 'kWh'
+    return f'{value:.2f} {unit}'[:24]
+
+
+def _fossil(state: dict | None) -> str:
+    """The grid's share of fossil fuel as "34 % fossil"; '' when unknown. The word is English whatever the screen's
+    language (a screen text for it is still to be translated)."""
+    try:
+        value = float((state or {}).get('state'))
+    except (TypeError, ValueError):
+        return ''
+    if value != value or not 0 <= value <= 100:
+        return ''
+    return f'{round(value)} % fossil'
