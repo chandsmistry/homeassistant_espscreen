@@ -41,6 +41,15 @@ class Mapping(unittest.TestCase):
         self.assertEqual(x['p'][4], 600.0)
         self.assertEqual(x['e'][2], 'sensor.out')
 
+    def test_battery_tap_opens_the_charge(self):
+        states = {'sensor.out': st(800), 'sensor.in': st(0), 'sensor.soc': st(80, '%'), 'sensor.bat': st(500)}
+        for m in ({'battery_out': 'sensor.out', 'battery_in': 'sensor.in', 'soc': 'sensor.soc'}, {'battery': 'sensor.bat', 'soc': 'sensor.soc'}):
+            x = energy_flow.payload({}, states, mapping=m)
+            self.assertEqual(x['e'][2], 'sensor.soc')
+            self.assertEqual(x['u'][2], ['80', '%'])
+        x = energy_flow.payload({}, states, mapping={'battery': 'sensor.bat'})
+        self.assertEqual(x['e'][2], 'sensor.bat')
+
     def test_grid_pair(self):
         x = energy_flow.payload({}, {'sensor.i': st(0), 'sensor.x': st(900)}, mapping={'grid_import': 'sensor.i', 'grid_export': 'sensor.x'})
         self.assertEqual(x['p'][2], 900.0)

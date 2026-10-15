@@ -410,6 +410,7 @@ def mapped(mapping: dict, states: dict[str, dict]) -> tuple[dict, dict[str, dict
     if battery:
         if mapping.get('soc'):
             battery['stat_soc'] = mapping['soc']
+            battery['tap'] = mapping['soc']  # a tap on the battery opens its charge, as power-flow-card-plus's does
         sources_.append(battery)
     devices_ = []
     for item in (mapping.get('devices') or [])[:MAPPED_DEVICES]:
