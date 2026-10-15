@@ -217,12 +217,3 @@ export function energyFits(shape: Shape, across: number, down: number, columns: 
   const width = cardContent(shape, across, columns), height = cardHeight(shape, down, rows, 0, true) - 2 * (pad + 1);
   return width >= mm(ENERGY_MIN_MM.width) && height >= mm(compact ? ENERGY_MIN_MM.compact : ENERGY_MIN_MM.standard);
 }
-
-/** Photos uses the existing clock digit font and the native safe margin, scaled by preview width.
- * Keep this proportional to the glass rather than a fixed CSS font size in the inspector. */
-export function photoClockMetrics(shape: Shape) {
-  const { compact, px } = uiScale(shape);
-  const font = Math.max(8, Math.round((compact ? 24 : 48) * (shape.dpi || (compact ? 143 : 170)) / (compact ? 143 : 170)));
-  const width = shape.width || 1280;
-  return { font, line: Math.round(font * 1.17), margin: px(compact ? 12 : 28), width };
-}

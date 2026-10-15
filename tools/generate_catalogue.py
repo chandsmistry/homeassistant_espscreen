@@ -239,8 +239,13 @@ def normalise(tile, types, translations, facts, commands=None):
             if domain != 'screen' or 'energy' not in cards_of(data):
                 fail(where, 'energy options belong to the screen\'s energy card')
         photo_options = data.get('photos')
-        if photo_options and (domain != 'screen' or set(photo_options) != {'feature', 'clock_feature', 'packed_feature', 'jpeg_feature', 'transitions', 'clock_positions'} or not isinstance(photo_options['transitions'], list)):
+        if photo_options and (domain != 'screen' or set(photo_options) != {'feature', 'clock_feature', 'clock_size_feature', 'clock_size_key', 'clock_size_min', 'clock_size_max', 'clock_size_default', 'date_ratio', 'packed_feature', 'jpeg_feature', 'transitions', 'clock_positions'} or not isinstance(photo_options['transitions'], list)):
             fail(where, 'invalid photos metadata')
+        if photo_options:
+            if any(not isinstance(photo_options[key], str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,31}', photo_options[key]) for key in ('feature', 'clock_feature', 'clock_size_feature', 'clock_size_key', 'packed_feature', 'jpeg_feature')):
+                fail(where, 'invalid photos feature or wire key')
+            if any(type(photo_options[key]) is not int for key in ('clock_size_min', 'clock_size_max', 'clock_size_default', 'date_ratio')) or not (1 <= photo_options['clock_size_min'] <= photo_options['clock_size_default'] <= photo_options['clock_size_max'] <= 100) or not 1 <= photo_options['date_ratio'] <= 100:
+                fail(where, 'invalid photos size bounds')
         pd = data.get('pd')
         if pd is not None:
             check_keys(f'{where} pd', pd, {'entities', 'taps', 'action', 'action_name', 'action_description', 'entity_field',
@@ -330,7 +335,9 @@ def header(catalogue):
                   for data in catalogue['domains'].values() for e, price in data.get('cards', {}).items()) + '};', '']
     photos = catalogue['domains']['screen'].get('photos')
     if photos:
-        lines += ['namespace photos {', 'inline constexpr const char *FEATURE = ' + json.dumps(photos['feature']) + ';', 'inline constexpr const char *CLOCK_FEATURE = ' + json.dumps(photos['clock_feature']) + ';', 'inline constexpr const char *PACKED_FEATURE = ' + json.dumps(photos['packed_feature']) + ';', 'inline constexpr const char *JPEG_FEATURE = ' + json.dumps(photos['jpeg_feature']) + ';', 'inline constexpr const char *CLOCK_POSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['clock_positions']) + '};', 'inline constexpr const char *TRANSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['transitions']) + '};', '}']
+        lines += ['namespace photos {', 'inline constexpr const char *FEATURE = ' + json.dumps(photos['feature']) + ';', 'inline constexpr const char *CLOCK_FEATURE = ' + json.dumps(photos['clock_feature']) + ';', 'inline constexpr const char *PACKED_FEATURE = ' + json.dumps(photos['packed_feature']) + ';', 'inline constexpr const char *JPEG_FEATURE = ' + json.dumps(photos['jpeg_feature']) + ';', 'inline constexpr const char *CLOCK_POSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['clock_positions']) + '};', 'inline constexpr const char *TRANSITIONS[] = {' + ', '.join(json.dumps(e) for e in photos['transitions']) + '};', '}  // namespace photos']
+    if photos:
+        lines[-1:-1] = [f'inline constexpr const char *{key.upper()} = {json.dumps(photos[key])};' for key in ('clock_size_feature', 'clock_size_key')] + [f'inline constexpr int {key.upper()} = {photos[key]};' for key in ('clock_size_min', 'clock_size_max', 'clock_size_default', 'date_ratio')]
     pd = catalogue['domains']['screen'].get('pd')
     if pd:
         lines += ['namespace pd {', 'inline constexpr const char *ENTITIES[] = {' + ', '.join(json.dumps(e) for e in pd['entities']) + '};']

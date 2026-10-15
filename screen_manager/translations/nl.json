@@ -2359,7 +2359,10 @@
           "native": "Full resolution",
           "fast": "Faster loading (up to 960 px)",
           "small": "Fastest loading (up to 640 px)"
-        }
+        },
+        "photo_clock_size": "Grootte",
+        "photo_clock_reset": "Standaard herstellen",
+        "photo_clock_size_hint": "Hoogte van de tijd als percentage van het scherm. De datum volgt op 35%. Grote maten worden passend gemaakt."
       },
       "plugins": {
         "title": "Plugins",

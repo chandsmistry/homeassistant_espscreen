@@ -411,6 +411,7 @@ std::string receive(const std::string &payload) {
         next.name = string(root["n"], 80);
       }
       if (next.entity == "image.screensaver_photos") {
+        next.photo_clock_size = root[tile_catalogue::photos::CLOCK_SIZE_KEY].is<int>() ? std::clamp(root[tile_catalogue::photos::CLOCK_SIZE_KEY].as<int>(), tile_catalogue::photos::CLOCK_SIZE_MIN, tile_catalogue::photos::CLOCK_SIZE_MAX) : tile_catalogue::photos::CLOCK_SIZE_DEFAULT;
         next.photo_clock_position = string(root["pp"],16);
         bool position_known=false;
         for (const auto *option : tile_catalogue::photos::CLOCK_POSITIONS) if (next.photo_clock_position == option) position_known=true;

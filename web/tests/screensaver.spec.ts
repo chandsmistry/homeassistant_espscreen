@@ -3,6 +3,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import PhotoClockPreview from "../src/components/PhotoClockPreview.vue";
 import UiSelect from "../src/components/ui/UiSelect.vue";
 import SaverInspector from "../src/components/SaverInspector.vue";
 import ScreensaverCard from "../src/components/ScreensaverCard.vue";
@@ -12,6 +13,8 @@ import { useScreensaverStore } from "../src/stores/screensaver";
 import { useInventoryStore } from "../src/stores/inventory";
 import { useUiStore } from "../src/stores/ui";
 import { useInspectorStore } from "../src/stores/inspector";
+
+vi.mock("../src/wasm/load", () => ({loadFirmware:vi.fn(() => Promise.reject(new Error("No WASM in jsdom; native parity runs in WASM tests")))}));
 
 let insp: ReturnType<typeof useInspectorStore>;
 beforeEach(() => { insp = useInspectorStore(); });
@@ -133,7 +136,19 @@ describe("a step in the drawer", () => {
     expect((position.props() as {options: unknown[]}).options).toHaveLength(7);
     position.vm.$emit("update:modelValue","top_right");await flushPromises();
     expect(useScreenStore().currentScreen!.screensaver!.photo_clock_position).toBe("top_right");
-    expect(wrapper.find('.photo-clock').classes()).toContain('clock-top_right');
+    expect(wrapper.findComponent(PhotoClockPreview).props('position')).toBe('top_right');
+  });
+
+  it("sets clock size through both inputs, resets, and uses the native renderer props", async () => {
+    useScreenStore().currentScreen!.screensaver=saver({photo_clock:true,photo_effects:true,photo_positions:true,photo_sizes:true});
+    const wrapper=mount(SaverInspector,{props:{step:"photos"}});
+    expect(wrapper.findComponent(PhotoClockPreview).props('percent')).toBe(12);
+    await wrapper.find('#photo-clock-size').setValue('20');await flushPromises();
+    expect(useScreenStore().currentScreen!.screensaver!.photo_clock_size).toBe(20);
+    await wrapper.find('#photo-clock-size-number').setValue('40');await flushPromises();
+    expect(wrapper.findComponent(PhotoClockPreview).props('percent')).toBe(40);
+    const reset=wrapper.findAll('button').find(b=>b.text()==='Reset to default')!;await reset.trigger('click');
+    expect(useScreenStore().currentScreen!.screensaver!.photo_clock_size).toBe(12);
   });
 
   it("shows the clock in the glass's own shape, without a temperature when none is chosen", async () => {
@@ -160,7 +175,7 @@ describe("Photos preferences on the real save path", () => {
   });
   it("sends all photo fields and retains them after inventory refresh and a later step edit", async () => {
     const screen=useScreenStore().currentScreen!;screen.virtual=false;
-    const choices={photo_fit:"fit" as const,photo_order:"filename" as const,photo_quality:"fast",photo_seconds:15,photo_mb:4,
+    const choices={photo_clock_size:24,photo_fit:"fit" as const,photo_order:"filename" as const,photo_quality:"fast",photo_seconds:15,photo_mb:4,
       photo_clock:true,photo_clock_position:"top_right",photo_transition:"fade"};
     let stored:Record<string,unknown>={};
     const request=vi.fn(async (_url:string,options:RequestInit)=>{

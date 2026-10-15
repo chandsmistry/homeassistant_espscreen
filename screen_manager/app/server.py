@@ -3181,7 +3181,7 @@ class Manager:
         broken = {entity for entity in screen_saver.players(choice) if self.camera.cover_broken(entity)}
         return screen_saver.message(choice, self.saver_states(), pictures, short, media_extras, self.player_ground, keys,
                                     held=self.saver_shown.get(screen.get('id'), ''), bar=self.saver_item if row else None,
-                                    broken=broken)
+                                    broken=broken, photo_size=catalogue.PHOTOS['clock_size_feature'] in (getattr(sender, 'features', None) or ()))
 
     def saver_item(self, item):
         """One of the clock's entity items as the top bar sends it (header_bar.entity_item)."""
@@ -3978,6 +3978,7 @@ def create_app(manager, development=False):
                                      'ready': (manager.firmware_version(screen['id'], screen) or (0, 0, 0)) >= SCREENSAVER_MIN_FIRMWARE,
                                      'pictures': bool(camera_feed.box(screen, 'full')), 'standby': can_standby(screen),
                                      'photo_effects': catalogue.PHOTOS['feature'] in (getattr(sender, 'features', None) or ()),
+                                     'photo_sizes': catalogue.PHOTOS['clock_size_feature'] in (getattr(sender, 'features', None) or ()),
                                      'photo_positions': catalogue.PHOTOS['clock_feature'] in (getattr(sender, 'features', None) or ())}
             # The delivery and our own word for a screen that reports nothing, in the editor's language (app 0.2.90).
             status = manager.status.get(screen['id'])
@@ -4246,6 +4247,8 @@ def create_app(manager, development=False):
             raise ValueError(t('addon.errors.not_paired'))
         requested = data.get('screensaver') if isinstance(data, dict) else None
         sender = manager.page_senders.get(manager.aliases.get(screen['id'], screen['id']))
+        if isinstance(requested, dict) and 'photo_clock_size' in requested and catalogue.PHOTOS['clock_size_feature'] not in (getattr(sender, 'features', None) or ()):
+            raise ValueError(t('addon.errors.photos_update'))
         if isinstance(requested, dict) and requested.get('photo_clock_position', 'bottom_left') != 'bottom_left' and catalogue.PHOTOS['clock_feature'] not in (getattr(sender, 'features', None) or ()):
             raise ValueError(t('addon.errors.photos_update'))
         if isinstance(requested, dict) and (requested.get('photo_clock') or requested.get('photo_transition', 'none') != 'none') and catalogue.PHOTOS['feature'] not in (getattr(sender, 'features', None) or ()):

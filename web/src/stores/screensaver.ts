@@ -153,6 +153,8 @@ export const useScreensaverStore = defineStore("screensaver", () => {
     return {
       time: clock.time,
       date: clock.date,
+      photoTime: clock.digits,
+      photoDate: clock.longDate,
       temperature: degrees !== undefined && degrees !== null && degrees !== "" ? `${Math.round(Number(degrees))}°` : null,
     };
   });

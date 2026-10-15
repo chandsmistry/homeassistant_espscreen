@@ -654,6 +654,7 @@ api:
                     features.add("saver_items");
                     features.add(tile_catalogue::photos::FEATURE);
                     features.add(tile_catalogue::photos::CLOCK_FEATURE);
+                    features.add(tile_catalogue::photos::CLOCK_SIZE_FEATURE);
                     features.add(tile_catalogue::photos::PACKED_FEATURE);
                     #if defined(USE_LIVE_VIEW) && defined(SCREEN_PICTURES)
                     features.add(tile_catalogue::photos::JPEG_FEATURE);

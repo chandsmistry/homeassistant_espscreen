@@ -126,10 +126,10 @@ export const useScreenStore = defineStore("screen", () => {
     const edit = ++saverEdits;
     try {
       const { show, media, camera, order, off, weather = "auto", more = [], items = [],
-        photo_seconds, photo_mb, photo_fit, photo_order, photo_clock, photo_clock_position, photo_quality, photo_transition } = next;
+        photo_clock_size, photo_seconds, photo_mb, photo_fit, photo_order, photo_clock, photo_clock_position, photo_quality, photo_transition } = next;
       const result = await send<{ screensaver: ScreensaverChoice }>(`screens/${encodeURIComponent(screen.id)}/screensaver`, "PUT",
         { screensaver: { show, media, camera, order, off, weather, more, items: items.map(({ id: _id, ...item }) => item),
-          photo_seconds, photo_mb, photo_fit, photo_order, photo_clock, photo_clock_position, photo_quality, photo_transition } });
+          photo_clock_size, photo_seconds, photo_mb, photo_fit, photo_order, photo_clock, photo_clock_position, photo_quality, photo_transition } });
       if (result?.screensaver && edit === saverEdits) screen.screensaver = { ...next, ...result.screensaver };
     } catch (e: any) {
       if (edit === saverEdits) screen.screensaver = { ...before };

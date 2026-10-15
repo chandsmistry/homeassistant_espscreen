@@ -11,6 +11,7 @@
 #include "generated/profiles.h"
 #include "generated/text.h"
 #include "image_transport.h"
+#include "../../components/smart_display/photo_clock.h"
 
 static_assert(ESP_SCREEN_RENDERER_ABI == 3, "Update the host adapter for the renderer ABI change");
 
@@ -20,6 +21,7 @@ lv_indev_t *pointer{};
 FirmwareUi firmware{};
 std::vector<uint32_t> draw_buffer, framebuffer;
 int width{}, height{}, page{};
+uint32_t flushes = 0;
 lv_point_t position{};
 bool pressed = false, dirty = true;
 uint32_t epoch = 0, epoch_at = 1000;
@@ -27,6 +29,7 @@ int utc_offset = 0;
 std::string last_result, diagnostics, outgoing_action;
 
 void flush(lv_display_t *d, const lv_area_t *area, uint8_t *pixels) {
+  ++flushes;
   // LVGL's native 32-bit pixels are BGRA; ImageData is RGBA. Keep draw memory
   // separate, otherwise a partial refresh modifies its own input while copying.
   const int span = area->x2 - area->x1 + 1;
@@ -57,6 +60,27 @@ void nav(lv_event_t *event) {
 extern "C" {
 // Whether the previewed board draws pictures (firmware 0.46.0): a board without PSRAM, such as the CYD, has no camera
 // hooks, so its media card keeps no square for a cover; the preview drops them the same way after preview_init.
+// Dedicated Photos inspector canvas. It shares the exact renderer and font faces with the panel.
+const char *preview_photo_clock(int percent,const char *anchor,const char *time,const char *date) {
+  static lv_obj_t *root=nullptr,*digits=nullptr,*day=nullptr;
+  if(!root){
+    auto *screen=lv_screen_active();
+    for(uint32_t i=0;i<lv_obj_get_child_count(screen);++i)lv_obj_add_flag(lv_obj_get_child(screen,i),LV_OBJ_FLAG_HIDDEN);
+    root=lv_obj_create(screen);lv_obj_remove_style_all(root);lv_obj_set_pos(root,0,0);lv_obj_set_size(root,width,height);
+    lv_obj_set_style_bg_color(root,lv_color_black(),0);lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
+    lv_obj_remove_flag(root,LV_OBJ_FLAG_SCROLLABLE);lv_obj_remove_flag(root,LV_OBJ_FLAG_CLICKABLE);
+  }
+  using namespace runtime_tiles;
+  const auto r=photo_clock::render(root,digits,day,width,height,percent,anchor?anchor:"bottom_left",time?time:"12:34",date?date:"Monday, 14 October",lv_color_white(),
+    {clock_font,setpoint_font,bedside_font,control_font,detail_font},{detail_font,control_font,label_font,small_font,watch_font});
+  lv_obj_update_layout(root);lv_obj_invalidate(root);lv_refr_now(display);
+  JsonDocument doc;auto add=[&](const char *key,const photo_clock::Box &b){auto out=doc[key].to<JsonObject>();out["x"]=b.x;out["y"]=b.y;out["w"]=b.w;out["h"]=b.h;};
+  add("time",r.layout.time);add("date",r.layout.date);doc["requested"]=r.layout.requested;doc["actual"]=r.layout.actual;
+  doc["time_scale"]=r.layout.time_scale;doc["date_scale"]=r.layout.date_scale;doc["clamped"]=r.layout.clamped;
+  doc["font_line"]=r.time_font?lv_font_get_line_height(r.time_font):0;
+  doc["glyphs_complete"]=r.time_font&&r.date_font&&photo_clock::supports(r.time_font,time?time:"12:34")&&photo_clock::supports(r.date_font,date?date:"Monday, 14 October");
+  last_result.clear();serializeJson(doc,last_result);return last_result.c_str();
+}
 void preview_standby(int on) {
   runtime_tiles::screen_awake = [on] { return !on; };
   runtime_tiles::saver_sync(on);
@@ -246,6 +270,8 @@ const char *preview_layout() {
                 : mode == LV_LABEL_LONG_CLIP ? "clip" : "wrap";
       o["text_width"] = one.x; o["text_height"] = one.y; o["wrapped_height"] = wrapped.y;
       o["line_height"] = font ? lv_font_get_line_height(font) : 0;
+      o["scale_x"] = lv_obj_get_style_transform_scale_x(object,LV_PART_MAIN);
+      o["scale_y"] = lv_obj_get_style_transform_scale_y(object,LV_PART_MAIN);
       o["content_width"] = width; o["content_height"] = lv_obj_get_content_height(object);
       const size_t n = std::strlen(text);
       o["dots"] = mode == LV_LABEL_LONG_DOT && n >= 3 && std::strcmp(text + n - 3, "...") == 0;
@@ -263,6 +289,7 @@ const char *preview_layout() {
 }
 const char *preview_diagnostics() {
   JsonDocument doc;
+  doc["flushes"]=flushes;
   doc["page"] = page;
   doc["count"] = runtime_tiles::model.count;
   doc["columns"] = runtime_tiles::grid.columns;

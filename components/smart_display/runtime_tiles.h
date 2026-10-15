@@ -1,4 +1,5 @@
 #include "photo_transition.h"
+#include "photo_clock.h"
 #pragma once
 #include <cmath>
 #include <cstring>
@@ -236,13 +237,14 @@ struct SaverChoice {
   uint32_t features = 0;
   bool muted = false;
   bool photo_clock = false;
+  int photo_clock_size = tile_catalogue::photos::CLOCK_SIZE_DEFAULT;
   std::string photo_clock_position = "bottom_left";
   std::string photo_transition = "none";
   int photo_seconds = 30;
   bool operator==(const SaverChoice &o) const {
     return kind == o.kind && entity == o.entity && name == o.name && title == o.title && artist == o.artist &&
            album == o.album && picture == o.picture && ground == o.ground && weather == o.weather && row == o.row &&
-           state == o.state && features == o.features && muted == o.muted && photo_clock == o.photo_clock &&
+           state == o.state && features == o.features && muted == o.muted && photo_clock == o.photo_clock && photo_clock_size == o.photo_clock_size &&
            photo_transition == o.photo_transition && photo_seconds == o.photo_seconds && photo_clock_position == o.photo_clock_position;
   }
 };
@@ -12180,48 +12182,29 @@ inline saver_view::Keys saver_key_layout() {
 }
 // The words over the picture, once it is there: a cover's title with its artist and album, a camera's name alone, in
 // white over the darkened picture or the cover's colour.
-// Photo clock matches the preview: one persistent time label, with no date or player controls.
-inline lv_obj_t *photo_clock_label = nullptr;
-inline std::string photo_clock_anchor;
-inline int photo_clock_width = 0, photo_clock_height = 0;
-inline const lv_font_t *photo_clock_font = nullptr;
-inline uint32_t photo_clock_ink = 0;
+// The panel and WASM settings preview share the same font selection, transforms and bounds.
+inline std::string photo_clock_log_key;
 inline void saver_photo_clock() {
-  if (saver_second) { lv_obj_delete(saver_second); saver_second = nullptr; }
   saver_words_due = false;
   if (!saver_now.photo_clock) {
-    if (saver_first) { lv_obj_delete(saver_first); saver_first = nullptr; }
-    photo_clock_label = nullptr;
-    return;
+    if (saver_first) { lv_obj_delete(saver_first); saver_first=nullptr; }
+    if (saver_second) { lv_obj_delete(saver_second); saver_second=nullptr; }
+    photo_clock_log_key.clear(); return;
   }
-  const int width = overlay_card::screen_width(), height = overlay_card::screen_height();
-  const int margin = ui::px(ui::large() ? 28 : 12);
-  // Reuse the existing clock digit step rather than the small settings/control face.
-  const lv_font_t *font = clock_font ? clock_font : control_font ? control_font : detail_font;
-  const uint32_t ink = media_ink();
-  const auto now = now_time ? now_time() : esphome::ESPTime{};
-  const std::string text = time_text(now);
-  const auto box = saver_view::photo_words(width, height, margin, font ? lv_font_get_line_height(font) : 24,
-                                          0, 0, saver_now.photo_clock_position).first;
-  lv_text_align_t align = LV_TEXT_ALIGN_LEFT;
-  if (saver_now.photo_clock_position.find("center") != std::string::npos) align = LV_TEXT_ALIGN_CENTER;
-  else if (saver_now.photo_clock_position.find("right") != std::string::npos) align = LV_TEXT_ALIGN_RIGHT;
-  if (!saver_first) saver_first = saver_text(camera_root, font, ink, box, text, align);
-  else {
-    if (std::strcmp(lv_label_get_text(saver_first), text.c_str()) != 0) lv_label_set_text(saver_first, text.c_str());
-    if (photo_clock_label != saver_first || photo_clock_anchor != saver_now.photo_clock_position ||
-        photo_clock_width != width || photo_clock_height != height || photo_clock_font != font || photo_clock_ink != ink) {
-      if (font) lv_obj_set_style_text_font(saver_first, font, 0);
-      lv_obj_set_style_text_color(saver_first, theme::rgb(ink), 0);
-      lv_obj_set_style_text_align(saver_first, align, 0);
-      lv_obj_set_pos(saver_first, box.x, box.y);
-      lv_obj_set_size(saver_first, box.w, box.h);
-    }
+  const auto now=now_time?now_time():esphome::ESPTime{};
+  const auto result=photo_clock::render(camera_root,saver_first,saver_second,
+      overlay_card::screen_width(),overlay_card::screen_height(),saver_now.photo_clock_size,
+      saver_now.photo_clock_position,time_text(now),date_text(now),theme::rgb(media_ink()),
+      {clock_font,setpoint_font,bedside_font,control_font,detail_font},
+      {detail_font,control_font,label_font,small_font,watch_font});
+  const auto &p=result.layout;
+  const auto key=std::to_string(saver_now.photo_clock_size)+saver_now.photo_clock_position+std::to_string(p.actual);
+  if(key!=photo_clock_log_key){
+    ESP_LOGI("saver","photo_clock size_pct=%d requested_px=%d actual_px=%d font_px=%d scale=%d date_scale=%d anchor=%s clamped=%d",
+      saver_now.photo_clock_size,p.requested,p.actual,result.time_font?lv_font_get_line_height(result.time_font):0,
+      p.time_scale,p.date_scale,saver_now.photo_clock_position.c_str(),p.clamped?1:0);
+    photo_clock_log_key=key;
   }
-  photo_clock_label = saver_first; photo_clock_anchor = saver_now.photo_clock_position;
-  photo_clock_width = width; photo_clock_height = height; photo_clock_font = font; photo_clock_ink = ink;
-  // A newly arrived photo or effect may have been added after the existing label.
-  if (lv_obj_get_index(saver_first) + 1 != lv_obj_get_child_count(camera_root)) lv_obj_move_foreground(saver_first);
 }
 inline void saver_words() {
   if (!camera_root || !saver_camera) return;
@@ -12234,7 +12217,6 @@ inline void saver_words() {
   const bool media = c.kind == "media";
   const bool photo = c.entity == "image.screensaver_photos";
   if (photo) { saver_photo_clock(); return; }
-  photo_clock_label = nullptr;  // media/camera captions own a different label lifecycle
   const std::string first = media && !c.title.empty() ? c.title : c.name;
   const std::string second = media ? media_card::subtitle(c.artist, c.album) : std::string();
   const lv_font_t *font = media ? first_font : second_font;
@@ -12371,6 +12353,7 @@ inline void saver_keys_draw() {
 }
 
 inline void saver_hide() {
+  photo_clock_log_key.clear();
   saver_follow_due = false;
   if (saver_root) lv_obj_delete(saver_root);
   saver_root = nullptr;

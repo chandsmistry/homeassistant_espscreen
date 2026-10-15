@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Photos has a configurable clock size from 4% to 40% of screen height, with a larger 12% default. Its settings preview uses the panel renderer and existing fonts.
+
 - Photos clock: use the existing readable clock digit font and scale the inspector overlay to the same screen proportions.
 
 - **Negotiated Photos JPEG.** P4 firmware can receive full-size baseline JPEG stills through its existing picture loader, retaining transitions and clock overlays. The add-on preserves suitable original JPEG bytes or encodes composed frames at quality 95 with 4:4:4 sampling. Frames above the 1 MB JPEG bound fall back to BMP at the same dimensions; older firmware retains BMP/RLE. Originals and saved settings remain unchanged. Physical speed and appearance are not yet confirmed.

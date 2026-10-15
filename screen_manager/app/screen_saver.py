@@ -67,7 +67,7 @@ GONE = frozenset(('', 'unavailable', 'unknown'))
 
 def validate(value):
     """A clean copy of a screensaver choice, or ValueError. Every field is optional; the default fills the rest."""
-    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb', 'photo_fit', 'photo_order', 'photo_clock', 'photo_transition', 'photo_clock_position', 'photo_quality'}:
+    if not isinstance(value, dict) or set(value) - set(DEFAULT) - {'photo_seconds', 'photo_mb', 'photo_fit', 'photo_order', 'photo_clock', 'photo_transition', 'photo_clock_position', 'photo_quality', 'photo_clock_size'}:
         raise ValueError('screensaver fields')
     result = {**DEFAULT, 'order': list(DEFAULT['order']), 'off': [], 'more': [], 'items': []}
     if 'show' in value:
@@ -80,7 +80,7 @@ def validate(value):
                                                         or entity.split('.')[0] not in DOMAINS[kind])):
             raise ValueError(f'screensaver {kind}')
         result[kind] = entity
-    for name, (low, high, _) in (('photo_seconds', PHOTO_SECONDS), ('photo_mb', PHOTO_MB)):
+    for name, (low, high, _) in (('photo_seconds', PHOTO_SECONDS), ('photo_mb', PHOTO_MB), ('photo_clock_size', (catalogue.PHOTOS['clock_size_min'], catalogue.PHOTOS['clock_size_max'], catalogue.PHOTOS['clock_size_default']))):
         if name in value:
             number = value[name]
             if isinstance(number, bool) or not isinstance(number, int) or not low <= number <= high:
@@ -242,7 +242,7 @@ def pick(choice, states, pictures, keys=False, now=None, held='', broken=()):
     return ''
 
 
-def message(choice, states, pictures, short, media_extras, ground=None, keys=False, now=None, held='', bar=None, broken=()):
+def message(choice, states, pictures, short, media_extras, ground=None, keys=False, now=None, held='', bar=None, broken=(), photo_size=False):
     """The screen message for what the screensaver shows now. `short(text, n)` cuts a text the way every message does,
     `media_extras(attrs)` is the media card's (core.media_extras), `ground(entity, attrs)` the cover's colours, `keys`
     whether the screen's screensaver has keys (KEYS_FEATURE), `held` the player it shows now, `bar(item)` the top bar's
@@ -254,6 +254,8 @@ def message(choice, states, pictures, short, media_extras, ground=None, keys=Fal
         result = {'op': 'saver', 'k': 'camera', 'e': photos.PHOTOS, 'n': 'Photos'}
         if any(key in choice for key in ('photo_clock', 'photo_transition', 'photo_seconds', 'photo_clock_position')):
             result.update(pc=choice.get('photo_clock', False), pt=choice.get('photo_transition', 'none'), ps=choice.get('photo_seconds', 30), pp=choice.get('photo_clock_position', 'bottom_left'))
+        if photo_size:
+            result[catalogue.PHOTOS['clock_size_key']] = choice.get('photo_clock_size', catalogue.PHOTOS['clock_size_default'])
         return result
     result = {'op': 'saver', 'k': kind}
     if kind == 'clock':

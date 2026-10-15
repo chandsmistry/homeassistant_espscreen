@@ -174,3 +174,9 @@ has.
 - **The words** stand where `saver_view.h` puts them, by the same five-to-four rule, pure arithmetic that
   `tests/test_saver_view.cpp` checks on every glass. `tests/test_screen_saver.py` covers the choice, the pick, the
   message, the picture and the delivery.
+
+## Photos clock size
+
+Photos offers a Size control under Show clock over photos. The time line height is 4% to 40% of the screen height, with a 12% default and a reset button. The date follows at 35% of the time line height. Both stay inside the screen at every anchor, with large or long text clamped to fit. The settings preview runs the same C++ renderer, existing font selection and LVGL scaling as the panel. Scaling beyond the largest existing complete font can soften glyph edges; no font is added.
+
+The optional photo_clock_size setting is validated and stored with the screensaver choice. Its generated wire key is sent only after the screen advertises the generated photo_clock_size capability. Older saved choices keep their existing fields unchanged.

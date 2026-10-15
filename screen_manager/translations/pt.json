@@ -2720,7 +2720,10 @@
           "native": "Full resolution",
           "fast": "Faster loading (up to 960 px)",
           "small": "Fastest loading (up to 640 px)"
-        }
+        },
+        "photo_clock_size": "Tamanho",
+        "photo_clock_reset": "Repor predefinição",
+        "photo_clock_size_hint": "Altura da hora em percentagem do ecrã. A data usa 35%. Os tamanhos grandes são ajustados ao espaço."
       },
       "plugins": {
         "title": "Plugins",

@@ -29,7 +29,13 @@ inline constexpr const char *PACKED_FEATURE = "photo_rle";
 inline constexpr const char *JPEG_FEATURE = "photo_jpeg";
 inline constexpr const char *CLOCK_POSITIONS[] = {"top_left", "top_center", "top_right", "center", "bottom_left", "bottom_center", "bottom_right"};
 inline constexpr const char *TRANSITIONS[] = {"none", "fade", "wipe_left", "wipe_right", "wipe_up", "wipe_down", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out", "pan_left", "pan_right", "diamond", "checker", "spiral", "blocks", "blinds", "random"};
-}
+inline constexpr const char *CLOCK_SIZE_FEATURE = "photo_clock_size";
+inline constexpr const char *CLOCK_SIZE_KEY = "pz";
+inline constexpr int CLOCK_SIZE_MIN = 4;
+inline constexpr int CLOCK_SIZE_MAX = 40;
+inline constexpr int CLOCK_SIZE_DEFAULT = 12;
+inline constexpr int DATE_RATIO = 35;
+}  // namespace photos
 namespace pd {
 inline constexpr const char *ENTITIES[] = {"screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"};
 inline constexpr const char *ACTION = "screen.open_selector";
