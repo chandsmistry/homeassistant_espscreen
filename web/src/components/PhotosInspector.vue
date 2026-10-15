@@ -2,6 +2,7 @@
 import { computed, ref, watch, onBeforeUnmount } from 'vue';
 import { getJson } from '../api';
 import catalogue from '../model/catalogue.json';
+import { photoClockMetrics } from '../model/ui-scale';
 import { t } from '../i18n';
 import { useScreenStore } from '../stores/screen';
 import { useScreensaverStore } from '../stores/screensaver';
@@ -13,6 +14,11 @@ const report = ref<{exists: boolean; total: number; usable: number; portraits: n
 const preview = ref(''), error = ref(''), loading = ref(false);
 let epoch = 0;
 const fit = computed(() => saver.saver?.photo_fit ?? 'fill');
+const clockStyle = computed(() => {
+  const m = photoClockMetrics(scr.currentScreen?.shape || {});
+  return { '--clock-font': `${100 * m.font / m.width}cqw`, '--clock-line': `${100 * m.line / m.width}cqw`,
+    '--clock-margin': `${100 * m.margin / m.width}cqw` };
+});
 const order = computed(() => saver.saver?.photo_order ?? 'shuffle');
 const transition = computed(() => saver.saver?.photo_transition ?? 'none');
 const fits = computed(() => ['fit', 'fill', 'pair'].map(k => [k, T(`photo_modes.${k}`)] as const));
@@ -43,7 +49,7 @@ onBeforeUnmount(() => { epoch++; });
   <div class="photo-preview" :style="{aspectRatio: saver.glassRatio}">
     <img v-if="preview" :src="preview" :alt="T('photo_preview')" @error="error = T('photo_unavailable'); preview = ''" />
     <span v-else>{{ loading ? T('photo_loading') : T('photo_empty') }}</span>
-    <span v-if="saver.saver?.photo_clock" class="photo-clock" :class="`clock-${saver.saver?.photo_clock_position ?? 'bottom_left'}`">{{ saver.clockPreview.time }}</span>
+    <span v-if="saver.saver?.photo_clock" class="photo-clock" :style="clockStyle" :class="`clock-${saver.saver?.photo_clock_position ?? 'bottom_left'}`">{{ saver.clockPreview.time }}</span>
   </div>
   <p v-if="report" class="help">{{ T('photo_count', {usable: report.usable, total: report.total}) }}</p>
   <p v-if="report && !report.exists" class="help">{{ T('photo_folder_missing') }}</p>
@@ -75,12 +81,12 @@ onBeforeUnmount(() => { epoch++; });
   <small class="help">{{ T('photos_hint') }}</small>
 </template>
 <style scoped>
-.photo-preview { width:100%; background:#10151b; border-radius:12px; overflow:hidden; position:relative; display:grid; place-items:center; color:#fff; }
+.photo-preview { width:100%; background:#10151b; border-radius:12px; overflow:hidden; position:relative; container-type:inline-size; display:grid; place-items:center; color:#fff; }
 .photo-preview img {width:100%;height:100%;object-fit:contain;}
-.photo-clock {position:absolute;color:white;text-shadow:0 1px 4px #000;font-size:22px;}
-.clock-top_left {top:12px;left:16px;} .clock-top_center {top:12px;left:50%;transform:translateX(-50%);} .clock-top_right {top:12px;right:16px;}
+.photo-clock {position:absolute;color:white;font-family:"Bar Roboto",sans-serif;font-weight:500;font-size:var(--clock-font);line-height:var(--clock-line);white-space:nowrap;}
+.clock-top_left {top:var(--clock-margin);left:var(--clock-margin);} .clock-top_center {top:var(--clock-margin);left:50%;transform:translateX(-50%);} .clock-top_right {top:var(--clock-margin);right:var(--clock-margin);}
 .clock-center {top:50%;left:50%;transform:translate(-50%,-50%);}
-.clock-bottom_left {bottom:12px;left:16px;} .clock-bottom_center {bottom:12px;left:50%;transform:translateX(-50%);} .clock-bottom_right {bottom:12px;right:16px;}
+.clock-bottom_left {bottom:var(--clock-margin);left:var(--clock-margin);} .clock-bottom_center {bottom:var(--clock-margin);left:50%;transform:translateX(-50%);} .clock-bottom_right {bottom:var(--clock-margin);right:var(--clock-margin);}
 .photo-skipped {max-height:180px;overflow:auto;padding-left:20px;font-size:12px;overflow-wrap:anywhere;}
 label {display:block;margin-top:12px;}
 </style>

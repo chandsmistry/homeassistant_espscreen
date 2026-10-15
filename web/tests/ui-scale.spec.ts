@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import boardShapes from "../../screen_manager/app/boards.json";
-import { energyFits, pillMetrics, tallKeys, textEms, touchMin, uiScale, widestSetpoint, cardContent, cardHeight, cellContent, modeBar, watchCard, watchPadding, wideChip } from "../src/model/ui-scale";
+import { photoClockMetrics, energyFits, pillMetrics, tallKeys, textEms, touchMin, uiScale, widestSetpoint, cardContent, cardHeight, cellContent, modeBar, watchCard, watchPadding, wideChip } from "../src/model/ui-scale";
 
 describe("the firmware's sizes in the mockup (app 0.4.32)", () => {
+  it("scales the Photos clock and equal safe margins from the glass rather than fixed inspector CSS pixels", () => {
+    expect(photoClockMetrics({width:1280,height:800,dpi:149,look:"standard"})).toEqual({font:42,line:49,margin:25,width:1280});
+    expect(photoClockMetrics({width:320,height:240,dpi:143,look:"compact"})).toEqual({font:24,line:28,margin:12,width:320});
+    expect(photoClockMetrics({width:480,height:480,dpi:170,look:"standard"})).toEqual({font:48,line:56,margin:28,width:480});
+  });
   it("scales as ui::px does, from the board's density and look", () => {
     expect(uiScale({ dpi: 170, look: "standard" }).px(46)).toBe(46);
     expect(uiScale({ dpi: 143, look: "compact" }).px(34)).toBe(34);

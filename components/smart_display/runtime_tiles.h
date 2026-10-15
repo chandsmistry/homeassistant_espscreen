@@ -12196,7 +12196,8 @@ inline void saver_photo_clock() {
   }
   const int width = overlay_card::screen_width(), height = overlay_card::screen_height();
   const int margin = ui::px(ui::large() ? 28 : 12);
-  const lv_font_t *font = control_font ? control_font : detail_font;
+  // Reuse the existing clock digit step rather than the small settings/control face.
+  const lv_font_t *font = clock_font ? clock_font : control_font ? control_font : detail_font;
   const uint32_t ink = media_ink();
   const auto now = now_time ? now_time() : esphome::ESPTime{};
   const std::string text = time_text(now);

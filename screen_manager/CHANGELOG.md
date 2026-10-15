@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Photos clock: use the existing readable clock digit font and scale the inspector overlay to the same screen proportions.
+
 - **Negotiated Photos JPEG.** P4 firmware can receive full-size baseline JPEG stills through its existing picture loader, retaining transitions and clock overlays. The add-on preserves suitable original JPEG bytes or encodes composed frames at quality 95 with 4:4:4 sampling. Frames above the 1 MB JPEG bound fall back to BMP at the same dimensions; older firmware retains BMP/RLE. Originals and saved settings remain unchanged. Physical speed and appearance are not yet confirmed.
 
 - **Photos clock correction.** Match the time-only preview with one persistent native label. Update text when the minute changes, and placement only when needed; keep the selected anchor and existing font/margins. The Photos overlay no longer adds a date or rebuilds labels every second.

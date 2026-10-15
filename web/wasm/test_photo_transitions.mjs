@@ -48,6 +48,7 @@ receive({op:'saver',k:'camera',e:'image.screensaver_photos',n:'Photos',pc:true,p
 const clockObjects=()=>JSON.parse(m.ccall('preview_layout','string',[],[])).objects.filter(o=>o.type==='label');
 const clockLabel=()=>clockObjects().findLast(o=>/^\d{1,2}:\d{2}$/.test(o.text));
 const originalClock=clockLabel();assert.ok(originalClock,'time-only clock visible');
+assert.equal(originalClock.line_height,49,'Photos clock reuses the readable 42px clock digit step at 149dpi');
 assert.ok(!clockObjects().some(o=>/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/.test(o.text)),'photo overlay has no full date');
 for(let i=0;i<3;i++){tick(1000);assert.equal(clockLabel().address,originalClock.address,'clock object retained between ticks');}
 m._preview_time(ms+1000,1789401900,0);m._preview_render();
