@@ -51,6 +51,7 @@ struct Want {
   Slot slot = Slot::FULL;
   Rank rank = Rank::PAGE;
   uint32_t every = 0;       // a picture that refreshes (a camera): the next one this long after the last started; 0: once
+  bool refresh_from_start = false;  // Photos avoids adding its interval after the transfer time.
   bool drawn = false;       // the app draws it (a map): an answer without a link is a hitch, asked again, later each time
   uint8_t tries = 0;        // downloads that may fail before the picture is given up (an alert's); 0: no end
   std::string url;          // a link the owner has already (the app sends an alert's by itself): nothing to ask
@@ -285,6 +286,9 @@ class Loader {
     job.started_at = 0;
   }
   // What the store says, every round: a picture it holds is here, one it lost is asked for again.
+  static uint32_t refresh_at(const Job &job) {
+    return job.want.refresh_from_start && job.started_at ? job.started_at : job.kept_at;
+  }
   void settle(Job &job, uint32_t now) {
     if (job.phase == Phase::LOADING) return;
     uint32_t at = 0;
@@ -292,7 +296,7 @@ class Loader {
     if (held) {
       job.kept_at = at;
       // Once is enough for a picture that does not refresh; one that does is fresh until its turn comes again.
-      if (!job.want.every || now - at < job.want.every) {
+      if (!job.want.every || now - refresh_at(job) < job.want.every) {
         if (job.phase != Phase::DONE) job.told = false;
         job.phase = Phase::DONE;
         return;
@@ -339,7 +343,7 @@ class Loader {
     if (job.phase != Phase::LINKED) return false;
     // A failed load is tried again after the gap; a picture that refreshes keeps its rhythm.
     if (job.finished_at && now - job.finished_at < camera_view::GAP_MS) return false;
-    if (job.want.every && job.kept_at && now - job.kept_at < job.want.every) return false;
+    if (job.want.every && job.kept_at && now - refresh_at(job) < job.want.every) return false;
     return true;
   }
 };

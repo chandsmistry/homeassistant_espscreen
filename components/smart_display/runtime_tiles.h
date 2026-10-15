@@ -11893,6 +11893,7 @@ inline void camera_want() {
   w.rank = picture_loader::Rank::VIEW;
   // A camera at its pace, the screensaver's cover once; a map is drawn by the app, so it is always there to be had.
   w.every = camera.once ? 0 : camera.every;
+  w.refresh_from_start = saver_camera && camera.entity == "image.screensaver_photos";
   w.drawn = camera_map_index >= 0;
   const std::string entity = camera.entity;
   w.ask = [entity] { camera_request(entity); };

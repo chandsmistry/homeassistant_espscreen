@@ -43,6 +43,28 @@ static const Owner CARD{Kind::CARD, 0}, VIEW{Kind::VIEW, 0}, ALERT{Kind::ALERT, 
 static Owner tile(uint32_t n) { return {Kind::TILE, n}; }
 
 int main() {
+  // Photos measures its interval from the request, without overlapping or bursting after a slow transfer.
+  for (bool from_start : {false, true}) {
+    Bench b;
+    auto round = [&](uint32_t t) {
+      auto w = b.want("photo", "saver|photo", Rank::VIEW, Slot::FULL, 5000);
+      w.refresh_from_start = from_start;
+      b.loader.begin(); b.loader.want(VIEW, std::move(w)); b.loader.end(t, true);
+    };
+    round(1000); b.loader.answer("saver|photo", "http://app/photo", 1100); round(1200);
+    round(6100); assert(b.loads.size() == 1); // never overlap an unfinished transfer
+    b.finish(Slot::FULL, true, 7000);
+    round(7799); assert(b.loads.size() == 1); // keep the existing 800 ms retry/transfer gap
+    round(7800); assert(b.loads.size() == (from_start ? 2 : 1));
+    if (from_start) {
+      round(7900); assert(b.loads.size() == 2); // no catch-up queue
+      b.loader.begin(); b.loader.end(8000, true); assert(!b.loader.busy()); // wake removes the owner
+    } else {
+      round(11999); assert(b.loads.size() == 1);
+      round(12000); assert(b.loads.size() == 2); // ordinary camera cadence unchanged
+    }
+  }
+
   // A card's cover: asked for at once, loaded once its link is here, and then it is simply there.
   {
     Bench b;
