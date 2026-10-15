@@ -207,7 +207,7 @@ class Rules(unittest.TestCase):
         want = TILES.split('inline void camera_want() {', 1)[1].split('\n}\n', 1)[0]
         self.assertIn('if (!camera_root || !camera.open() || !pictures_awake()) return;', want)
         # The answer starts the download in the same round, not on the next tick.
-        answer = TILES.split('inline void camera_answer(const std::string &view, const std::string &entity, const std::string &url, uint32_t number) {', 1)[1].split('\n}\n', 1)[0]
+        answer = TILES.split('inline void camera_answer(const std::string &view, const std::string &entity, const std::string &url, uint32_t number, const std::string &photo_frame) {', 1)[1].split('\n}\n', 1)[0]
         self.assertTrue(answer.rstrip().endswith('pictures_round();'))
         # Never under a finger, and not while the pages turn: the round tells the loader whether it may load.
         round_ = TILES.split('inline void pictures_round() {', 1)[1].split('\n}\n', 1)[0]
@@ -227,7 +227,7 @@ class Rules(unittest.TestCase):
         self.assertIn('pictures.put(key, *src, now)', done)
         # A picture the store has no room for is drawn from the download, and says so in the log.
         self.assertIn('ESP_LOGW("picture", "no room to keep %s", key.c_str());', done)
-        self.assertIn('if (!kept) { slot_key[s] = key; slot_at[s] = now; }', done)
+        self.assertIn('if (!kept && key.compare(0, 11, "photo-next|") != 0) { slot_key[s] = key; slot_at[s] = now; }', done)
         view = TILES.split('inline void view_done(picture_loader::Outcome outcome) {', 1)[1].split('\n}\n', 1)[0]
         self.assertIn('lv_image_dsc_t *src = picture_of(camera_key());', view)
         self.assertIn('camera_show(camera_root, camera_picture, src, outcome == picture_loader::Outcome::LOADED);', view)

@@ -3322,7 +3322,7 @@ class Manager:
             colours = self.player_ground(entity, (self.ha.states.get(entity) or {}).get('attributes') or {})
             if colours and colours != '-':
                 ground = int(colours.split(',')[0], 16)
-        url = ''
+        url, prepared_id = '', ''
         base = await camera_feed.base_url(self.ha.request)
         if entity == photos.PHOTOS and base:
             choice = self.savers.get(screen.get('device_id'))
@@ -3330,20 +3330,37 @@ class Manager:
                 sender = self.page_senders.get(inbox)
                 packed = catalogue.PHOTOS['packed_feature'] in (getattr(sender, 'features', None) or ())
                 jpeg = catalogue.PHOTOS['jpeg_feature'] in (getattr(sender, 'features', None) or ())
-                next_key = (request.get('session'), request.get('next'))
-                if request.get('next') and await self.photo_show(inbox).advance(next_key):
-                    LOG.info('photo_gesture action=next screen=%s request=%s', screen['name'], request.get('next'))
-                async def photo_frame():
-                    # The screen polls the same URL. Resolve the settled frame on each GET,
-                    # reusing the prepared cache until the photo's display interval expires.
-                    import hashlib
-                    current_choice = self.savers.get(screen.get('device_id'))
-                    image, _ = await self.photo_show(inbox).frame(current_choice, self.photo_box(box,current_choice), rle=packed, jpeg=jpeg)
-                    return '"' + hashlib.sha256(image).hexdigest()[:16] + '"', image
-                tag, image = await photo_frame()
+                prepared = request.get('photo_prepare') == '1' and catalogue.PHOTOS['prepared_feature'] in (getattr(sender, 'features', None) or ())
+                if prepared:
+                    prepared_id, image = await self.photo_show(inbox).reserve(
+                        choice, self.photo_box(box, choice), request.get('photo_session'),
+                        request.get('photo_commit', ''), rle=packed, jpeg=jpeg)
+                    tag = '"' + prepared_id + '"'
+                    photo_frame = None  # An immutable reservation GET never reads or advances playback.
+                    LOG.info('photo_prepare screen=%s frame=%s acknowledged=%s bytes=%d',
+                             screen['name'], prepared_id, request.get('photo_commit', ''), len(image))
+                else:
+                    next_key = (request.get('session'), request.get('next'))
+                    if request.get('next') and await self.photo_show(inbox).advance(next_key):
+                        LOG.info('photo_gesture action=next screen=%s request=%s', screen['name'], request.get('next'))
+                    async def photo_frame():
+                        # The screen polls the same URL. Resolve the settled frame on each GET,
+                        # reusing the prepared cache until the photo's display interval expires.
+                        import hashlib
+                        current_choice = self.savers.get(screen.get('device_id'))
+                        image, _ = await self.photo_show(inbox).frame(current_choice, self.photo_box(box,current_choice), rle=packed, jpeg=jpeg)
+                        return '"' + hashlib.sha256(image).hexdigest()[:16] + '"', image
+                    tag, image = await photo_frame()
                 old = self.photo_links.get(inbox)
                 token = old[1] if old and old[0] == tag and old[1] in self.camera.links and self.camera.links[old[1]].content_type == ('image/jpeg' if jpeg else camera_feed.CONTENT_TYPE) else self.camera.link(entity, box, prepared=(tag, image), refresh=photo_frame, content_type='image/jpeg' if jpeg else camera_feed.CONTENT_TYPE)
                 self.photo_links[inbox] = (tag, token)
+                if prepared:
+                    # Keep only current and next immutable links, not a new full frame per tap for two minutes.
+                    links = self.photo_show(inbox).reservation_links
+                    if token not in links:
+                        links.append(token)
+                    while len(links) > 2:
+                        self.camera.links.pop(links.pop(0), None)
                 if len(self.photo_links) > 32:
                     self.photo_links.pop(next(iter(self.photo_links)))
                 url = f'{base}/camera/{token}.{"jpg" if jpeg else "bmp"}'
@@ -3357,7 +3374,10 @@ class Manager:
             # then. A screen told there is none keeps a black glass until the next track.
             LOG.info('Screensaver picture of %s on %s: still on its way', entity, screen['name'])
             return
-        await self.send_auxiliary(inbox, {'v': 1, 'op': 'camera', 't': 'saver', 'e': entity, 'u': url}, action, request)
+        message = {'v': 1, 'op': 'camera', 't': 'saver', 'e': entity, 'u': url}
+        if prepared_id:
+            message['pf'] = prepared_id
+        await self.send_auxiliary(inbox, message, action, request)
         LOG.info('Screensaver picture of %s on %s%s', entity, screen['name'], '' if url else ': none')
         if not url and kind == 'media':
             # The cover did not come: a pass right away, which gives the glass to the next step (cover_broken).

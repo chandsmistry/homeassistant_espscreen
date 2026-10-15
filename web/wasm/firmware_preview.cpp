@@ -99,6 +99,8 @@ void preview_standby(int on) {
   runtime_tiles::saver_sync(on);
   dirty = true;
 }
+// Test harness supplies the selected board's store budget; no device service is added.
+void preview_picture_budget(int bytes) { runtime_tiles::pictures.budget = std::max(0, bytes); }
 void preview_pictures(int on) {
   if (on) return;
   runtime_tiles::camera_full = {};
@@ -305,6 +307,13 @@ const char *preview_diagnostics() {
   JsonDocument doc;
   doc["flushes"]=flushes;
   doc["saver_active"] = runtime_tiles::saver_camera || runtime_tiles::saver_root;
+  doc["photo_preload_enabled"] = runtime_tiles::photo_prepared.enabled;
+  doc["photo_preload_ready"] = runtime_tiles::photo_prepared.ready;
+  doc["photo_preload_waiting"] = runtime_tiles::photo_prepared.waiting;
+  doc["photo_preload_wanted"] = runtime_tiles::photo_prepared.wanted;
+  doc["photo_preload_displayed"] = runtime_tiles::photo_prepared.displayed;
+  doc["photo_preload_key"] = runtime_tiles::photo_display_key;
+  doc["photo_store_bytes"] = runtime_tiles::pictures.size();
   doc["photo_next_pending"] = runtime_tiles::saver_next_photo_request;
   doc["photo_next_serial"] = runtime_tiles::saver_next_photo_serial;
   doc["photo_next_tapped_at"] = runtime_tiles::saver_photo_tapped_at;

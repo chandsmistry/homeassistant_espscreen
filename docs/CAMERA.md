@@ -456,3 +456,22 @@ The Photos time overlay uses the board's existing clock digit font rather than t
 A tap on Photos asks for the next picture and stays in standby. A swipe up returns to the main page. Other swipe directions are consumed, and other screensavers keep their normal wake behaviour. Manual requests carry a session-scoped increasing `next` serial so a retried request advances once. The normal picture transfer and transition pace is unchanged. Device logs report the gesture, request and successful loaded source with a changed link, plus elapsed time to source installation. Transition completion and pixel uniqueness are not measured. A cache hit is not reported as a new source.
 
 Repeated taps during a manual next-picture download join that same request. They do not restart it, reset its timing or queue another advance. After it finishes, a fresh tap can request another photo. Leaving standby, changing its settings, a failed download, an unchanged result or a 60-second manual-request deadline clears pending state. None of these unsuccessful outcomes is reported as an advance. This does not preload pictures or speed up a slow transfer.
+
+### Prepared next Photos frame
+
+Firmware advertising the catalogue's `photo_prepared_next` capability can request `photo_prepare=1`,
+with a saver-local `photo_session` and an optional `photo_commit` frame id. The response keeps the
+ordinary saver camera fields and adds `pf`, an opaque reservation id. Its URL serves immutable finished
+bytes: downloading or retrying that URL does not advance playback. The first reservation supplies the
+initial picture. After displaying it, acknowledging its id reserves the next picture. Duplicate or
+out-of-order acknowledgements do not consume another photo. A new saver session retires the old one;
+settings and album changes invalidate reservations. The add-on retains at most the current and next
+reservation links per screen. Older firmware retains the refreshable slideshow URL.
+
+The panel prepares and retains one decoded next picture while the current picture remains visible.
+When it is ready, a tap or elapsed interval starts the selected transition without another network
+round trip. This does not shorten that transition. First entry, a preparation miss or a tap faster than
+preparation still waits for the current transfer; repeated taps join one pending request. Leaving
+Photos releases prepared state. Preparation of the following photo waits for the current animation to end,
+so long zoom and pan effects can still need a transfer at the next interval. This uses memory, not removable storage, and does not change the
+source photos, image detail, selected transitions or other screensavers.

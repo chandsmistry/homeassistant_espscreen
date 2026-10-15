@@ -10,7 +10,7 @@ let ms=0,count=0;
 function tick(n=100){ms+=n;m._preview_time(ms,1789401840,0);m._preview_render();}
 function info(){return JSON.parse(m.ccall('preview_diagnostics','string',[],[]));}
 function actions(){let a,out=[];while((a=m.ccall('preview_next_action','string',[],[])))out.push(JSON.parse(a));return out;}
-function standby(entity='image.screensaver_photos'){receive({op:'saver',k:'camera',e:entity,n:'Photo',pt:'none',ps:30});m._preview_standby(1);tick();actions();}
+function standby(entity='image.screensaver_photos'){receive({op:'saver',k:'camera',e:entity,n:'Photo',pt:'none',ps:30});m._preview_standby(1);tick();const initial=actions().find(a=>a.data.photo_prepare);if(initial){receive({op:'camera',t:'saver',e:entity,u:'http://firmware-preview.invalid/legacy.bmp',view:Number(initial.data.view)});tick();actions();}}
 function gesture(x,y,xx=x,yy=y){tick(300);m._preview_touch(x,y,1);tick(100);if(xx!==x||yy!==y){m._preview_touch(xx,yy,1);tick(100);}m._preview_touch(xx,yy,0);tick(100);}
 standby();gesture(600,400);
 assert.equal(info().saver_active,true);assert.equal(info().photo_next_pending,true);

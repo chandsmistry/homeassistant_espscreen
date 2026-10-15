@@ -254,6 +254,12 @@ class PhotoShow:
         self.ahead = None
         self.prefetch = None
         self.metadata = {}
+        self.reservation_links = []
+        self.reservation = None
+        self.reservation_session = None
+        self.reservation_signature = None
+        self.reservation_commits = OrderedDict()
+        self.retired_sessions = OrderedDict()
         self.advance_serials = OrderedDict()  # Bounded per-session manual-next high-water marks.
         import threading
         self.render_lock = threading.Lock()
@@ -426,7 +432,7 @@ class PhotoShow:
         loop=asyncio.get_running_loop()
         async with self.lock:
             signature=(settings.get('photo_fit','fill'),settings.get('photo_order','shuffle'),settings.get('photo_mb',8),box,rle,jpeg)
-            if self.settings == signature and (self.current_paths or self.ahead):
+            if self.settings == signature and (self.current_paths or self.ahead or self.reservation):
                 return
             if self.prefetch:
                 await self.prefetch
@@ -436,6 +442,77 @@ class PhotoShow:
             self.ahead=await loop.run_in_executor(None,self.next_paths,settings)
             if self.ahead:
                 await loop.run_in_executor(None,self.render,self.ahead,box,signature[0],rle,jpeg)
+
+    async def reserve(self, settings, box, session, commit='', rle=False, jpeg=False):
+        """One immutable pending frame. Only acknowledging its id moves the visible cursor.
+
+        GET and duplicate/out-of-order acknowledgements never consume another photo.
+        A fresh saver session retires the previous session, including its late replies.
+        """
+        import asyncio
+        import secrets
+        loop = asyncio.get_running_loop()
+        if not isinstance(session, str) or not session or len(session) > 160:
+            raise ValueError('invalid photo preparation session')
+        if not isinstance(commit, str) or len(commit) > 128:
+            raise ValueError('invalid photo preparation acknowledgement')
+        async with self.lock:
+            if session in self.retired_sessions:
+                raise ValueError('retired photo preparation session')
+            # Re-stat the selected album on each reservation request. Files themselves stay untouched.
+            await loop.run_in_executor(None, self.describe, settings.get('photo_mb', 8), True)
+            files = tuple((p, os.stat(p).st_mtime_ns, os.stat(p).st_size)
+                          for p in self.album.files if os.path.isfile(p))
+            signature = (repr(sorted(settings.items())), box, rle, jpeg, files)
+            reset = session != self.reservation_session or signature != self.reservation_signature
+            if reset:
+                if session != self.reservation_session and self.reservation_session:
+                    self.retired_sessions[self.reservation_session] = True
+                    while len(self.retired_sessions) > 32:
+                        self.retired_sessions.popitem(last=False)
+                if self.prefetch:
+                    await self.prefetch
+                    self.prefetch = None
+                self.reservation_session, self.reservation_signature = session, signature
+                self.reservation, self.reservation_commits = None, {}
+                self.current_paths, self.ahead, self.since = (), None, None
+                self.settings = (settings.get('photo_fit', 'fill'), settings.get('photo_order', 'shuffle'),
+                                 settings.get('photo_mb', 8), box, rle, jpeg)
+                self.album.order = []
+            if commit:
+                if commit in self.reservation_commits:
+                    pass  # A duplicate acknowledges no additional frame.
+                elif self.reservation and commit == self.reservation['id']:
+                    self.current_paths = self.reservation['paths']
+                    self.since = self.album.clock()
+                    self.reservation_commits[commit] = True
+                    while len(self.reservation_commits) > 32:
+                        del self.reservation_commits[next(iter(self.reservation_commits))]
+                    self.reservation = None
+                elif not reset:
+                    raise ValueError('unknown photo preparation acknowledgement')
+                # Changed files/settings invalidate the old id, then issue a fresh reservation.
+            if self.reservation is None:
+                order, rng_state = list(self.album.order), self.album.rng.getstate()
+                def prepare():
+                    paths = self.next_paths(settings)
+                    image, _ = self.render(paths, box, settings.get('photo_fit', 'fill'), rle, jpeg)
+                    return paths, image
+                worker = loop.run_in_executor(None, prepare)
+                try:
+                    paths, image = await asyncio.shield(worker)
+                except (OSError, ValueError, asyncio.CancelledError):
+                    # Cancellation cannot stop an executor thread. Finish it before restoring its cursor,
+                    # so a late worker cannot mutate the next request's selection after releasing the lock.
+                    try:
+                        await worker
+                    except (OSError, ValueError, asyncio.CancelledError):
+                        pass
+                    self.album.order = order
+                    self.album.rng.setstate(rng_state)
+                    raise
+                self.reservation = {'id': secrets.token_hex(12), 'paths': paths, 'image': image}
+            return self.reservation['id'], self.reservation['image']
 
     async def advance(self, request_key):
         """Expire once per gesture, under the same lock as the playback cursor.

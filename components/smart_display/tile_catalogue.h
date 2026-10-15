@@ -31,6 +31,7 @@ inline constexpr const char *CLOCK_POSITIONS[] = {"top_left", "top_center", "top
 inline constexpr const char *TRANSITIONS[] = {"none", "fade", "wipe_left", "wipe_right", "wipe_up", "wipe_down", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out", "pan_left", "pan_right", "diamond", "checker", "spiral", "blocks", "blinds", "random"};
 inline constexpr const char *CLOCK_SIZE_FEATURE = "photo_clock_size";
 inline constexpr const char *CLOCK_SIZE_KEY = "pz";
+inline constexpr const char *PREPARED_FEATURE = "photo_prepared_next";
 inline constexpr int CLOCK_SIZE_MIN = 4;
 inline constexpr int CLOCK_SIZE_MAX = 40;
 inline constexpr int CLOCK_SIZE_DEFAULT = 12;

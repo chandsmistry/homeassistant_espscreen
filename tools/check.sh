@@ -215,6 +215,7 @@ firmware_preview() {
   node web/wasm/test_photo_clock_size.mjs || return 1
   node web/wasm/test_photo_gestures.mjs || return 1
   node web/wasm/test_photo_retaps.mjs || return 1
+  node web/wasm/test_photo_preload.mjs || return 1
 }
 editor_build() { cd "$ROOT/web" && npm run build; }
 

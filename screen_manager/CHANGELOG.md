@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Photos can negotiate a prepared next picture, retained decoded on the panel. A ready tap or interval change starts the selected transition locally. First entry and preparation misses still wait for transfer. The add-on serves immutable reserved frames and advances each acknowledged frame once; older firmware keeps its existing slideshow path.
+
 - Repeated Photos next taps retain the current download and join the same pending request instead of restarting it or queuing another advance.
 
 - Photos standby now keeps a tap in standby and asks for the next photo. A swipe up returns home. Other screensavers keep their wake behaviour.

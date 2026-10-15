@@ -189,5 +189,19 @@ int main() {
     kept.collect(shown, away, [&](const Image *i) { taken.push_back(i); });
     assert(left == 1 && kept.find("glass") && taken.size() == 2);
   }
+  { // Bounded prepared next evicts only unpinned cache entries and never exceeds its budget.
+    picture_store::Store<Image> p; p.budget=300;
+    p.allocate=[](size_t n){ return std::malloc(n); }; p.release=[](void *x){std::free(x);};
+    std::set<const Image *> pin;
+    p.shown=[&](const Image *i){return pin.count(i)>0;};
+    auto *current=p.put_bounded("current",a,1); pin.insert(current);
+    auto *next=p.put_bounded("next",a,2); pin.insert(next);
+    p.put_bounded("cache",a,3); assert(p.size()==300);
+    assert(p.put_bounded("following",a,4)); assert(p.size()==300);
+    assert(p.find("current")==current && p.find("next")==next);
+    assert(!p.put_bounded("too-big",c,5)); assert(p.size()==200);
+    p.collect(p.shown); assert(p.size()==200);
+    pin.clear(); p.forget(p.shown); assert(p.size()==0);
+  }
   return 0;
 }

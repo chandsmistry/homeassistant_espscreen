@@ -2,6 +2,7 @@
 #include "photo_clock.h"
 #include "photo_gestures.h"
 #include "photo_next.h"
+#include "photo_preload.h"
 #pragma once
 #include <cmath>
 #include <cstring>
@@ -378,7 +379,7 @@ inline std::string hhmm(const esphome::ESPTime &time) {
 inline void history_received();
 // Camera images full screen and on an alert (firmware 0.2.57+, the Guition binds them; see the end of this file).
 inline void camera_open(const std::string &entity, const std::string &name, int map_index = -1, const std::string &focus = "");
-inline void camera_answer(const std::string &view, const std::string &entity, const std::string &url, uint32_t number);
+inline void camera_answer(const std::string &view, const std::string &entity, const std::string &url, uint32_t number, const std::string &photo_frame = "");
 inline bool camera_supported();
 // Every picture goes one way (picture_loader.h; see the end of this file): an owner says what it wants, and draws what
 // picture_of() has for its key.
@@ -400,6 +401,7 @@ inline bool pictures_kept();
 inline bool picture_kept_here(const lv_image_dsc_t *image);
 inline void picture_retire(const std::string &key);
 inline bool picture_shown(const lv_image_dsc_t *image);
+inline const lv_image_dsc_t *photo_prepared_image = nullptr;
 struct Widgets;
 // The card's cover on screen, and the part a media tile keeps its cover in; both go with the image buffer.
 inline lv_obj_t *media_detail_picture = nullptr;
@@ -10539,7 +10541,7 @@ inline bool draws(lv_obj_t *obj, const lv_image_dsc_t *image) {
 // Whether a card on the glass or kept, or the card open over the page, still draws this picture.
 inline bool picture_shown(const lv_image_dsc_t *image) {
 #if LV_USE_IMAGE
-  bool shown = false;
+  bool shown = image == photo_prepared_image;
   auto on = [&](lv_obj_t *obj) { if (draws(obj, image)) shown = true; };
   each_card([&](Widgets &w) { on(w.picture); if (w.extra_mode == "media") on(w.parts[MEDIA_PICTURE]); });
   on(media_detail_picture);
@@ -10683,7 +10685,7 @@ inline picture_loader::Loader loader;
 namespace owners {
 using picture_loader::Kind;
 using picture_loader::Owner;
-inline constexpr Owner VIEW{Kind::VIEW, 0}, CARD{Kind::CARD, 0}, ALERT{Kind::ALERT, 0}, LIBRARY{Kind::LIBRARY, 0};
+inline constexpr Owner VIEW{Kind::VIEW, 0}, CARD{Kind::CARD, 0}, ALERT{Kind::ALERT, 0}, LIBRARY{Kind::LIBRARY, 0}, PHOTO_NEXT{Kind::VIEW, 1};
 inline Owner tile(size_t index) { return {Kind::TILE, static_cast<uint32_t>(index)}; }
 }  // namespace owners
 inline ImageHooks &slot_hooks(picture_loader::Slot slot) {
@@ -11275,6 +11277,10 @@ inline void live_tick() {
 
 // Asks ESP Screen Manager for a link (app 0.2.66+ answers with op "camera"). An event, like history_request.
 // A cover (firmware 0.2.64+) adds the size it wants and the colour behind its rounded corners; the app bakes both in.
+inline photo_preload::State photo_prepared;
+inline std::string photo_display_key;
+inline uint32_t photo_preload_retry_at = 0;
+inline void photo_preload_round();
 inline photo_gestures::ManualNext saver_manual_next;
 inline bool &saver_next_photo_request = saver_manual_next.pending;
 inline uint32_t &saver_next_photo_serial = saver_manual_next.serial, &saver_photo_tapped_at = saver_manual_next.tapped_at;
@@ -11312,7 +11318,22 @@ inline void camera_request(const std::string &entity, int size, uint32_t backgro
     saver_photo_request_view = camera_view_id;
     ESP_LOGI("saver", "photo_gesture action=request next=%s view=%u", next_photo.c_str(), (unsigned)camera_view_id);
   }
-  request.data.init(count + (!next_photo.empty() ? 1 : 0) + (saver ? 1 : 0) + (larger ? 1 : 0) + (live ? 1 : 0) + (sound ? 1 : 0));
+  const bool prepare = saver && entity == "image.screensaver_photos" && photo_prepared.enabled;
+  const std::string photo_session = protocol_key(transfer.lease) + "-" + std::to_string(photo_prepared.session);
+  if (prepare) photo_prepared.view = camera_view_id;
+  request.data.init((prepare ? 2 + (!photo_prepared.displayed.empty() ? 1 : 0) : 0) + count + (!next_photo.empty() ? 1 : 0) + (saver ? 1 : 0) + (larger ? 1 : 0) + (live ? 1 : 0) + (sound ? 1 : 0));
+  const std::string prepare_keys[] = {"photo_prepare", "photo_session"}, prepare_values[] = {"1", photo_session};
+  if (prepare) {
+    for (int i = 0; i < 2; ++i) {
+      esphome::api::HomeassistantServiceMap entry;
+      entry.key = esphome::StringRef(prepare_keys[i]); entry.value = esphome::StringRef(prepare_values[i]); request.data.push_back(entry);
+    }
+    if (!photo_prepared.displayed.empty()) {
+      esphome::api::HomeassistantServiceMap entry;
+      entry.key = esphome::StringRef("photo_commit"); entry.value = esphome::StringRef(photo_prepared.displayed); request.data.push_back(entry);
+    }
+    ESP_LOGI("saver", "photo_preload action=request generation=%u", (unsigned)photo_prepared.generation);
+  }
   if (!next_photo.empty()) {
     esphome::api::HomeassistantServiceMap entry;
     entry.key = esphome::StringRef("next"); entry.value = esphome::StringRef(next_photo);
@@ -11710,7 +11731,7 @@ inline void alert_clear() {
 inline std::string camera_tag();
 // The app's answer: a link, or "" when it has no picture. It goes to the picture that asked (picture_loader::answer), and
 // the round right after starts the download, rather than the next tick (firmware 0.2.73+): the answer is most of the wait.
-inline void camera_answer(const std::string &view, const std::string &entity, const std::string &url, uint32_t number) {
+inline void camera_answer(const std::string &view, const std::string &entity, const std::string &url, uint32_t number, const std::string &photo_frame) {
   if (!camera_supported()) return;
   const uint32_t now = esphome::millis();
   if (view == "full" || view == "saver") {
@@ -11720,6 +11741,15 @@ inline void camera_answer(const std::string &view, const std::string &entity, co
     if (view == "full" && live_view::is_stream(url)) {
       if (live_wanted() && !camera.live) live_begin(url);
       return;
+    }
+    if (saver_camera && entity == "image.screensaver_photos" && photo_prepared.enabled) {
+      if (number != photo_prepared.view) return;
+      if (photo_frame.empty()) {
+        photo_prepared.enabled = false; photo_prepared_image = nullptr; loader.release(owners::PHOTO_NEXT);
+        ESP_LOGI("saver", "photo_preload action=legacy_fallback"); pictures_round(); return;
+      }
+      if (!photo_prepared.answer(number, photo_frame, url)) return;
+      loader.answer("photo-prepared", url, now); pictures_round(); return;
     }
     if (saver_camera && entity == "image.screensaver_photos") {
       if (saver_next_photo_request && number != saver_photo_request_view) return;
@@ -11902,7 +11932,7 @@ inline void picture_done(picture_loader::Slot slot, bool ok, bool cached) {
   if (!key.empty()) {
     auto &hooks = slot_hooks(slot);
     lv_image_dsc_t *src = hooks.source ? hooks.source() : nullptr;
-    if (slot == picture_loader::Slot::FULL && ok && !cached && saver_camera && saver_now.entity == "image.screensaver_photos" && camera_picture && saver_now.photo_transition != "none") {
+    if (slot == picture_loader::Slot::FULL && ok && !cached && saver_camera && saver_now.entity == "image.screensaver_photos" && camera_picture && saver_now.photo_transition != "none" && !photo_prepared.enabled) {
 #if LV_USE_IMAGE
       auto *old = static_cast<const lv_image_dsc_t *>(lv_image_get_src(camera_picture));
       if (old && src && old->data && src->data && (old->data_size != src->data_size || std::memcmp(old->data,src->data,src->data_size))) {
@@ -11915,10 +11945,10 @@ inline void picture_done(picture_loader::Slot slot, bool ok, bool cached) {
     bool kept = false;
     if (pictures_kept() && src && src->data) {
       if (cached && pictures.entry(key)) { pictures.touch(key, now); kept = true; }
-      else kept = pictures.put(key, *src, now) != nullptr;
+      else kept = (key.compare(0, 11, "photo-next|") == 0 ? pictures.put_bounded(key, *src, now) : pictures.put(key, *src, now)) != nullptr;
       if (!kept) ESP_LOGW("picture", "no room to keep %s", key.c_str());
     }
-    if (!kept) { slot_key[s] = key; slot_at[s] = now; }
+    if (!kept && key.compare(0, 11, "photo-next|") != 0) { slot_key[s] = key; slot_at[s] = now; }
     if (src) picture_memory("after", key.substr(0, key.find('|')).c_str(), src->header.w * src->header.h);
     // A tile's picture the store keeps needs its download no more: the slot's buffer goes now, not with the next
     // picture of another size (one per tile, so most are). The full view keeps its own, which its next refresh reuses.
@@ -11927,13 +11957,83 @@ inline void picture_done(picture_loader::Slot slot, bool ok, bool cached) {
       ESP_LOGD("picture", "the tiles' download let go of %s", key.c_str());
     }
     loader.arrived(key, cached);
+    if (key.compare(0, 11, "photo-next|") == 0 && hooks.release) hooks.release();
   }
   pictures_round();
 }
 
 // ---- What every picture wants, each round ----
+inline void photo_preload_round() {
+  const uint32_t now = esphome::millis();
+  if (photo_preload_retry_at && now - photo_preload_retry_at >= 2000u) {
+    loader.release(owners::PHOTO_NEXT); photo_prepared.waiting = false; photo_preload_retry_at = 0;
+  }
+  if (photo_prepared.ready && photo_prepared.due(now, uint32_t(saver_now.photo_seconds) * 1000u)) {
+    auto *src = picture_of(photo_prepared.key());
+    if (src && src->data) {
+      const bool first = camera_picture == nullptr;
+#if LV_USE_IMAGE
+      auto *old = camera_picture ? static_cast<const lv_image_dsc_t *>(lv_image_get_src(camera_picture)) : nullptr;
+      photo_transition::clear();
+      if (old && saver_now.photo_transition != "none") {
+        photo_transition::allocate = pictures.allocate; photo_transition::release = pictures.release;
+        if (!photo_transition::retain(old)) ESP_LOGW("saver", "Photo transition falls back to hard cut: insufficient memory");
+      }
+#endif
+      camera_show(camera_root, camera_picture, src, true);
+      camera.shown = true;
+      if (first && camera_picture) {
+        lv_obj_set_size(camera_picture, lv_pct(100), lv_pct(100));
+        lv_image_set_inner_align(camera_picture, LV_IMAGE_ALIGN_COVER);
+      }
+      if (photo_transition::buffer) photo_transition::start(camera_root, src, saver_now.photo_transition,
+          overlay_card::screen_width(), overlay_card::screen_height(), saver_now.photo_seconds);
+      saver_words();
+      if (saver_first) lv_obj_move_foreground(saver_first);
+      if (saver_second) lv_obj_move_foreground(saver_second);
+      ESP_LOGI("saver", "photo_preload action=promote ready=1 tap_to_picture_ms=%u automatic=%d",
+               (unsigned)(photo_prepared.wanted ? esphome::millis() - photo_prepared.tapped_at : 0), !photo_prepared.wanted);
+      ESP_LOGI("saver", "photo_preload stage=promote psram_free=%u", (unsigned)psram_free());
+      const std::string old_key = photo_display_key;
+      photo_display_key = photo_prepared.key(); photo_prepared_image = nullptr;
+      photo_prepared.promoted(now);
+      if (!old_key.empty()) pictures.retire(old_key);
+    } else {
+      photo_prepared.ready = false; photo_prepared_image = nullptr;
+      photo_preload_retry_at = now ? now : 1;
+    }
+  }
+  // Motion effects retain their source for their full duration. Never fetch into that animation.
+  if (!photo_prepared.waiting && (!photo_transition::overlay || !lv_anim_get(photo_transition::overlay, nullptr))) photo_prepared.begin();
+  if (!photo_prepared.waiting) return;
+  picture_loader::Want w;
+  w.key = photo_prepared.key(); w.tag = "photo-prepared"; w.slot = picture_loader::Slot::FULL;
+  w.tries = 1; // Controlled re-reservation after failure, never cancel an automatic retry already in flight.
+  w.rank = photo_prepared.displayed.empty() || photo_prepared.wanted ? picture_loader::Rank::VIEW : picture_loader::Rank::AHEAD;
+  w.ask = [] { camera_request(camera.entity); };
+  w.done = [](picture_loader::Outcome outcome) {
+    if (shows(outcome)) {
+      auto *src = picture_of(photo_prepared.key());
+      if (src && pictures.holder(src)) {
+        photo_prepared_image = src; photo_prepared.ready = true;
+        ESP_LOGI("saver", "photo_preload action=ready bytes=%u psram_free=%u", (unsigned)src->data_size, (unsigned)psram_free());
+      } else {
+        photo_preload_retry_at = esphome::millis() ? esphome::millis() : 1;
+        ESP_LOGW("saver", "photo_preload action=not_ready reason=store_full keeping_current=1");
+      }
+    } else {
+      photo_preload_retry_at = esphome::millis() ? esphome::millis() : 1;
+      ESP_LOGW("saver", "photo_preload action=load_failed keeping_current=1");
+    }
+  };
+  loader.want(owners::PHOTO_NEXT, std::move(w));
+}
 inline void camera_want() {
   if (!camera_root || !camera.open() || !pictures_awake()) return;
+  if (saver_camera && camera.entity == "image.screensaver_photos" && photo_prepared.enabled) {
+    if (pictures_kept() && pictures.budget >= 2 * picture_cap().bytes) { photo_preload_round(); return; }
+    photo_prepared.enabled = false; // A board without a decoded picture store keeps the legacy path.
+  }
   if (camera.live) return;  // its pictures stream (live_view.h); the loader has nothing to fetch
   picture_loader::Want w;
   w.key = camera_key();
@@ -12400,6 +12500,8 @@ inline void saver_keys_draw() {
 }
 
 inline void saver_hide() {
+  photo_prepared_image = nullptr; photo_prepared.reset(); photo_display_key.clear(); photo_preload_retry_at = 0; loader.release(owners::PHOTO_NEXT);
+  pictures.retire_if([](const auto &entry) { return entry.key.compare(0, 11, "photo-next|") == 0; });
   saver_manual_next.cancel(); saver_photo_request_view = 0;
   saver_photo_url.clear(); saver_photo_displayed_url.clear();
   photo_clock_log_key.clear();
@@ -12492,6 +12594,8 @@ inline void saver_forget() { saver_hide(); }
 // The app's word (page_receiver.cpp). In standby the glass follows at once, through apply_screen_settings.
 inline void saver_receive(const SaverChoice &next) {
   if (next == saver_next) return;
+  photo_prepared_image = nullptr; photo_prepared.reset(); photo_preload_retry_at = 0;
+  loader.release(owners::PHOTO_NEXT);
   saver_manual_next.cancel();
   saver_next = next;
   if (!awake() && saver_changed) saver_changed();
@@ -12749,7 +12853,11 @@ inline void released() {
       if (back_home) back_home();
       ESP_LOGI("saver", "photo_gesture home_done saver_active=%d page=%u", saver_camera ? 1 : 0, (unsigned)(shown_page ? *shown_page : 0));
     } else if (result.action == photo_gestures::Action::next) {
-      if (saver_manual_next.tap(esphome::millis())) {
+      if (photo_prepared.enabled) {
+        const bool fresh = photo_prepared.tap(esphome::millis());
+        ESP_LOGI("saver", "photo_gesture gesture=tap action=%s ready=%d saver_active=1", fresh ? "next" : "coalesced", photo_prepared.ready);
+        pictures_round();
+      } else if (saver_manual_next.tap(esphome::millis())) {
         ESP_LOGI("saver", "photo_gesture gesture=tap action=next next=%u saver_active=1", (unsigned)saver_next_photo_serial);
         loader.refresh(owners::VIEW); pictures_round();
       } else ESP_LOGI("saver", "photo_gesture gesture=tap action=coalesced next=%u pending=1 saver_active=1", (unsigned)saver_next_photo_serial);

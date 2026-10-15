@@ -1932,6 +1932,7 @@
     "date_ratio": 35,
     "packed_feature": "photo_rle",
     "jpeg_feature": "photo_jpeg",
+    "prepared_feature": "photo_prepared_next",
     "clock_positions": [
      "top_left",
      "top_center",

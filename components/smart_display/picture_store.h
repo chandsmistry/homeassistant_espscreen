@@ -127,6 +127,12 @@ template <class Image> struct Store {
     note("keeps", *slot);
     return &slot->image;
   }
+  // Prepared Photos never temporarily exceed the store budget. Pinned/displayed frames stay.
+  Image *put_bounded(const std::string &key, const Image &from, uint32_t now) {
+    if (!from.data_size || from.data_size > budget) return nullptr;
+    while (size() + from.data_size > budget) if (!make_room()) return nullptr;
+    return put(key, from, now);
+  }
   // Every slot taken (firmware 0.52.0): the picture that no card draws and was used longest ago makes way, one no longer
   // wanted (retired) before any other. Before, the slots ran out long before the bytes reached the budget: on a 4-inch
   // board sixteen covers of tracks gone by take 0.7 MB of 1.5, and from then on no new picture was kept, so a media card

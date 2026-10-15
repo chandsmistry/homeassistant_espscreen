@@ -395,7 +395,7 @@ std::string receive(const std::string &payload) {
         }
         camera_map_sheet(next);
       }
-      camera_answer(view, entity, url, number);
+      camera_answer(view, entity, url, number, string(root["pf"], 100));
       result = model.ready() ? "Synced" : "Loading tiles";
       return true;
     }

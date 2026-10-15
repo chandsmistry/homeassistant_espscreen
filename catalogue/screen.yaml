@@ -65,5 +65,6 @@ photos:
   date_ratio: 35
   packed_feature: photo_rle
   jpeg_feature: photo_jpeg
+  prepared_feature: photo_prepared_next
   clock_positions: [top_left, top_center, top_right, center, bottom_left, bottom_center, bottom_right]
   transitions: [none, fade, wipe_left, wipe_right, wipe_up, wipe_down, slide_left, slide_right, slide_up, slide_down, zoom_in, zoom_out, pan_left, pan_right, diamond, checker, spiral, blocks, blinds, random]
