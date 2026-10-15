@@ -100,6 +100,9 @@ SUMS = {'solar': 'sensor.screen_energy_solar_power', 'grid': 'sensor.screen_ener
 def source_entity(prefs: dict, kind: str) -> str:
     """The sensor behind a source's circle: its one power sensor, the sum's key for several, '' for none."""
     ids = [e for s in sources(prefs, kind) for e in rates(s)]
+    taps = [s['tap'] for s in sources(prefs, kind) if s.get('tap')]
+    if len(ids) == 1 and taps:
+        return taps[0]  # a net of two chosen sensors opens the first of them
     return ids[0] if len(ids) == 1 else SUMS[kind] if ids else ''
 
 
@@ -160,7 +163,7 @@ def related_entities(prefs: dict) -> list[str]:
     """Every entity whose state changes the card: the power sensors, the batteries' charge, the devices."""
     out = []
     for source in (prefs or {}).get('energy_sources') or []:
-        for entity_id in rates(source) + ([source['stat_soc']] if source.get('stat_soc') else []):
+        for entity_id in rates(source) + ([source['stat_soc']] if source.get('stat_soc') else []) + list(source.get('inputs') or []):
             if entity_id not in out:
                 out.append(entity_id)
     for device in (prefs or {}).get('device_consumption') or []:
@@ -328,12 +331,118 @@ def _reading(state: dict | None) -> list[str]:
     return [str(state.get('state') or '')[:32], str(unit)[:16]]
 
 
-def payload(prefs: dict, states: dict[str, dict], glyph=None, home_name: str = '') -> dict:
+# The energy card with sensors of its own (tile option `energy_sources`, the way power-flow-card-plus is configured):
+# the keys a person may set. Every value is a sensor id; `devices` is a list of {entity, name?}, at most MAPPED_DEVICES.
+MAPPED_KEYS = ('grid', 'grid_import', 'grid_export', 'solar', 'battery', 'battery_out', 'battery_in', 'soc', 'home')
+MAPPED_DEVICES = 4
+VIRTUAL_GRID = 'sensor.screen_energy_grid_net'
+VIRTUAL_BATTERY = 'sensor.screen_energy_battery_net'
+
+
+def mapping_empty(mapping) -> bool:
+    return not isinstance(mapping, dict) or not any(mapping.get(k) for k in (*MAPPED_KEYS, 'devices'))
+
+
+def clean_mapping(mapping):
+    """A mapping as stored: only known keys, sensor ids, at most MAPPED_DEVICES devices. {} for an empty one (the card
+    then follows Home Assistant's Energy settings); None when it is not a mapping at all."""
+    if mapping in (None, {}):
+        return {}
+    if not isinstance(mapping, dict) or set(mapping) - {*MAPPED_KEYS, 'devices'}:
+        return None
+
+    def sensor(value):
+        return isinstance(value, str) and value.startswith('sensor.') and len(value) <= 255 and value.isascii() and ' ' not in value
+
+    out = {}
+    for key in MAPPED_KEYS:
+        value = mapping.get(key)
+        if value in (None, ''):
+            continue
+        if not sensor(value):
+            return None
+        out[key] = value
+    if 'devices' in mapping:
+        if not isinstance(mapping['devices'], list) or len(mapping['devices']) > MAPPED_DEVICES:
+            return None
+        devices_ = []
+        for item in mapping['devices']:
+            if not isinstance(item, dict) or set(item) - {'entity', 'name'} or not sensor(item.get('entity')):
+                return None
+            name = item.get('name') or ''
+            if not isinstance(name, str) or len(name) > 48:
+                return None
+            devices_.append({'entity': item['entity'], **({'name': name} if name else {})})
+        if devices_:
+            out['devices'] = devices_
+    return out
+
+
+def mapped(mapping: dict, states: dict[str, dict]) -> tuple[dict, dict[str, dict], str]:
+    """The Energy settings a person's own sensors stand for, as `energy/get_prefs` would hand them: (prefs, states with
+    the nets of paired sensors added, the sensor that overrides the house's consumption or ''). A pair is netted into one
+    signed sensor (import minus export, discharge minus charge), the form Home Assistant keeps; a missing sensor counts
+    as 0 W, as in Home Assistant."""
+    mapping = mapping or {}
+    states = dict(states)
+    sources_ = []
+
+    def net(positive: str, negative: str, key: str) -> str:
+        a, b = power_w(states.get(positive)) if positive else None, power_w(states.get(negative)) if negative else None
+        if a is None and b is None:
+            return key
+        states[key] = {'state': f'{round((a or 0.0) - (b or 0.0), 1):g}', 'attributes': {'unit_of_measurement': 'W'}}
+        return key
+
+    if mapping.get('grid'):
+        sources_.append({'type': 'grid', 'stat_rate': mapping['grid']})
+    elif mapping.get('grid_import') or mapping.get('grid_export'):
+        sources_.append({'type': 'grid', 'stat_rate': net(mapping.get('grid_import', ''), mapping.get('grid_export', ''), VIRTUAL_GRID),
+                         'tap': mapping.get('grid_import') or mapping.get('grid_export')})
+    if mapping.get('solar'):
+        sources_.append({'type': 'solar', 'stat_rate': mapping['solar']})
+    battery = None
+    if mapping.get('battery'):
+        battery = {'type': 'battery', 'stat_rate': mapping['battery']}
+    elif mapping.get('battery_out') or mapping.get('battery_in'):
+        battery = {'type': 'battery', 'stat_rate': net(mapping.get('battery_out', ''), mapping.get('battery_in', ''), VIRTUAL_BATTERY),
+                   'tap': mapping.get('battery_out') or mapping.get('battery_in')}
+    if battery:
+        if mapping.get('soc'):
+            battery['stat_soc'] = mapping['soc']
+        sources_.append(battery)
+    devices_ = []
+    for item in (mapping.get('devices') or [])[:MAPPED_DEVICES]:
+        if isinstance(item, dict) and item.get('entity'):
+            devices_.append({'stat_consumption': item['entity'], 'stat_rate': item['entity'], 'name': item.get('name') or ''})
+    return {'energy_sources': sources_, 'device_consumption': devices_}, states, mapping.get('home') or ''
+
+
+def mapped_entities(mapping: dict) -> list[str]:
+    """Every sensor a mapping reads, for the watch list and the history a tap opens."""
+    out = []
+    for key in MAPPED_KEYS:
+        if isinstance(mapping, dict) and mapping.get(key) and mapping[key] not in out:
+            out.append(mapping[key])
+    for item in (mapping or {}).get('devices') or []:
+        if isinstance(item, dict) and item.get('entity') and item['entity'] not in out:
+            out.append(item['entity'])
+    return out
+
+
+def payload(prefs: dict, states: dict[str, dict], glyph=None, home_name: str = '', mapping: dict | None = None) -> dict:
     """The energy card's `x` on the wire (firmware 0.47.0, page_receiver.cpp): what the house has (`h`), the power of
     each side (`p`), the flows between them (`f`), the batteries' charge (`c`), the sensor behind each source with its
     state (`e`, `u`) and the devices, biggest first (`d`, `o`). `glyph` maps an `mdi:` icon to the codepoint a screen
     draws, or None."""
+    home_override = ''
+    if not mapping_empty(mapping):
+        prefs, states, home_override = mapped(mapping, states)
     m = moment(prefs, states)
+    if home_override:
+        value = power_w(states.get(home_override))
+        if value is not None:
+            m.home = max(0.0, value)
     w = lambda value: round(value, 1) if value > 0 else 0.0  # never -0.0
     out = {
         'h': (1 if m.has_solar else 0) | (2 if m.has_grid else 0) | (4 if m.has_battery else 0),

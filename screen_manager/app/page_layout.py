@@ -30,6 +30,8 @@ APPEARANCE = {
     "mapLook": "look",
     # How the energy card shows power along a line: running dots or calm lines (catalogue/screen.yaml `energy`).
     "energyFlow": "flow",
+    # The sensors the energy card takes instead of Home Assistant's Energy settings (energy_flow.clean_mapping).
+    "energySources": "energy_sources",
 }
 # A favourite (app 0.4.42) keeps what it plays (`play`, Home Assistant's own ids) and on which speaker (`speaker`), and
 # since app 0.4.84 its own shuffle and repeat.

@@ -1311,7 +1311,9 @@ TILE_EVENT_OPTIONS = {'size': 'size', 'controls': 'controls', 'display': 'displa
                       # Its own shuffle and repeat (app 0.4.84).
                       'shuffle': 'shuffle', 'repeat': 'repeat',
                       # How the energy card shows power along a line: dots or lines.
-                      'flow': 'flow'}
+                      'flow': 'flow',
+                      # The sensors the energy card takes instead of Home Assistant's Energy settings.
+                      'energy_sources': 'energy_sources'}
 TILE_SIZES = {'full': 'full', 'fullscreen': 'full', 'full screen': 'full', 'full-screen': 'full', 'page': 'full', 'whole page': 'full',
               'wide': 'wide', 'double': 'wide', 'large': 'wide', 'big': 'wide',
               'single': 'single', 'small': 'single', 'normal': 'single', 'tall': 'tall', 'high': 'tall', 'square': 'square'}
@@ -1862,7 +1864,7 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
             continue
         if 'options' in tile:
             options = tile['options']
-            if not isinstance(options, dict) or set(options) - {'tap', 'display', 'inline', 'history_hours', 'background', 'size', 'icon', 'controls', 'action', 'refresh', 'sub', 'fit', 'overlay', 'guard', 'flow', *MAP_OWN, *FAVORITE_OWN}:
+            if not isinstance(options, dict) or set(options) - {'tap', 'display', 'inline', 'history_hours', 'background', 'size', 'icon', 'controls', 'action', 'refresh', 'sub', 'fit', 'overlay', 'guard', 'flow', 'energy_sources', *MAP_OWN, *FAVORITE_OWN}:
                 raise ValueError(t('addon.errors.layout.unknown_settings'))
             # A navigation tile (screen.page_<n>, firmware 0.2.62+) has a name, an icon, a colour and a width; never the page.
             if page_target(tile['entity']):
@@ -1898,8 +1900,16 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
                     raise ValueError(t('addon.errors.layout.invalid_setting', setting='flow'))
                 if options.get('flow') == ENERGY_FLOWS[0]:
                     options = {k: v for k, v in options.items() if k != 'flow'}
-            elif 'flow' in options:
-                options = {k: v for k, v in options.items() if k != 'flow'}
+                if 'energy_sources' in options:
+                    import energy_flow
+                    mapping = energy_flow.clean_mapping(options['energy_sources'])
+                    if mapping is None:
+                        raise ValueError(t('addon.errors.layout.invalid_setting', setting='energy_sources'))
+                    options = {k: v for k, v in options.items() if k != 'energy_sources'}
+                    if mapping:
+                        options['energy_sources'] = mapping
+            elif 'flow' in options or 'energy_sources' in options:
+                options = {k: v for k, v in options.items() if k not in ('flow', 'energy_sources')}
             # Every tile's taps and its type's own (run, an automation's alone: firmware 0.7.0+), from the catalogue.
             taps = tuple(catalogue.PD['taps']) if catalogue.is_pd(tile['entity']) else tuple(catalogue.taps(domain))
             choices = {'tap': taps, 'display': displays, 'inline': ('none', 'slider')}
@@ -2328,7 +2338,7 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
     if tile['entity'] == ENERGY_TILE:
         import energy_flow
         glyph = lambda icon: tile_icons.GLYPHS.get(icon[4:]) if isinstance(icon, str) and icon.startswith('mdi:') else None
-        return energy_flow.payload(energy or {}, states, glyph, home_name)
+        return energy_flow.payload(energy or {}, states, glyph, home_name, (tile.get('options') or {}).get('energy_sources'))
     domain = tile['entity'].split('.')[0]
     attrs = states.get(tile['entity'], {}).get('attributes', {})
     # A map card carries only its movement mark (app 0.4.33): the screen asks for a new picture when it changes, so

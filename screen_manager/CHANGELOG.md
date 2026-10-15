@@ -2,6 +2,8 @@
 
 - **PD visual fidelity.** The header supports the HA glance hexagram. Battery Allocations follows the reference panel spacing, smaller badges, regular labels and bold values, with three visible bars and no extra heading. PD-only fonts preserve other cards’ typography.
 
+- **Energy card with its own sensors.** The energy card's inspector has a Sensors section: pick a sensor for grid (one signed, or import and export), solar, battery (one signed, or discharge and charge), battery level, home consumption and up to four devices, the way power-flow-card-plus is set up. With nothing chosen the card follows Home Assistant's Energy settings exactly as before. No firmware change.
+
 - **Native PD cards.** Updated firmware draws PD text, pills, battery bars and small embedded decorations locally from live data, like Energy. No bitmap download or 45-second telemetry throttle; older firmware keeps the picture fallback. Legacy map classification is removed from saved PD layouts. PDC has no internal border and fills its tile with equal padding. Internal drags do not open its configurable selector action; edge-swipe handling is unchanged.
 
 - **PD mode refresh.** Both PD picture cards refresh when the header sensor confirms a changed control mode, without waiting for the 45-second telemetry interval.

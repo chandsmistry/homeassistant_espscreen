@@ -14,6 +14,7 @@ import IconPicker from "./IconPicker.vue";
 import { coverPrimary, hasCoverTilt, withCoverTilt } from "../model/tall-controls";
 import ChoiceField from "./ChoiceField.vue";
 import FavoriteSection from "./inspector/FavoriteSection.vue";
+import EnergySourcesSection from "./inspector/EnergySourcesSection.vue";
 import MapSection from "./inspector/MapSection.vue";
 import NameField from "./inspector/NameField.vue";
 import TitleButton from "./inspector/TitleButton.vue";
@@ -221,6 +222,8 @@ const backgroundName = computed(() => inv.inventory.backgrounds?.[props.tile.opt
       <SwitchRow class="key-name-choice" :label="t('editor.tile.keys.name_shown')" :description="t('editor.tile.keys.name_shown_hint')"
         :model-value="tile.options?.overlay !== 'none'" @update:model-value="(on) => setTileOption(tile, 'overlay', on ? 'name' : 'none')" />
     </Section>
+
+    <EnergySourcesSection v-if="energyTile && scr.supports(0, 47, 0)" :tile="tile" />
 
     <!-- What the card shows first, then where it stands, what a finger does to it, and last its icon and colour. -->
     <template v-if="!ui.phone || more">

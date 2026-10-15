@@ -2217,6 +2217,9 @@ class Manager:
         if ENERGY_TILE in shown:
             summed = energy_flow.sums(self.energy_prefs())
             shown |= set(energy_flow.related_entities(self.energy_prefs())) | set(summed)
+            for tile in layout['tiles']:
+                if tile['entity'] == ENERGY_TILE:
+                    shown |= set(energy_flow.mapped_entities((tile.get('options') or {}).get('energy_sources')))
         if entity not in shown:
             return
         what = 'line' if entity in summed else history_card.kind(entity, self.ha.states.get(entity))
@@ -2328,7 +2331,7 @@ class Manager:
             return tuple(e for e in followed if e != tile['entity']) + tuple(e for e in self.ha.states if isinstance(e, str) and e.startswith('zone.'))
         # The energy card (app 0.4.77) reads every sensor of the Energy settings.
         if tile['entity'] == ENERGY_TILE:
-            return tuple(energy_flow.related_entities(self.energy_prefs()))
+            return tuple(energy_flow.related_entities(self.energy_prefs())) + tuple(energy_flow.mapped_entities((tile.get('options') or {}).get('energy_sources')))
         if tile['entity'].startswith('media_player.'):
             # The speakers of its menu: who it groups with, the speakers that play its library, and the one it follows.
             entity = tile['entity']
