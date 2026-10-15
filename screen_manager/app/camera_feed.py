@@ -927,7 +927,8 @@ def web_app(feed, live=None):
         # Last-Modified with every picture: online_image warns at every load about a missing one (it never sends
         # If-Modified-Since on its own; only the ETag decides a 304 here).
         headers = {'Cache-Control': 'no-cache', 'Last-Modified': formatdate(usegmt=True), **({'ETag': etag} if etag else {})}
-        if status == 200 and prepared:
+        # Photos uses the original buffered response path; its prepared bytes and ETag are unchanged.
+        if status == 200 and prepared and link.entity != 'image.screensaver_photos':
             response = web.StreamResponse(headers={**headers, 'Content-Type': CONTENT_TYPE, 'Content-Length': str(len(body))})
             await response.prepare(request)
             first_byte_ms = (time.monotonic()-started)*1000

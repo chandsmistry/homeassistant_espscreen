@@ -524,6 +524,24 @@ class Feed(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await feed.serve(token, etag))[0], 304)
         self.assertEqual(self.fetched, [])
 
+    @unittest.skipUnless(HAS_AIOHTTP, 'Requires aiohttp')
+    async def test_prepared_photos_keep_original_response_and_exact_bytes(self):
+        from aiohttp import web
+        from types import SimpleNamespace
+        feed, _ = self.feed([])
+        body = b'BM' + bytes(range(256)) * 4096
+        token = feed.link('image.screensaver_photos', (1280, 800), prepared=('"frame-a"', body))
+        app = camera_feed.web_app(feed)
+        handler = next(route.handler for route in app.router.routes() if route.method == 'GET')
+        response = await handler(SimpleNamespace(match_info={'token': token}, headers={}))
+        self.assertIsInstance(response, web.Response)
+        self.assertFalse(response.prepared)
+        self.assertEqual(response.body, body)
+        self.assertEqual(response.content_length, len(body))
+        self.assertEqual(response.headers['ETag'], '"frame-a"')
+        unchanged = await handler(SimpleNamespace(match_info={'token': token}, headers={'If-None-Match': '"frame-a"'}))
+        self.assertEqual(unchanged.status, 304)
+
     async def test_the_number_of_links_is_bounded(self):
         feed, clock = self.feed([picture('JPEG', (64, 36))])
         tokens = []
