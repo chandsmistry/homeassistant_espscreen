@@ -3330,6 +3330,9 @@ class Manager:
                 sender = self.page_senders.get(inbox)
                 packed = catalogue.PHOTOS['packed_feature'] in (getattr(sender, 'features', None) or ())
                 jpeg = catalogue.PHOTOS['jpeg_feature'] in (getattr(sender, 'features', None) or ())
+                next_key = (request.get('session'), request.get('next'))
+                if request.get('next') and await self.photo_show(inbox).advance(next_key):
+                    LOG.info('photo_gesture action=next screen=%s request=%s', screen['name'], request.get('next'))
                 async def photo_frame():
                     # The screen polls the same URL. Resolve the settled frame on each GET,
                     # reusing the prepared cache until the photo's display interval expires.

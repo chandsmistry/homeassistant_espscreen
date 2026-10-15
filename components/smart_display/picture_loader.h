@@ -161,6 +161,14 @@ class Loader {
     if (load) load(next->want.slot, next->url, next->want.key);
   }
 
+  // A manual next-photo tap asks immediately without altering the ordinary refresh pace.
+  void refresh(const Owner &owner) {
+    if (auto *job = find(owner)) {
+      if (job->phase == Phase::LOADING) stop(*job);
+      job->forced = true; job->phase = Phase::NEW; job->url.clear(); job->asked_at = 0; job->finished_at = 0;
+    }
+  }
+
   // ---- the app and the downloads ----
   // The app's answer for `tag`: a link, or "" when it has no picture.
   void answer(const std::string &tag, const std::string &url, uint32_t now) {
@@ -189,6 +197,7 @@ class Loader {
     note(*job, ok ? "loaded" : "load failed");
     if (ok) {
       job->phase = Phase::DONE;
+      job->forced = false;
       job->failures = 0;
       job->told = true;
       return job->want.key;
@@ -243,6 +252,7 @@ class Loader {
     Phase phase = Phase::NEW;
     std::string url;
     uint32_t asked_at = 0, none_at = 0, started_at = 0, finished_at = 0;
+    bool forced = false;
     uint32_t kept_at = 0;  // when the store's copy was made (a picture that refreshes waits for its turn from there)
     uint8_t failures = 0, empties = 0, attempts = 0;
     bool seen = false;
@@ -290,7 +300,7 @@ class Loader {
     return job.want.refresh_from_start && job.started_at ? job.started_at : job.kept_at;
   }
   void settle(Job &job, uint32_t now) {
-    if (job.phase == Phase::LOADING) return;
+    if (job.phase == Phase::LOADING || job.forced) return;
     uint32_t at = 0;
     const bool held = kept && kept(job.want.key, at);
     if (held) {
@@ -343,7 +353,7 @@ class Loader {
     if (job.phase != Phase::LINKED) return false;
     // A failed load is tried again after the gap; a picture that refreshes keeps its rhythm.
     if (job.finished_at && now - job.finished_at < camera_view::GAP_MS) return false;
-    if (job.want.every && job.kept_at && now - refresh_at(job) < job.want.every) return false;
+    if (!job.forced && job.want.every && job.kept_at && now - refresh_at(job) < job.want.every) return false;
     return true;
   }
 };

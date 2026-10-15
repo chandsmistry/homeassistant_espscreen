@@ -18,6 +18,7 @@ static_assert(ESP_SCREEN_RENDERER_ABI == 3, "Update the host adapter for the ren
 namespace {
 lv_display_t *display{};
 lv_indev_t *pointer{};
+lv_obj_t *standby_overlay{};
 FirmwareUi firmware{};
 std::vector<uint32_t> draw_buffer, framebuffer;
 int width{}, height{}, page{};
@@ -82,6 +83,18 @@ const char *preview_photo_clock(int percent,const char *anchor,const char *time,
   last_result.clear();serializeJson(doc,last_result);return last_result.c_str();
 }
 void preview_standby(int on) {
+  // The hardware YAML's dim_wake_overlay is the click target underneath saver pictures.
+  // Use the same allows_wake gate here, so real LVGL releases exercise that boundary.
+  if (!standby_overlay) {
+    standby_overlay = lv_obj_create(lv_layer_top()); lv_obj_remove_style_all(standby_overlay);
+    lv_obj_set_size(standby_overlay, lv_pct(100), lv_pct(100));
+    lv_obj_add_flag(standby_overlay, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(standby_overlay, [](lv_event_t *) {
+      if (runtime_tiles::touch_input::allows_wake() && runtime_tiles::alarm_wake) runtime_tiles::alarm_wake();
+    }, LV_EVENT_CLICKED, nullptr);
+  }
+  if (on) lv_obj_remove_flag(standby_overlay, LV_OBJ_FLAG_HIDDEN);
+  else lv_obj_add_flag(standby_overlay, LV_OBJ_FLAG_HIDDEN);
   runtime_tiles::screen_awake = [on] { return !on; };
   runtime_tiles::saver_sync(on);
   dirty = true;
@@ -138,6 +151,7 @@ int preview_init(int w, int h, int display_dpi, int columns, int rows) {
   runtime_tiles::refresh = [] { dirty = true; };
   runtime_tiles::layout_changed = show_page;
   runtime_tiles::dismiss = [] { runtime_tiles::hide_detail(); dirty = true; };
+  runtime_tiles::alarm_wake = [] { runtime_tiles::screen_awake = [] { return true; }; runtime_tiles::saver_wake(); if (standby_overlay) lv_obj_add_flag(standby_overlay, LV_OBJ_FLAG_HIDDEN); dirty = true; };
   runtime_tiles::back_home = [] { runtime_tiles::hide_detail(); runtime_tiles::navigation_history.clear(); page = runtime_tiles::home_page(); show_page(); };
   runtime_tiles::touch_input::turn_page = [](int target) { page = target; show_page(); };
   lv_obj_add_event_cb(firmware.prev, nav, LV_EVENT_CLICKED, reinterpret_cast<void *>(-1));
@@ -290,6 +304,9 @@ const char *preview_layout() {
 const char *preview_diagnostics() {
   JsonDocument doc;
   doc["flushes"]=flushes;
+  doc["saver_active"] = runtime_tiles::saver_camera || runtime_tiles::saver_root;
+  doc["photo_next_pending"] = runtime_tiles::saver_next_photo_request;
+  doc["photo_next_serial"] = runtime_tiles::saver_next_photo_serial;
   doc["page"] = page;
   doc["count"] = runtime_tiles::model.count;
   doc["columns"] = runtime_tiles::grid.columns;

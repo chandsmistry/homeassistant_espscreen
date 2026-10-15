@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Photos standby now keeps a tap in standby and asks for the next photo. A swipe up returns home. Other screensavers keep their wake behaviour.
+
 - Photos has a configurable clock size from 4% to 40% of screen height, with a larger 12% default. Its settings preview uses the panel renderer and existing fonts.
 
 - Photos clock: use the existing readable clock digit font and scale the inspector overlay to the same screen proportions.

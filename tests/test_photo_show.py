@@ -17,6 +17,69 @@ class PhotoShowTests(unittest.IsolatedAsyncioTestCase):
         self.show=photos.PhotoShow(self.temp.name,clock=lambda:self.now)
     def make(self,name,size,color):
         path=Path(self.temp.name)/name;Image.new('RGB',size,color).save(path);return path
+    async def test_manual_next_and_interleaved_duplicates_keep_timer_and_prefetch(self):
+        for name, color in (('a.png','red'),('b.png','blue'),('c.png','green')):
+            self.make(name,(40,80),color)
+        settings={'photo_order':'filename','photo_seconds':30}
+        await self.show.frame(settings,(160,80))
+        ahead=self.show.ahead
+        self.assertTrue(await self.show.advance(('boot','1')))
+        self.assertEqual(self.show.ahead,ahead)
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(self.show.current_paths[0].endswith('b.png'))
+        self.assertFalse(await self.show.advance(('boot','1')))
+        self.assertTrue(await self.show.advance(('boot','2')))
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(self.show.current_paths[0].endswith('c.png'))
+        self.assertFalse(await self.show.advance(('boot','1')))
+        self.now+=29
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(self.show.current_paths[0].endswith('c.png'))
+        self.now+=2
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(self.show.current_paths[0].endswith('a.png'))
+
+    async def test_concurrent_manual_next_only_one_applies(self):
+        results=await asyncio.gather(*(self.show.advance(('boot','1')) for _ in range(10)))
+        self.assertEqual(results.count(True),1)
+        self.assertEqual(results.count(False),9)
+
+    async def test_cancelled_manual_next_before_lock_can_retry(self):
+        await self.show.lock.acquire()
+        pending=asyncio.create_task(self.show.advance(('boot','1')))
+        await asyncio.sleep(0)
+        pending.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await pending
+        self.show.lock.release()
+        self.assertTrue(await self.show.advance(('boot','1')))
+        # Cancellation after application/response loss must not apply twice.
+        self.assertFalse(await self.show.advance(('boot','1')))
+        self.assertTrue(await self.show.advance(('new-boot','1')))
+
+    async def test_manual_next_pending_survives_response_cancellation_and_get(self):
+        for name, color in (('a.png','red'),('b.png','blue'),('c.png','green')):
+            self.make(name,(40,80),color)
+        settings={'photo_order':'filename','photo_seconds':30}
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(await self.show.advance(('boot','1')))
+        # A cancelled response before frame() leaves expiry pending for the next GET.
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(self.show.current_paths[0].endswith('b.png'))
+        self.assertFalse(await self.show.advance(('boot','1')))
+        await self.show.frame(settings,(160,80))
+        self.assertTrue(self.show.current_paths[0].endswith('b.png'))
+
+    async def test_manual_next_rejects_invalid_and_stale_serials_and_wraps(self):
+        for key in ((None,'1'),('boot',None),('boot','bad'),('boot','0'),('boot','4294967296')):
+            self.assertFalse(await self.show.advance(key))
+        self.assertTrue(await self.show.advance(('boot','4294967295')))
+        self.assertTrue(await self.show.advance(('boot','1')))
+        self.assertFalse(await self.show.advance(('boot','4294967295')))
+        for n in range(40):
+            self.assertTrue(await self.show.advance((f'boot-{n}','1')))
+        self.assertEqual(len(self.show.advance_serials),32)
+
     async def test_pair_distinct_portraits_and_equal_gutter(self):
         self.make('a.png',(40,80),'red');self.make('b.png',(40,80),'blue');self.make('landscape.png',(80,40),'green')
         _,raw=await self.show.frame({'photo_fit':'pair','photo_order':'filename'},(160,80))

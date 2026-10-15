@@ -1,5 +1,6 @@
 #include "photo_transition.h"
 #include "photo_clock.h"
+#include "photo_gestures.h"
 #pragma once
 #include <cmath>
 #include <cstring>
@@ -11273,6 +11274,10 @@ inline void live_tick() {
 
 // Asks ESP Screen Manager for a link (app 0.2.66+ answers with op "camera"). An event, like history_request.
 // A cover (firmware 0.2.64+) adds the size it wants and the colour behind its rounded corners; the app bakes both in.
+inline bool saver_next_photo_request = false;
+inline uint32_t saver_next_photo_serial = 0, saver_photo_tapped_at = 0;
+inline uint32_t saver_photo_request_view = 0;
+inline std::string saver_photo_url, saver_photo_displayed_url;
 inline void camera_request(const std::string &entity, int size, uint32_t background) {
   if (inbox.empty()) return;
   esphome::api::HomeassistantActionRequest request;
@@ -11299,7 +11304,18 @@ inline void camera_request(const std::string &entity, int size, uint32_t backgro
   const std::string live_text = live ? live_view::box_text(live_area()) : std::string();
   // With the camera's sound where the board has a speaker (features/audio.yaml binds it).
   const bool sound = live && live_view::has_speaker();
-  request.data.init(count + (saver ? 1 : 0) + (larger ? 1 : 0) + (live ? 1 : 0) + (sound ? 1 : 0));
+  const std::string next_photo = saver && entity == "image.screensaver_photos" && saver_next_photo_request
+      ? std::to_string(saver_next_photo_serial) : std::string();
+  if (!next_photo.empty()) {
+    saver_photo_request_view = camera_view_id;
+    ESP_LOGI("saver", "photo_gesture action=request next=%s view=%u", next_photo.c_str(), (unsigned)camera_view_id);
+  }
+  request.data.init(count + (!next_photo.empty() ? 1 : 0) + (saver ? 1 : 0) + (larger ? 1 : 0) + (live ? 1 : 0) + (sound ? 1 : 0));
+  if (!next_photo.empty()) {
+    esphome::api::HomeassistantServiceMap entry;
+    entry.key = esphome::StringRef("next"); entry.value = esphome::StringRef(next_photo);
+    request.data.push_back(entry);
+  }
   if (saver) {
     esphome::api::HomeassistantServiceMap entry;
     entry.key = esphome::StringRef("saver");
@@ -11701,6 +11717,10 @@ inline void camera_answer(const std::string &view, const std::string &entity, co
       if (live_wanted() && !camera.live) live_begin(url);
       return;
     }
+    if (saver_camera && entity == "image.screensaver_photos") {
+      if (saver_next_photo_request && number != saver_photo_request_view) return;
+      saver_photo_url = url;
+    }
     loader.answer(camera_tag(), url, now);
   } else if (view == "cover") {  // a media card's or tile's album cover (firmware 0.2.64+)
     if (url.empty()) ESP_LOGI("camera", "no cover for %s", entity.c_str());
@@ -11802,6 +11822,17 @@ inline void view_done(picture_loader::Outcome outcome) {
     map_move_shown = map_move;
     map_preview();
     map_waiting_show();
+  }
+  if (saver_camera && camera.entity == "image.screensaver_photos" &&
+      outcome == picture_loader::Outcome::LOADED) {
+    const bool changed = !saver_photo_url.empty() && saver_photo_url != saver_photo_displayed_url;
+    if (saver_next_photo_request && changed) {
+      ESP_LOGI("saver", "photo_change next=%u tap_to_picture_ms=%u saver_active=1 page=%u changed_link=1",
+               (unsigned)saver_next_photo_serial, (unsigned)(esphome::millis() - saver_photo_tapped_at),
+               (unsigned)(shown_page ? *shown_page : 0));
+      saver_next_photo_request = false;
+    } else if (!saver_next_photo_request && changed) ESP_LOGI("saver", "photo_change automatic=1 changed_link=1");
+    saver_photo_displayed_url = saver_photo_url;
   }
   saver_follow_pending();
 }
@@ -12353,6 +12384,8 @@ inline void saver_keys_draw() {
 }
 
 inline void saver_hide() {
+  saver_next_photo_request = false; saver_photo_tapped_at = 0; saver_photo_request_view = 0;
+  saver_photo_url.clear(); saver_photo_displayed_url.clear();
   photo_clock_log_key.clear();
   saver_follow_due = false;
   if (saver_root) lv_obj_delete(saver_root);
@@ -12544,6 +12577,14 @@ inline void swipe_glow(Edge edge) {
 }
 
 namespace touch_input {
+inline photo_gestures::Contact photo_contact;
+inline bool photo_contact_latched = false;
+inline std::function<bool()> photo_allowed;
+inline bool photo_active() {
+  return saver_camera && saver_now.entity == "image.screensaver_photos" && (!photo_allowed || photo_allowed());
+}
+inline bool allows_wake() { return !photo_contact_latched; }
+
 // A finger arrived or left: the standby clock, the "back to page 1" clock and `touch_down`.
 inline std::function<void(bool down)> contact;
 // A touchscreen's report in the screen's own coordinates: ESPHome's LvglComponent::rotate_coordinates,
@@ -12650,11 +12691,16 @@ inline void edge_release() {
 }
 
 inline void pressed(int x, int y, int id, bool calibrating) {
+  if (x == 0 && y == 0 && photo_active()) return;  // Photos must not turn the ghost sentinel into a tap
   if (contact) contact(true);
   screen_input::touch_guard.begin(esphome::millis(), x, y, id);
   int sx = x, sy = y;
   screen_point(sx, sy);
-  edge_press(x, y);
+  photo_contact_latched = photo_active() && !calibrating;
+  photo_contact.begin(photo_contact_latched, sx, sy, id, ui::px(40), ui::px(14));
+  if (photo_contact_latched) {
+    for (auto *input = lv_indev_get_next(nullptr); input; input = lv_indev_get_next(input)) lv_indev_wait_release(input);
+  } else edge_press(x, y);
   ESP_LOGI("touch", "press x=%d y=%d id=%d test=%d screen=%d,%d", x, y, id, calibrating ? 1 : 0, sx, sy);
 }
 
@@ -12670,12 +12716,29 @@ inline void moved(int x, int y, int id, int state) {
   if (id != screen_input::touch_guard.contact()) return;
   // Swiping in from an edge ("Swiping between pages"); the tap under the finger is consumed and LVGL waits for the
   // release. LVGL 9.5 sends no PRESSING to the input device, hence the touchscreen trigger.
-  edge_move(x, y);
+  if (photo_contact.active()) { int sx = x, sy = y; screen_point(sx, sy); photo_contact.update(sx, sy, id); }
+  else if (!photo_contact_latched) edge_move(x, y);
 }
 
 inline void released() {
   if (contact) contact(false);
   touched_at = esphome::millis();
+  if (photo_contact_latched) {
+    if (!photo_active()) { photo_contact.cancel(); screen_input::touch_guard.consume(); return; }
+    const auto result = photo_contact.finish(esphome::millis(), screen_input::touch_guard);
+    if (result.action == photo_gestures::Action::home) {
+      ESP_LOGI("saver", "photo_gesture gesture=swipe direction=up action=home");
+      if (alarm_wake) alarm_wake();
+      if (back_home) back_home();
+      ESP_LOGI("saver", "photo_gesture home_done saver_active=%d page=%u", saver_camera ? 1 : 0, (unsigned)(shown_page ? *shown_page : 0));
+    } else if (result.action == photo_gestures::Action::next) {
+      saver_next_photo_request = true; ++saver_next_photo_serial;
+      saver_photo_tapped_at = esphome::millis();
+      ESP_LOGI("saver", "photo_gesture gesture=tap action=next next=%u saver_active=1", (unsigned)saver_next_photo_serial);
+      loader.refresh(owners::VIEW); pictures_round();
+    } else ESP_LOGI("saver", "photo_gesture gesture=rejected direction=%s action=none", photo_gestures::direction_name(result.direction));
+    return;
+  }
   edge_release();
 }
 }  // namespace touch_input

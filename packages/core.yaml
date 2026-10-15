@@ -228,6 +228,7 @@ esphome:
           runtime_tiles::refresh = []() { if (!id(ui_refresh).is_running()) id(ui_refresh).execute(); };
           // What a finger on the glass does lives in the shared tree (runtime_tiles::touch_input); a board's
           // three touchscreen triggers are one line each. These four are what only the YAML can answer.
+          runtime_tiles::touch_input::photo_allowed = [] { return !id(calibration_active) && !id(alert_active); };
           runtime_tiles::touch_input::contact = [](bool down) {
             id(last_touch_ms) = millis();
             id(last_use_ms) = millis();
@@ -2163,10 +2164,14 @@ lvgl:
             scrollbar_mode: 'OFF'
             clickable: true
             on_click:
-              - script.execute: wake_display
+              - if:
+                  condition:
+                    lambda: 'return runtime_tiles::touch_input::allows_wake();'
+                  then:
+                    - script.execute: wake_display
               # A page that is one full tile switching something on or off switches with this push as well
               # (firmware 0.2.65+, runtime_tiles::wake_tap); on every other page the first touch only wakes.
-              - lambda: 'runtime_tiles::wake_tap();'
+              - lambda: 'if (runtime_tiles::touch_input::allows_wake()) runtime_tiles::wake_tap();'
 
     - id: touch_cal_page
       styles: ${TOUCH_TEST_PAGE_PAINT}

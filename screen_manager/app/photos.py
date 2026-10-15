@@ -254,6 +254,7 @@ class PhotoShow:
         self.ahead = None
         self.prefetch = None
         self.metadata = {}
+        self.advance_serials = OrderedDict()  # Bounded per-session manual-next high-water marks.
         import threading
         self.render_lock = threading.Lock()
         self.state_lock = threading.RLock()
@@ -435,6 +436,31 @@ class PhotoShow:
             self.ahead=await loop.run_in_executor(None,self.next_paths,settings)
             if self.ahead:
                 await loop.run_in_executor(None,self.render,self.ahead,box,signature[0],rle,jpeg)
+
+    async def advance(self, request_key):
+        """Expire once per gesture, under the same lock as the playback cursor.
+
+        Cancellation while waiting consumes nothing. Once applied, a retried or
+        interleaved duplicate cannot expire another frame, even after its GET.
+        Prepared frames, ordinary timers and the transfer path stay unchanged.
+        """
+        async with self.lock:
+            session, raw_serial = request_key
+            try:
+                serial = int(raw_serial)
+            except (TypeError, ValueError):
+                return False
+            if not session or not 0 < serial <= 0xffffffff:
+                return False
+            previous = self.advance_serials.get(session)
+            if previous is not None and not 0 < ((serial - previous) & 0xffffffff) < 0x80000000:
+                return False
+            self.since = None
+            self.advance_serials[session] = serial
+            self.advance_serials.move_to_end(session)
+            while len(self.advance_serials) > 32:
+                self.advance_serials.popitem(last=False)
+            return True
 
     async def frame(self, settings, box, preview=False, rle=False, jpeg=False):
         import asyncio

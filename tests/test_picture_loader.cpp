@@ -335,6 +335,18 @@ int main() {
     assert(b.asked.size() == 4 && b.asked[3] == "tile|1" && b.forgotten.size() == 1 && b.forgotten[0] == "tile|1");
     assert(b.loader.settled_for(tile(0)) && !b.loader.settled_for(tile(1)));
   }
+  { // A manual refresh ignores held cache and interval, ordinary refresh does not.
+    Bench b;
+    const Owner owner = VIEW;
+    auto round = [&](uint32_t now) { b.loader.begin(); b.loader.want(owner, b.want("photo", "saver", Rank::VIEW, Slot::FULL, 30000)); b.loader.end(now, true); };
+    round(1000); b.loader.answer("saver", "first", 1010); round(1011); b.finish(Slot::FULL, true, 1020);
+    round(2000); assert(b.loads.size() == 1);
+    b.loader.refresh(owner); round(2100); assert(b.asked.size() == 2);
+    b.loader.answer("saver", "second", 2110); round(2111); assert(b.loads.size() == 2);
+    b.loader.refresh(owner); assert(b.cancels.size() == 1); round(2200);
+    b.loader.answer("saver", "third", 2210); round(2211); b.finish(Slot::FULL, true, 2220);
+    round(3000); assert(b.loads.size() == 3);
+  }
   printf("test_picture_loader: ok\n");
   return 0;
 }
