@@ -5767,14 +5767,14 @@ inline void event(lv_event_t *event) {
     }
     // The map tile opens full screen as any map does (firmware 0.21.0+).
     if (card.is_map()) {
-      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap == tile_catalogue::pd::OPEN_TAP && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap != "none" && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         camera_open(card.entity, card.name, (int)w.index);  // its name comes with its state ("Map")
       return;
     }
     // The energy card: a circle with a sensor behind it opens that sensor's history (firmware 0.47.0+).
     if (card.is_energy()) {
       lv_point_t at;
-      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap == tile_catalogue::pd::OPEN_TAP && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap != "none" && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         energy_view::tap(w, card, at);
       return;
     }
