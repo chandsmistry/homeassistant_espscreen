@@ -11975,7 +11975,9 @@ inline void photo_preload_round() {
 #if LV_USE_IMAGE
       auto *old = camera_picture ? static_cast<const lv_image_dsc_t *>(lv_image_get_src(camera_picture)) : nullptr;
       photo_transition::clear();
-      if (old && saver_now.photo_transition != "none") {
+      // A tap shows the prepared picture at once: the selected transition belongs to the interval change.
+      const bool cut = photo_prepared.wanted;
+      if (old && saver_now.photo_transition != "none" && !cut) {
         photo_transition::allocate = pictures.allocate; photo_transition::release = pictures.release;
         if (!photo_transition::retain(old)) ESP_LOGW("saver", "Photo transition falls back to hard cut: insufficient memory");
       }
@@ -11991,8 +11993,9 @@ inline void photo_preload_round() {
       saver_words();
       if (saver_first) lv_obj_move_foreground(saver_first);
       if (saver_second) lv_obj_move_foreground(saver_second);
-      ESP_LOGI("saver", "photo_preload action=promote ready=1 tap_to_picture_ms=%u automatic=%d",
-               (unsigned)(photo_prepared.wanted ? esphome::millis() - photo_prepared.tapped_at : 0), !photo_prepared.wanted);
+      ESP_LOGI("saver", "photo_preload action=promote ready=1 tap_to_picture_ms=%u automatic=%d transition=%s",
+               (unsigned)(photo_prepared.wanted ? esphome::millis() - photo_prepared.tapped_at : 0), !photo_prepared.wanted,
+               photo_transition::buffer ? saver_now.photo_transition.c_str() : "cut");
       ESP_LOGI("saver", "photo_preload stage=promote psram_free=%u", (unsigned)psram_free());
       const std::string old_key = photo_display_key;
       photo_display_key = photo_prepared.key(); photo_prepared_image = nullptr;

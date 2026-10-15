@@ -469,8 +469,8 @@ settings and album changes invalidate reservations. The add-on retains at most t
 reservation links per screen. Older firmware retains the refreshable slideshow URL.
 
 The panel prepares and retains one decoded next picture while the current picture remains visible.
-When it is ready, a tap or elapsed interval starts the selected transition without another network
-round trip. This does not shorten that transition. First entry, a preparation miss or a tap faster than
+When it is ready, an elapsed interval starts the selected transition without another network
+round trip, and a tap shows the picture at once, without the transition. First entry, a preparation miss or a tap faster than
 preparation still waits for the current transfer; repeated taps join one pending request. Leaving
 Photos releases prepared state. Preparation of the following photo waits for the current animation to end,
 so long zoom and pan effects can still need a transfer at the next interval. This uses memory, not removable storage, and does not change the
