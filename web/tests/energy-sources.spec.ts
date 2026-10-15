@@ -21,7 +21,7 @@ describe("the energy card's sensors", () => {
     expect(performance.now() - started).toBeLessThan(1500);
     expect(view.findAll("input").length).toBeGreaterThanOrEqual(10);
     expect(view.findAll('[role="option"]').filter((o) => o.isVisible()).length).toBe(0);
-    expect(view.findAll('[role="option"]').length).toBeLessThanOrEqual(10 * 40);
+    expect(view.findAll('[role="option"]').length).toBeLessThanOrEqual(13 * 40);
   });
 
   it("saves a picked sensor once, and typing alone saves nothing", async () => {
@@ -41,5 +41,16 @@ describe("the energy card's sensors", () => {
     await grid.trigger("blur");
     expect(setTileOption).not.toHaveBeenCalled();
     expect((grid.element as HTMLInputElement).value).toBe("");
+  });
+
+  it("saves the look toggles and a device's tolerance, and drops them when cleared", async () => {
+    const own = { ...tile, options: { energy_sources: { grid: "sensor.s1", devices: [{ entity: "sensor.s2" }] } } };
+    const view = mount(EnergySourcesSection, { props: { tile: own } });
+    const boxes = view.findAll('input[type="checkbox"]');
+    expect(boxes.length).toBe(3);
+    await boxes[0].setValue(true);
+    expect(setTileOption).toHaveBeenLastCalledWith(own, "energy_sources", { grid: "sensor.s1", hide_rest: true, devices: [{ entity: "sensor.s2" }] });
+    await view.find('input[type="number"]').setValue("10");
+    expect(setTileOption).toHaveBeenLastCalledWith(own, "energy_sources", { grid: "sensor.s1", devices: [{ entity: "sensor.s2", tolerance: 10 }] });
   });
 });

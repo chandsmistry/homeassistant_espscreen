@@ -2093,9 +2093,34 @@
             "label": "Home",
             "hint": "The house's own consumption. Without it the card works it out from the other sensors."
           },
+          "solar_kwh": {
+            "label": "Solar energy today",
+            "hint": "A second line under the sun's number, in kWh with two decimals."
+          },
+          "grid_kwh": {
+            "label": "Grid energy today",
+            "hint": "A second line under the grid's number, in kWh with two decimals."
+          },
+          "fossil": {
+            "label": "Grid fossil share",
+            "hint": "A percentage sensor, for example the share of fossil fuel in the grid's power. Shown under the grid's number where there is room."
+          },
+          "hide_rest": {
+            "label": "Hide Untracked and Other",
+            "hint": "Leave out the circle for what no device measures. Needs the newest screen firmware; older firmware keeps showing it."
+          },
+          "card_colours": {
+            "label": "Card colours for grid and battery",
+            "hint": "Red and purple for the grid, green for the battery, as power-flow-card-plus is set up here."
+          },
+          "faint_zero": {
+            "label": "Keep idle lines faintly",
+            "hint": "A line with no power stays on the card as a faint grey line."
+          },
           "device": "Device {n}",
           "device_hint": "Up to four devices drawn under the house.",
           "device_name": "Name shown on the card",
+          "device_tolerance": "Hide at or under this many W (0 hides only zero)",
           "reset": "Use Home Assistant's Energy settings"
         }
       },

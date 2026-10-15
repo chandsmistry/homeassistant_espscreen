@@ -6,7 +6,8 @@ export type PdBlockAction = { entity: string; action: { action: string; data?: R
 export type PdActions = Record<string, PdBlockAction | null>;
 /** The sensors an energy card takes instead of Home Assistant's Energy settings (add-on: energy_flow.clean_mapping). */
 export type EnergySources = { grid?: string; grid_import?: string; grid_export?: string; solar?: string; battery?: string; battery_out?: string;
-  battery_in?: string; soc?: string; home?: string; devices?: { entity: string; name?: string }[] };
+  battery_in?: string; soc?: string; home?: string; solar_kwh?: string; grid_kwh?: string; fossil?: string;
+  hide_rest?: boolean; card_colours?: boolean; faint_zero?: boolean; devices?: { entity: string; name?: string; tolerance?: number }[] };
 export type TileOptions = {
   pd_actions?: PdActions;
   // A plugin tile's own options (design): what its manifest lets the inspector set.

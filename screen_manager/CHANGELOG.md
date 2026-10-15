@@ -6,6 +6,8 @@
 
 - **Energy card with its own sensors.** The energy card's inspector has a Sensors section: pick a sensor for grid (one signed, or import and export), solar, battery (one signed, or discharge and charge), battery level, home consumption and up to four devices, the way power-flow-card-plus is set up. With nothing chosen the card follows Home Assistant's Energy settings exactly as before. No firmware change.
 
+- **Energy card with its own sensors, more of power-flow-card-plus.** The Sensors section also takes a kWh sensor for the sun and one for the grid (a second line under the number), a grid fossil-share sensor, a tolerance in W below which a device counts as off, and three switches: hide Untracked and Other, the card's colours for the grid and the battery, and idle lines kept faintly. The lines show where the circle has room. A tap on the circles of the Map and Energy cards now opens their history again. Older screen firmware ignores the new options.
+
 - Repeated Photos next taps retain the current download and join the same pending request instead of restarting it or queuing another advance.
 
 - Photos standby now keeps a tap in standby and asks for the next photo. A swipe up returns home. Other screensavers keep their wake behaviour.

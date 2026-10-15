@@ -20,11 +20,14 @@ const props = defineProps<{ tile: Tile }>();
 const mapping = computed<EnergySources>(() => (props.tile.options?.energy_sources as EnergySources | undefined) ?? {});
 const sensorIds = computed(() => (inv.inventory.entities || []).map((item) => item.id).filter((id) => id.startsWith("sensor.")));
 const KEYS = ["grid", "grid_import", "grid_export", "solar", "battery", "battery_out", "battery_in", "soc", "home"] as const;
-type Key = (typeof KEYS)[number];
+const TEXTS = ["solar_kwh", "grid_kwh", "fossil"] as const;
+const LOOKS = ["hide_rest", "card_colours", "faint_zero"] as const;
+type Key = (typeof KEYS)[number] | (typeof TEXTS)[number];
 
 function save(next: EnergySources) {
   const clean: EnergySources = { ...next };
-  for (const key of KEYS) if (!clean[key]) delete clean[key];
+  for (const key of [...KEYS, ...TEXTS]) if (!clean[key]) delete clean[key];
+  for (const key of LOOKS) if (!clean[key]) delete clean[key];
   if (clean.devices) clean.devices = clean.devices.filter((item) => item.entity);
   if (!clean.devices?.length) delete clean.devices;
   setTileOption(props.tile, "energy_sources", clean);
@@ -39,9 +42,19 @@ function device(index: number, entity: string) {
 function deviceName(index: number, name: string) {
   const list = [...devices.value];
   if (!list[index]) return;
-  list[index] = { entity: list[index].entity, ...(name.trim() ? { name: name.trim() } : {}) };
+  list[index] = { ...list[index], name: name.trim() || undefined };
+  if (!list[index].name) delete list[index].name;
   save({ ...mapping.value, devices: list });
 }
+function deviceTolerance(index: number, text: string) {
+  const list = [...devices.value];
+  if (!list[index]) return;
+  const value = Math.round(Number(text));
+  list[index] = { ...list[index], tolerance: Number.isFinite(value) && value > 0 ? Math.min(value, 10000) : undefined };
+  if (!list[index].tolerance) delete list[index].tolerance;
+  save({ ...mapping.value, devices: list });
+}
+const look = (key: (typeof LOOKS)[number], on: boolean) => save({ ...mapping.value, [key]: on });
 const used = computed(() => Object.keys(mapping.value).length > 0);
 const reset = () => save({});
 </script>
@@ -52,12 +65,21 @@ const reset = () => save({});
     <PropRow v-for="key in KEYS" :key="key" :label="t(`editor.tile.energy.sources.${key}.label`)" icon="flash" :hint="t(`editor.tile.energy.sources.${key}.hint`)">
       <EnergySensorField :value="mapping[key] ?? ''" :sensors="sensorIds" :label="t(`editor.tile.energy.sources.${key}.label`)" @commit="(v) => pick(key, v)" />
     </PropRow>
+    <PropRow v-for="key in TEXTS" :key="key" :label="t(`editor.tile.energy.sources.${key}.label`)" icon="flash" :hint="t(`editor.tile.energy.sources.${key}.hint`)">
+      <EnergySensorField :value="mapping[key] ?? ''" :sensors="sensorIds" :label="t(`editor.tile.energy.sources.${key}.label`)" @commit="(v) => pick(key, v)" />
+    </PropRow>
     <PropRow v-for="index in Math.min(devices.length + 1, MAX_DEVICES)" :key="`d${index}`" :label="t('editor.tile.energy.sources.device', { n: index })" icon="flash"
       :hint="index === 1 ? t('editor.tile.energy.sources.device_hint') : undefined">
       <EnergySensorField :value="devices[index - 1]?.entity ?? ''" :sensors="sensorIds" :label="t('editor.tile.energy.sources.device', { n: index })" @commit="(v) => device(index - 1, v)" />
       <input v-if="devices[index - 1]?.entity" class="energy-device-name" type="text" maxlength="48" :value="devices[index - 1]?.name ?? ''"
         :placeholder="entities.entityName(devices[index - 1].entity)" :aria-label="t('editor.tile.energy.sources.device_name')"
         @change="(e) => deviceName(index - 1, (e.target as HTMLInputElement).value)" />
+      <input v-if="devices[index - 1]?.entity" class="energy-device-name" type="number" min="0" max="10000" step="1" :value="devices[index - 1]?.tolerance ?? ''"
+        :placeholder="t('editor.tile.energy.sources.device_tolerance')" :aria-label="t('editor.tile.energy.sources.device_tolerance')"
+        @change="(e) => deviceTolerance(index - 1, (e.target as HTMLInputElement).value)" />
+    </PropRow>
+    <PropRow v-for="key in LOOKS" :key="key" :label="t(`editor.tile.energy.sources.${key}.label`)" icon="flash" :hint="t(`editor.tile.energy.sources.${key}.hint`)">
+      <input type="checkbox" :checked="!!mapping[key]" :aria-label="t(`editor.tile.energy.sources.${key}.label`)" @change="(e) => look(key, (e.target as HTMLInputElement).checked)" />
     </PropRow>
     <button v-if="used" type="button" class="energy-reset" @click="reset">{{ t("editor.tile.energy.sources.reset") }}</button>
   </Section>
