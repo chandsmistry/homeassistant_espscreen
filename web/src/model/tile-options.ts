@@ -19,7 +19,7 @@ import { PLUGIN_TILE, PLUGIN_TILE_OPTIONS } from "./plugins";
 const APPEARANCE = { display: "display", icon: "icon", background: "background", historyHours: "history_hours", refresh: "refresh", subtitle: "sub", fit: "fit", overlay: "overlay",
   mapEntities: "map", mapFraming: "framing", mapDistance: "distance",
   mapFollow: "follow", mapMarkers: "markers", mapNames: "names", mapZones: "zones", mapStreets: "streets", mapLook: "look",
-  energyFlow: "flow" } as const;
+  energyFlow: "flow", energySources: "energy_sources" } as const;
 const INTERACTION = ["tap", "inline", "controls", "action", "play", "speaker", "shuffle", "repeat"] as const;
 const PICTURE_OWN = ["refresh", ...Object.keys(rules.picture)];
 // A map card's own choices (app 0.4.33); its name on the picture is the live picture's `overlay`.
@@ -64,7 +64,9 @@ export function canonicalOptions(entity: string, options: TileOptions = {}, key 
   // Following is the map tile's own; a person's map follows that person.
   if (entity !== MAP_TILE) delete out.follow;
   // How power shows along a line is the energy card's own (catalogue/screen.yaml `energy`).
-  if (entity !== "screen.energy") delete out.flow;
+  if (entity !== "screen.energy") { delete out.flow; delete out.energy_sources; }
+  // No sensor of its own is the Energy settings of Home Assistant, as the add-on stores it.
+  else if (out.energy_sources && typeof out.energy_sources === "object" && !Object.keys(out.energy_sources).length) delete out.energy_sources;
   for (const [key, value] of Object.entries(DEFAULTS)) if (out[key] === value) delete out[key];
   // A Go to page tile has a name, an icon, a colour and a width, nothing else.
   if (pageTile(entity)) for (const key of ["display", "inline", "controls", "history_hours"]) delete out[key];

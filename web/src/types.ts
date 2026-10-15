@@ -4,6 +4,9 @@ export const BUILTIN_CARDS: string[] = ["screen.clock", "screen.nightstand", "sc
   "screen.pd_header", "screen.pd_dp3", "screen.pd_ultra", "screen.pd_ac", "screen.pd_max", "screen.pd_batteries"];
 export type PdBlockAction = { entity: string; action: { action: string; data?: Record<string, unknown> } };
 export type PdActions = Record<string, PdBlockAction | null>;
+/** The sensors an energy card takes instead of Home Assistant's Energy settings (add-on: energy_flow.clean_mapping). */
+export type EnergySources = { grid?: string; grid_import?: string; grid_export?: string; solar?: string; battery?: string; battery_out?: string;
+  battery_in?: string; soc?: string; home?: string; devices?: { entity: string; name?: string }[] };
 export type TileOptions = {
   pd_actions?: PdActions;
   // A plugin tile's own options (design): what its manifest lets the inspector set.
@@ -62,7 +65,7 @@ export type PageTile = {
   placement: { row: number; column: number; columns: number; rows: number };
   appearance: { label: string; presentation?: "single" | "wide" | "tall" | "square" | "full" | `${number}x${number}`; display?: string; icon?: string; background?: string; historyHours?: number; refresh?: number; subtitle?: string; fit?: string; overlay?: string;
     mapEntities?: string[]; mapFraming?: string; mapDistance?: string; mapFollow?: string; mapMarkers?: string; mapNames?: string;
-    mapZones?: string; mapStreets?: string; mapLook?: string; energyFlow?: string };
+    mapZones?: string; mapStreets?: string; mapLook?: string; energyFlow?: string; energySources?: EnergySources };
   interaction: { pdActions?: PdActions; tap?: string; inline?: string; controls?: string; action?: TileOptions["action"]; guard?: string; play?: FavoritePlay; speaker?: string; shuffle?: string; repeat?: string };
   children?: ChildTile[];
 };

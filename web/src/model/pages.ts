@@ -234,7 +234,7 @@ export function childOf(tile: Tile, id: string): ChildTile {
 const appearanceKeys = { display: "display", icon: "icon", background: "background", historyHours: "history_hours", refresh: "refresh", subtitle: "sub", fit: "fit", overlay: "overlay",
   mapEntities: "map", mapFraming: "framing", mapDistance: "distance",
   mapFollow: "follow", mapMarkers: "markers", mapNames: "names", mapZones: "zones", mapStreets: "streets", mapLook: "look",
-  energyFlow: "flow" } as const;
+  energyFlow: "flow", energySources: "energy_sources" } as const;
 
 /** A render view, never a second saved or editable layout. */
 export function projectLayout(layout: PageLayout, grid: PageGrid): Layout {

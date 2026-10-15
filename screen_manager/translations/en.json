@@ -2051,6 +2051,52 @@
           "hint": "Dots run along each line, faster as more power flows. Lines and arrows is calmer: a line grows thicker with the power and an arrow shows which way it goes. A screen with older firmware keeps the dots.",
           "dots": "Moving dots",
           "lines": "Lines and arrows"
+        },
+        "sources": {
+          "title": "Sensors",
+          "hint": "The card follows the Energy settings of Home Assistant. Choose a sensor for any circle below to use your own sensors instead, the way power-flow-card-plus is set up. Power sensors in W or kW.",
+          "hint_own": "The card shows the sensors chosen here. A circle without a sensor shows 0 W. Reset to follow Home Assistant's Energy settings again.",
+          "none": "Not set",
+          "grid": {
+            "label": "Grid",
+            "hint": "One sensor: positive power comes from the grid, negative goes back to it."
+          },
+          "grid_import": {
+            "label": "Grid import",
+            "hint": "With export below, instead of the single grid sensor: power from the grid."
+          },
+          "grid_export": {
+            "label": "Grid export",
+            "hint": "Power sent back to the grid."
+          },
+          "solar": {
+            "label": "Solar",
+            "hint": "Power the panels produce."
+          },
+          "battery": {
+            "label": "Battery",
+            "hint": "One sensor: positive power discharges the battery, negative charges it."
+          },
+          "battery_out": {
+            "label": "Battery discharge",
+            "hint": "With charge below, instead of the single battery sensor: power out of the battery."
+          },
+          "battery_in": {
+            "label": "Battery charge",
+            "hint": "Power into the battery."
+          },
+          "soc": {
+            "label": "Battery charge level",
+            "hint": "The battery's percentage."
+          },
+          "home": {
+            "label": "Home",
+            "hint": "The house's own consumption. Without it the card works it out from the other sensors."
+          },
+          "device": "Device {n}",
+          "device_hint": "Up to four devices drawn under the house.",
+          "device_name": "Name shown on the card",
+          "reset": "Use Home Assistant's Energy settings"
         }
       },
       "pd": {

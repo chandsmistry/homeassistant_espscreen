@@ -4,6 +4,8 @@
 
 - Photos can negotiate a prepared next picture, retained decoded on the panel. A ready tap or interval change starts the selected transition locally. First entry and preparation misses still wait for transfer. The add-on serves immutable reserved frames and advances each acknowledged frame once; older firmware keeps its existing slideshow path.
 
+- **Energy card with its own sensors.** The energy card's inspector has a Sensors section: pick a sensor for grid (one signed, or import and export), solar, battery (one signed, or discharge and charge), battery level, home consumption and up to four devices, the way power-flow-card-plus is set up. With nothing chosen the card follows Home Assistant's Energy settings exactly as before. No firmware change.
+
 - Repeated Photos next taps retain the current download and join the same pending request instead of restarting it or queuing another advance.
 
 - Photos standby now keeps a tap in standby and asks for the next photo. A swipe up returns home. Other screensavers keep their wake behaviour.
