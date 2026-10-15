@@ -307,6 +307,8 @@ const char *preview_diagnostics() {
   doc["saver_active"] = runtime_tiles::saver_camera || runtime_tiles::saver_root;
   doc["photo_next_pending"] = runtime_tiles::saver_next_photo_request;
   doc["photo_next_serial"] = runtime_tiles::saver_next_photo_serial;
+  doc["photo_next_tapped_at"] = runtime_tiles::saver_photo_tapped_at;
+  doc["photo_next_view"] = runtime_tiles::saver_photo_request_view;
   doc["page"] = page;
   doc["count"] = runtime_tiles::model.count;
   doc["columns"] = runtime_tiles::grid.columns;

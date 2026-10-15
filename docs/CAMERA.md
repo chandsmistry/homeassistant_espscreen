@@ -454,3 +454,5 @@ The Photos time overlay uses the board's existing clock digit font rather than t
 ### Photos standby touch
 
 A tap on Photos asks for the next picture and stays in standby. A swipe up returns to the main page. Other swipe directions are consumed, and other screensavers keep their normal wake behaviour. Manual requests carry a session-scoped increasing `next` serial so a retried request advances once. The normal picture transfer and transition pace is unchanged. Device logs report the gesture, request and successful loaded source with a changed link, plus elapsed time to source installation. Transition completion and pixel uniqueness are not measured. A cache hit is not reported as a new source.
+
+Repeated taps during a manual next-picture download join that same request. They do not restart it, reset its timing or queue another advance. After it finishes, a fresh tap can request another photo. Leaving standby, changing its settings, a failed download, an unchanged result or a 60-second manual-request deadline clears pending state. None of these unsuccessful outcomes is reported as an advance. This does not preload pictures or speed up a slow transfer.

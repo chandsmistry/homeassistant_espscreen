@@ -1,6 +1,7 @@
 #include "photo_transition.h"
 #include "photo_clock.h"
 #include "photo_gestures.h"
+#include "photo_next.h"
 #pragma once
 #include <cmath>
 #include <cstring>
@@ -11274,8 +11275,9 @@ inline void live_tick() {
 
 // Asks ESP Screen Manager for a link (app 0.2.66+ answers with op "camera"). An event, like history_request.
 // A cover (firmware 0.2.64+) adds the size it wants and the colour behind its rounded corners; the app bakes both in.
-inline bool saver_next_photo_request = false;
-inline uint32_t saver_next_photo_serial = 0, saver_photo_tapped_at = 0;
+inline photo_gestures::ManualNext saver_manual_next;
+inline bool &saver_next_photo_request = saver_manual_next.pending;
+inline uint32_t &saver_next_photo_serial = saver_manual_next.serial, &saver_photo_tapped_at = saver_manual_next.tapped_at;
 inline uint32_t saver_photo_request_view = 0;
 inline std::string saver_photo_url, saver_photo_displayed_url;
 inline void camera_request(const std::string &entity, int size, uint32_t background) {
@@ -11663,6 +11665,8 @@ inline void camera_open(const std::string &entity, const std::string &name, int 
 // The board's interval (250 ms): the store lets go of what no card draws, every picture says what it wants and the
 // loader asks, loads and breaks off (pictures_round), and the screensaver follows.
 inline void camera_tick() {
+  if (saver_manual_next.expire(esphome::millis()))
+    ESP_LOGI("saver", "photo_gesture action=not_advanced reason=expired next=%u pending_cleared=1", (unsigned)saver_next_photo_serial);
   pictures_collect();  // copies no card shows any more, and the oldest over the budget
   live_tiles_round();
   pictures_round();
@@ -11784,6 +11788,10 @@ inline std::string camera_tag() { return (saver_camera ? "saver|" : "full|") + c
 inline void view_done(picture_loader::Outcome outcome) {
   if (!camera_root) return;
   if (!shows(outcome)) {
+    if (saver_camera && camera.entity == "image.screensaver_photos" && saver_next_photo_request) {
+      ESP_LOGI("saver", "photo_gesture action=not_advanced reason=load_failed next=%u pending_cleared=1", (unsigned)saver_next_photo_serial);
+      saver_manual_next.cancel();
+    }
     if (!camera.shown && !saver_camera) camera_note_text(tr(txt::camera_no_image));
     if (map_waiting) lv_obj_add_flag(map_waiting, LV_OBJ_FLAG_HIDDEN);  // no picture comes: nothing to wait for
     saver_follow_pending();
@@ -11830,9 +11838,17 @@ inline void view_done(picture_loader::Outcome outcome) {
       ESP_LOGI("saver", "photo_change next=%u tap_to_picture_ms=%u saver_active=1 page=%u changed_link=1",
                (unsigned)saver_next_photo_serial, (unsigned)(esphome::millis() - saver_photo_tapped_at),
                (unsigned)(shown_page ? *shown_page : 0));
-      saver_next_photo_request = false;
+      saver_manual_next.cancel();
     } else if (!saver_next_photo_request && changed) ESP_LOGI("saver", "photo_change automatic=1 changed_link=1");
+    if (saver_next_photo_request && !changed) {
+      ESP_LOGI("saver", "photo_gesture action=not_advanced reason=same_link next=%u pending_cleared=1", (unsigned)saver_next_photo_serial);
+      saver_manual_next.cancel();
+    }
     saver_photo_displayed_url = saver_photo_url;
+  } else if (saver_camera && camera.entity == "image.screensaver_photos" &&
+             saver_next_photo_request && outcome == picture_loader::Outcome::UNCHANGED) {
+    ESP_LOGI("saver", "photo_gesture action=not_advanced reason=unchanged next=%u pending_cleared=1", (unsigned)saver_next_photo_serial);
+    saver_manual_next.cancel();
   }
   saver_follow_pending();
 }
@@ -12384,7 +12400,7 @@ inline void saver_keys_draw() {
 }
 
 inline void saver_hide() {
-  saver_next_photo_request = false; saver_photo_tapped_at = 0; saver_photo_request_view = 0;
+  saver_manual_next.cancel(); saver_photo_request_view = 0;
   saver_photo_url.clear(); saver_photo_displayed_url.clear();
   photo_clock_log_key.clear();
   saver_follow_due = false;
@@ -12476,6 +12492,7 @@ inline void saver_forget() { saver_hide(); }
 // The app's word (page_receiver.cpp). In standby the glass follows at once, through apply_screen_settings.
 inline void saver_receive(const SaverChoice &next) {
   if (next == saver_next) return;
+  saver_manual_next.cancel();
   saver_next = next;
   if (!awake() && saver_changed) saver_changed();
 }
@@ -12732,10 +12749,10 @@ inline void released() {
       if (back_home) back_home();
       ESP_LOGI("saver", "photo_gesture home_done saver_active=%d page=%u", saver_camera ? 1 : 0, (unsigned)(shown_page ? *shown_page : 0));
     } else if (result.action == photo_gestures::Action::next) {
-      saver_next_photo_request = true; ++saver_next_photo_serial;
-      saver_photo_tapped_at = esphome::millis();
-      ESP_LOGI("saver", "photo_gesture gesture=tap action=next next=%u saver_active=1", (unsigned)saver_next_photo_serial);
-      loader.refresh(owners::VIEW); pictures_round();
+      if (saver_manual_next.tap(esphome::millis())) {
+        ESP_LOGI("saver", "photo_gesture gesture=tap action=next next=%u saver_active=1", (unsigned)saver_next_photo_serial);
+        loader.refresh(owners::VIEW); pictures_round();
+      } else ESP_LOGI("saver", "photo_gesture gesture=tap action=coalesced next=%u pending=1 saver_active=1", (unsigned)saver_next_photo_serial);
     } else ESP_LOGI("saver", "photo_gesture gesture=rejected direction=%s action=none", photo_gestures::direction_name(result.direction));
     return;
   }

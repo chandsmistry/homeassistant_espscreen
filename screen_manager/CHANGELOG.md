@@ -1,5 +1,7 @@
 ## Unreleased
 
+- Repeated Photos next taps retain the current download and join the same pending request instead of restarting it or queuing another advance.
+
 - Photos standby now keeps a tap in standby and asks for the next photo. A swipe up returns home. Other screensavers keep their wake behaviour.
 
 - Photos has a configurable clock size from 4% to 40% of screen height, with a larger 12% default. Its settings preview uses the panel renderer and existing fonts.
