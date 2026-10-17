@@ -63,6 +63,7 @@
 #include "saver_view.h"
 #include "energy_view.h"
 #include "pd_view.h"
+#include "plant_view.h"
 #include "plugin_api.h"
 #include "plugin_host.h"
 #include "screen_hooks.h"
@@ -5503,7 +5504,7 @@ inline const char *icon_for(const Tile &tile) {
   if (d == "timer") return "\U000F051B";
   if (d == "person") return "\U000F0004";
   // The map tile's marker (firmware 0.21.0) only shows while its picture is on its way.
-  if (d == "screen") return tile.is_settings() ? "\U000F0493" : tile.is_page() ? "\U000F0054" : tile.entity == "screen.map" ? "\U000F034E" : tile.is_energy() ? "\U000F140B" : "\U000F0150";
+  if (d == "screen") return tile.is_settings() ? "\U000F0493" : tile.is_page() ? "\U000F0054" : tile.entity == "screen.map" ? "\U000F034E" : tile.is_energy() ? "\U000F140B" : tile.is_plant_room() ? "\U000F0F92" : "\U000F0150";
   if (d == "camera" || d == "image") return "\U000F07AE";
   if (d == "alarm_control_panel") return alarm_panel::icon(tile.state);
   if (d == "lock") return lock_icon(tile);
@@ -5769,6 +5770,13 @@ inline void event(lv_event_t *event) {
     if (card.is_map()) {
       if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap != "none" && camera_supported() && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
         camera_open(card.entity, card.name, (int)w.index);  // its name comes with its state ("Map")
+      return;
+    }
+    // The plant room card: a tab, a reading's history or a thermostat button (firmware 0.55.0+).
+    if (card.is_plant_room()) {
+      lv_point_t at;
+      if (code == LV_EVENT_SHORT_CLICKED && screen_input::touch_guard.distance() <= ui::mm(3) && card.tap != "none" && finger_at(at) && allowed(esphome::millis(), TILE_TOUCH + static_cast<int>(w.index), card.entity))
+        plant_view::tap(w, card, at);
       return;
     }
     // The energy card: a circle with a sensor behind it opens that sensor's history (firmware 0.47.0+).
@@ -8383,10 +8391,12 @@ inline void render_slot(size_t slot) {
   bool graph=d=="sensor" && t.display=="graph" && t.has_history && !clock;
   // The energy card (firmware 0.47.0+) draws its own diagram, on any size it takes.
   bool energy=t.is_energy();
+  // The plant room card (firmware 0.55.0+) draws its own tabs or schematic, on any size it takes.
+  bool plant=t.is_plant_room() && t.extra().plant;
   // A plugin's tile (docs/PLUGINS.md) draws itself too, when this screen has its plugin; else it is a plain card.
   bool plugin=t.is_plugin() && plugin_host::known(t);
   bool pd=t.is_pd() && t.extra().pd;
-  bool custom=clock||forecast||sunpath||bedside||energy||plugin||pd;
+  bool custom=clock||forecast||sunpath||bedside||energy||plant||plugin||pd;
   if(!large_tile)pad_vertical(w.tile,watch||custom||graph?2:4);
   // A big value that stepped up to the setpoint's digits (the watch block below) keeps them until that block
   // decides again, so a card is not restyled twice a render.
@@ -8426,6 +8436,9 @@ inline void render_slot(size_t slot) {
     lap(swipe_profile::GEOMETRY);
     energy_view::render(w,t,content_w,content_h);
     lap(swipe_profile::CUSTOM);
+  }else if(plant){
+    lv_obj_add_flag(w.slider,LV_OBJ_FLAG_HIDDEN);hide_panel(w);lv_obj_add_flag(w.progress,LV_OBJ_FLAG_HIDDEN);
+    plant_view::render(w,t,content_w,content_h);
   }else if(pd){
     lv_obj_add_flag(w.slider,LV_OBJ_FLAG_HIDDEN);hide_panel(w);lv_obj_add_flag(w.progress,LV_OBJ_FLAG_HIDDEN);
     pd_view::render(w,t,content_w,content_h);
@@ -8703,7 +8716,7 @@ inline void render_slot(size_t slot) {
   // in the media colours, not the card's.
   if(w.extra_mode=="bedside"){}  // render_bedside paints its own parts
   else if(w.extra_mode=="calm"||w.extra_mode=="flip")paint_face(w,title_color,value_color,icon_color);
-  else for(unsigned i=0;i<w.parts.size() && w.extra_mode!="media" && w.extra_mode!="tall" && w.extra_mode!="cover_tilt" && w.extra_mode!="forecast" && w.extra_mode!="forecast_rows" && w.extra_mode!="week" && w.extra_mode!="favorite" && w.extra_mode!="energy" && w.extra_mode!="pd";++i){
+  else for(unsigned i=0;i<w.parts.size() && w.extra_mode!="media" && w.extra_mode!="tall" && w.extra_mode!="cover_tilt" && w.extra_mode!="forecast" && w.extra_mode!="forecast_rows" && w.extra_mode!="week" && w.extra_mode!="favorite" && w.extra_mode!="energy" && w.extra_mode!="plant" && w.extra_mode!="pd";++i){
     auto *p=w.parts[i];if(!p)continue;
     bool muted=w.extra_mode=="sunpath" ? i>=1 : w.extra_mode=="calendar" ? i==15||i==17 : w.extra_mode=="digital" ? i==16||i==17 : i==16;
     if(lv_obj_check_type(p,&lv_label_class))set_color(p,LV_STYLE_TEXT_COLOR,muted?value_color:title_color);

@@ -75,6 +75,7 @@ for name, source_path in [('adapter', ROOT / 'web/wasm/firmware_preview.cpp'),
                           ('library', ROOT / 'components/smart_display/media_library.cpp'),
                           ('energy', ROOT / 'components/smart_display/energy_view.cpp'),
                           ('pd', ROOT / 'components/smart_display/pd_view.cpp'),
+                          ('plant', ROOT / 'components/smart_display/plant_view.cpp'),
                           ('plugins', ROOT / 'components/smart_display/plugin_host.cpp'),
                           ('hooks', ROOT / 'components/smart_display/screen_hooks.cpp')]:
     obj = objects / f'{name}.o'

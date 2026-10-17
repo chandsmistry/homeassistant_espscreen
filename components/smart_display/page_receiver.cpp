@@ -1066,6 +1066,60 @@ std::string receive(const std::string &payload) {
       e->home_name = string(extra["n"], 32);
       next.energy = std::move(e);
     }
+    // The plant room card (app 0.4.88, firmware 0.55.0): the tabs' rows with their colours and sensors, the schematic's
+    // numbers and the thermostat's buttons, all worked out by the app (screen_manager/app/plant_room.py).
+    if (tile.is_plant_room() && extra["tabs"].is<JsonArray>()) {
+      auto p = std::make_shared<plant_card::Data>();
+      p->any = true;
+      if (extra["b"].is<JsonArray>()) {
+        p->boiler = std::clamp(extra["b"][0] | 0, 0, 3);
+        p->boiler_text = string(extra["b"][1], 16);
+        p->boiler_colour = std::clamp(extra["b"][2] | 0, 0, 7);
+      }
+      for (JsonVariant t : extra["tabs"].as<JsonArray>()) {
+        if (p->tabs.size() == 3) break;
+        plant_card::Tab tab;
+        tab.key = string(t["k"], 8);
+        tab.headline = string(t["h"], 24);
+        tab.colour = std::clamp(t["c"] | 0, 0, 7);
+        if (t["r"].is<JsonArray>()) for (JsonVariant r : t["r"].as<JsonArray>()) {
+          if (tab.rows.size() == 8) break;
+          plant_card::Row row;
+          row.label = string(r[0], 24);
+          row.value = string(r[1], 24);
+          row.colour = std::clamp(r[2] | 0, 0, 7);
+          row.entity = string(r[3], 64);
+          if (!valid_entity(row.entity)) row.entity.clear();
+          tab.rows.push_back(std::move(row));
+        }
+        p->tabs.push_back(std::move(tab));
+      }
+      JsonVariant mp = extra["m"];
+      auto num = [&](const char *key) { return mp[key].is<float>() || mp[key].is<int>() ? mp[key].as<float>() : NAN; };
+      auto flag = [&](const char *key) { return mp[key].is<int>() && mp[key].as<int>() == 1; };
+      auto &sc = p->map;
+      sc.flow = num("flow"); sc.ret = num("ret"); sc.cylinder = num("cyl"); sc.draw = num("draw"); sc.mains = num("mains"); sc.bar = num("bar");
+      sc.thermocline = std::clamp(mp["tc"] | 8, 8, 92);
+      sc.firing = flag("fl"); sc.zone1 = flag("z1"); sc.zone2 = flag("z2"); sc.immersion = flag("im");
+      sc.hot_draw = flag("hd"); sc.mains_active = flag("ma"); sc.condensing = flag("co");
+      JsonVariant a = extra["a"];
+      p->thermostat = string(a["e"], 64);
+      if (!valid_entity(p->thermostat)) p->thermostat.clear();
+      p->confirm = string(a["cf"], 32);
+      if (a["c"].is<JsonArray>() && !p->thermostat.empty()) for (JsonVariant c : a["c"].as<JsonArray>()) {
+        if (p->controls.size() == 4) break;
+        plant_card::Control control;
+        control.label = string(c[0], 24);
+        control.service = string(c[1], 32);
+        control.key = string(c[2], 16);
+        control.value = string(c[3], 16);
+        control.active = c[4].is<bool>() && c[4].as<bool>();
+        // Only the thermostat's two services ever leave the card.
+        if (control.service != "climate.set_hvac_mode" && control.service != "climate.set_preset_mode") continue;
+        p->controls.push_back(std::move(control));
+      }
+      next.plant = std::move(p);
+    }
     // An alarm panel (app 0.3.8+, firmware 0.3.3+): how it takes codes, who changed it, and a delay's end.
     if (tile.domain() == "alarm_control_panel") {
       next.code_format = string(a["code_format"], 8);
