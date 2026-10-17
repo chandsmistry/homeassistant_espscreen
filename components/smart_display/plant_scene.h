@@ -294,6 +294,21 @@ class Builder {
     }
   }
   void march(const char *d, float on_len, float off_len, float w, Ink ink, float phase = 0) { dashes(d, on_len, off_len, w, ink, true, phase, 16 / 1.5f); }
+  // The ring around an open valve, less the part under the labels; it swells from the valve and fades, every two seconds.
+  void valve_ring(float cx, float cy) {
+    const float u = std::fmod(t_, 2.0f) / 2.0f, e = 1 - (1 - u) * (1 - u);
+    const float rad = 20 * (1 + 0.25f * e);
+    const uint8_t a = uint8_t(255 * 0.6f * (1 - e));
+    std::vector<Pt> ring;
+    for (int i = 0; i <= 48; ++i) {
+      const float t = float(i) / 48 * 6.2831853f, x = cx + 20 * std::cos(t), y = cy + 20 * std::sin(t);
+      const bool masked = (x >= 632 && x <= 676 && y >= 21 && y <= 37) || (x >= 335 && x <= 376 && y >= 154 && y <= 180);
+      if (masked) { stroke(ring, 2.5f, R(OK, a), false); ring.clear(); } else ring.push_back({cx + rad * std::cos(t), cy + rad * std::sin(t)});
+    }
+    stroke(ring, 2.5f, R(OK, a), false);
+  }
+  // A swing between 0 and 1 and back, `period` seconds for the whole there and back (CSS alternate).
+  float swing(float period, float offset = 0) const { return 0.5f - 0.5f * std::cos(6.2831853f * (t_ + offset) / period); }
   void probe_icon(float cx, float cy, Ink ink) {
     dot(cx, cy, 10, R(BLOCK), 255, ink, 2);
     line(cx, cy - 6, cx, cy + 1.5f, 2.2f, ink, true);
@@ -364,8 +379,9 @@ inline Scene Builder::build() {
   ctrl("M790,297 H654 V407 M654,423 V457 M654,473 V494 H495", hot_call);
   ctrl("M479,494 H355 V210", hot_call);
   arrow(355, 210, hot_call);
-  if (heating) fill({{649, 68}, {654, 60}, {659, 68}}, R(CTRL), 217);
-  if (hot_call) fill({{351, 214}, {355, 206}, {359, 214}}, R(CTRL), 217);
+  const uint8_t pulse = uint8_t(255 * (0.55f + 0.45f * swing(1.35f)) * 0.85f);
+  if (heating) fill({{649, 68}, {654, 60}, {659, 68}}, R(CTRL), pulse);
+  if (hot_call) fill({{351, 214}, {355, 206}, {359, 214}}, R(CTRL), pulse);
 
   // Flow pipes.
   pipe_base("M230,104 H260 M260,104 H300 V52 H790 M300,104 V194 H392", FLOW);
@@ -436,7 +452,7 @@ inline Scene Builder::build() {
   // Gas in.
   hit(0, 406, 38, 38, E_GAS);
   march("M0,420 H40", 4, 3, 8, R(GAS, 140));
-  dot(20, 420, 6, R(BLOCK), 255, firing ? R(SOFT) : R(GAS), firing ? 2.2f : 1.5f);
+  dot(20, 420, 6, R(BLOCK), 255, firing ? R(SOFT, uint8_t(255 * (0.72f + 0.28f * swing(1.6f)))) : R(GAS), firing ? 1.5f + 1.3f * swing(1.6f) : 1.5f);
   say(TAG, "GAS", 20, 438, R(GAS), 1);
 
   // The four pipe numbers.
@@ -519,14 +535,7 @@ inline Scene Builder::build() {
   rect(642, 40, 24, 24, 4, R(BLOCK), 255, heating ? R(FLOW) : R(BORDER), heating ? 2 : 1.5f);
   if (heating) {
     line(646, 52, 662, 52, 3, R(OK), true);
-    // The ring around an open valve, less the part under the labels.
-    std::vector<Pt> ring;
-    for (int i = 0; i <= 48; ++i) {
-      const float t = float(i) / 48 * 6.2831853f, x = 654 + 20 * std::cos(t), y = 52 + 20 * std::sin(t);
-      const bool masked = (x >= 632 && x <= 676 && y >= 21 && y <= 37) || (x >= 335 && x <= 376 && y >= 154 && y <= 180);
-      if (masked) { stroke(ring, 2.5f, R(OK, 128), false); ring.clear(); } else ring.push_back({x, y});
-    }
-    stroke(ring, 2.5f, R(OK, 128), false);
+    valve_ring(654, 52);
   } else {
     line(654, 44, 654, 60, 3, R(FLOW), true);
   }
@@ -537,13 +546,7 @@ inline Scene Builder::build() {
   rect(343, 182, 24, 24, 4, R(BLOCK), 255, hot_call ? R(DHW) : R(BORDER), hot_call ? 2 : 1.5f);
   if (hot_call) {
     line(347, 194, 363, 194, 3, R(OK), true);
-    std::vector<Pt> ring;
-    for (int i = 0; i <= 48; ++i) {
-      const float t = float(i) / 48 * 6.2831853f, x = 355 + 20 * std::cos(t), y = 194 + 20 * std::sin(t);
-      const bool masked = (x >= 632 && x <= 676 && y >= 21 && y <= 37) || (x >= 335 && x <= 376 && y >= 154 && y <= 180);
-      if (masked) { stroke(ring, 2.5f, R(OK, 128), false); ring.clear(); } else ring.push_back({x, y});
-    }
-    stroke(ring, 2.5f, R(OK, 128), false);
+    valve_ring(355, 194);
   } else {
     line(355, 186, 355, 202, 3, R(FLOW), true);
   }
@@ -564,6 +567,34 @@ inline Scene Builder::build() {
       if (cold_part < 255) rect(left + inset, y, right - left - 2 * inset, 2, 0, L(0xF7BF86), uint8_t(100 * (255 - cold_part) / 255), L(0xF7BF86), 0);
       if (cold_part) rect(left + inset, y, right - left - 2 * inset, 2, 0, L(0xA6D5E3), uint8_t(100 * cold_part / 255), L(0xA6D5E3), 0);
     }
+    // Cold water coming in at the bottom while a tap is drawing: three soft plumes that rise and fade.
+    if (on(F_TANK_COLD)) {
+      for (int i = 0; i < 3; ++i) {
+        const float rx0 = i == 0 ? 24 : i == 1 ? 30 : 33, ry0 = i == 0 ? 19 : i == 1 ? 23 : 25;
+        const float u = std::fmod(t_ + 1.1f * i, 3.4f) / 3.4f, e = 1 - (1 - u) * (1 - u);
+        const float sc = 0.7f + 0.6f * u, cy = 440 - 143 * e, op = 0.7f * (1 - u);
+        for (int ring = 5; ring >= 1; --ring) {
+          const float f = ring / 5.0f;
+          std::vector<Pt> p;
+          for (int k = 0; k < 20; ++k) {
+            const float a = k / 20.0f * 6.2831853f;
+            p.push_back({487 + rx0 * sc * f * std::cos(a), std::min(443.0f, cy + ry0 * sc * f * std::sin(a))});
+          }
+          fill(p, L(0x5FB2CC), uint8_t(255 * op * 0.9f * 0.22f));
+        }
+      }
+    }
+    // Bubbles climbing the whole tank, each at its own pace.
+    {
+      struct Bub { float x, r, dur, off, drift; };
+      for (const Bub &b : {Bub{410, 3, 9, 0, 6}, Bub{429, 4.5f, 9.6f, 1.4f, -8}, Bub{446, 3.5f, 10, 2.6f, 10}, Bub{466, 5, 10.8f, 0.8f, -12},
+                           Bub{484, 6, 12, 3.4f, 14}, Bub{503, 4, 12.8f, 4.2f, -10}, Bub{520, 5.5f, 13.5f, 2, 6}, Bub{539, 3, 14.4f, 5.6f, -8},
+                           Bub{558, 4.5f, 15, 7.2f, 14}}) {
+        const float u = std::fmod(t_ + b.off, b.dur) / b.dur, e = u * u * (3 - 2 * u);
+        const float op = u < 0.08f ? 0.4f * u / 0.08f : u > 0.9f ? 0.4f * (1 - u) / 0.1f : 0.4f;
+        dot(b.x + b.drift * e, 436 - 306 * e, b.r, L(0xFFFFFF), uint8_t(255 * op), L(0xFFFFFF), 0);
+      }
+    }
     // Two waves on the surface of the water.
     for (int w = 0; w < 2; ++w) {
       std::vector<Pt> p;
@@ -574,7 +605,7 @@ inline Scene Builder::build() {
   if (dhw_path) {
     // Charging: the heat soaks in from the coil's side.
     for (float x = 412; x < 562; x += 3) {
-      const float a = 0.8f * (1 - (x - 412) / 150) * 0.7f;
+      const float a = 0.8f * (1 - (x - 412) / 150) * (0.5f + 0.4f * swing(5.2f));
       rect(x, 188, 3, 238, 0, L(0xF08A5D), uint8_t(a * 255), L(0xF08A5D), 0);
     }
   }
