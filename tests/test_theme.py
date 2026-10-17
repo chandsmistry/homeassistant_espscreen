@@ -170,5 +170,16 @@ class Setting(unittest.TestCase):
         self.assertLess(brightness.index('"dark_mode"'), brightness.index('"standby_enabled"'))
 
 
+class RoleTableTest(unittest.TestCase):
+    def test_every_role_has_its_own_row_in_order(self):
+        """A role without its row shifts every later role's colours (the PD pills once turned pale pink and black)."""
+        enum = THEME[THEME.index('enum Role'):]
+        enum = enum[:enum.index('};')]
+        roles = [n for n in re.findall(r'^\s{2}([A-Z][A-Z0-9_]+),', enum, re.M) if n != 'ROLE_COUNT']
+        table = THEME[THEME.index('ROLES[ROLE_COUNT]'):]
+        rows = re.findall(r'/\* ([A-Z0-9_]+) \*/', table[:table.index('};')])
+        self.assertEqual(roles, rows)
+
+
 if __name__ == '__main__':
     unittest.main()
