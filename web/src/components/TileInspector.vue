@@ -17,6 +17,7 @@ import { coverPrimary, hasCoverTilt, withCoverTilt } from "../model/tall-control
 import ChoiceField from "./ChoiceField.vue";
 import FavoriteSection from "./inspector/FavoriteSection.vue";
 import EnergySourcesSection from "./inspector/EnergySourcesSection.vue";
+import PlantRoomSection from "./inspector/PlantRoomSection.vue";
 import MapSection from "./inspector/MapSection.vue";
 import NameField from "./inspector/NameField.vue";
 import TitleButton from "./inspector/TitleButton.vue";
@@ -103,6 +104,7 @@ const mapCard = computed(() => display.value === "map" && !pdCard.value);
 const mapTile = computed(() => props.tile.entity === "screen.map");
 // The energy card (app 0.4.77) is its diagram: no face and no second line to choose, its sensors are Home Assistant's.
 const energyTile = computed(() => props.tile.entity === "screen.energy");
+const plantTile = computed(() => props.tile.entity === "screen.plant_room");
 // A favourite (app 0.4.42): what it plays and on which speaker, in its own section.
 const favoriteCard = computed(() => display.value === "favorite" && domain.value === "media_player");
 // How the energy card shows power along a line: running dots, or calm lines that grow with it and an arrow each.
@@ -227,21 +229,23 @@ const backgroundName = computed(() => inv.inventory.backgrounds?.[props.tile.opt
     </Section>
 
     <EnergySourcesSection v-if="energyTile && scr.supports(0, 47, 0)" :tile="tile" />
+    <PlantRoomSection v-if="plantTile && scr.supports(0, 55, 0)" :tile="tile" />
 
     <!-- What the card shows first, then where it stands, what a finger does to it, and last its icon and colour. -->
     <template v-if="!ui.phone || more">
     <Section v-if="lookShown || (!bedside && !key)" :title="t('editor.tile.sections.look')">
       <p v-if="pdCard" class="hint">{{ t("editor.tile.pd.hint") }}</p>
+      <p v-if="plantTile" class="hint">{{ t(scr.supports(0, 55, 0) ? "editor.tile.plant.hint" : "editor.tile.plant.needs_firmware") }}</p>
       <p v-if="energyTile" class="hint">{{ t(scr.supports(0, 47, 0) ? "editor.tile.energy.hint" : "editor.tile.energy.needs_firmware") }}</p>
       <PropRow v-if="energyTile" :label="t('editor.tile.energy.flow.label')" icon="flash" :hint="t('editor.tile.energy.flow.hint')">
         <ChoiceField :choices="flowChoices" :value="current('flow', rules.energyFlow[0])" :tile="tile" preview-key="flow" :aria-label="t('editor.tile.energy.flow.label')" @pick="(v) => setTileOption(tile, 'flow', v)" />
       </PropRow>
-      <PropRow v-if="lookShown && tile.entity !== 'screen.settings' && !mapTile && !energyTile && !pdCard" :label="t('editor.tile.display.label')" icon="eye-outline" :hint="shownHint && !shownHint.warn ? shownHint.text : undefined">
+      <PropRow v-if="lookShown && tile.entity !== 'screen.settings' && !mapTile && !energyTile && !plantTile && !pdCard" :label="t('editor.tile.display.label')" icon="eye-outline" :hint="shownHint && !shownHint.warn ? shownHint.text : undefined">
         <ChoiceField :choices="displays" :value="display" :tile="tile" preview-key="display" :aria-label="t('editor.tile.display.label')" @pick="(v) => setTileOption(tile, 'display', v)" />
         <template v-if="shownHint?.warn" #note><small class="help warn">{{ shownHint.text }}</small></template>
       </PropRow>
       <!-- A bedside clock and its keys have no second line: the clock draws the time, a key its name alone. -->
-      <PropRow v-if="!bedside && !key && !mapCard && !energyTile && !pdCard" :label="t('editor.tile.sub.label')" icon="text-short" :hint="t(`editor.tile.sub.hint_${subKind}`)">
+      <PropRow v-if="!bedside && !key && !mapCard && !energyTile && !plantTile && !pdCard" :label="t('editor.tile.sub.label')" icon="text-short" :hint="t(`editor.tile.sub.hint_${subKind}`)">
         <ChoiceField :choices="subList" :value="subKind" :tile="tile" preview-key="sub" :sample="subSample" :aria-label="t('editor.tile.sub.label')" @pick="pickSubKind" />
         <template v-if="subKind === 'attr' || subKind === 'text'" #note>
           <UiSelect v-if="subKind === 'attr'" class="sub-value" :model-value="subAttribute" :options="subValues.map((value) => [value.key, value.name] as [string, string])"

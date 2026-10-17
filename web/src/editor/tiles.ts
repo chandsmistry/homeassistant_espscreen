@@ -213,7 +213,7 @@ export function resizeTile(tile: Tile, size: Size, axis: "columns" | "rows") {
     // has a plugin's tile (GitHub #224): it keeps only PLUGIN_TILE_OPTIONS, so a tile that got one before saves again.
     if (owned.content.kind === "plugin")
       for (const key of Object.keys(owned.interaction)) { if (!PLUGIN_TILE_OPTIONS.includes(key)) delete owned.interaction[key as keyof typeof owned.interaction]; }
-    else if (owned.content.kind === "builtin" && (owned.content.name === "map" || owned.content.name === "energy" || owned.content.name.startsWith("pd_"))) {
+    else if (owned.content.kind === "builtin" && (owned.content.name === "map" || owned.content.name === "energy" || owned.content.name === "plant_room" || owned.content.name.startsWith("pd_"))) {
       delete owned.interaction.controls;
       delete owned.interaction.inline;
     }
