@@ -119,11 +119,23 @@ class Payload(unittest.TestCase):
         self.assertEqual(x['b'][0], pr.BOILER_OFFLINE)
         self.assertEqual([t['k'] for t in x['tabs']], ['heat', 'hot', 'cold'])
         self.assertEqual(x['tabs'][0]['r'][0][1], '–')
-        self.assertIsNone(x['a']['hv'])
+        self.assertEqual(x['a']['c'], [])
 
     def test_actions_and_entities(self):
         x = pr.payload(base(), now=NOW)
-        self.assertEqual(x['a'], {'e': 'climate.hallway_thermostat', 'hv': 'heat', 'pm': 'none'})
+        self.assertEqual(x['a']['e'], 'climate.hallway_thermostat')
+        self.assertEqual([c[3] for c in x['a']['c']], ['off', 'heat', 'none', 'eco'])
+        self.assertEqual([c[4] for c in x['a']['c']], [False, True, True, False])
+        self.assertEqual(x['a']['c'][0][:3], ['Radiators off', 'climate.set_hvac_mode', 'hvac_mode'])
+        # Only these two services ever leave the card.
+        self.assertEqual({c[1] for c in x['a']['c']}, {'climate.set_hvac_mode', 'climate.set_preset_mode'})
+        s = base(); s[pr.PRESET['thermostat']] = st('heat_cool', hvac_action='idle', preset_mode='away')
+        self.assertEqual(pr.payload(s, now=NOW)['a']['c'], [])
+        # The schematic finds its sensors by the rows' places.
+        rows = lambda tab: [r[3] for r in x['tabs'][tab]['r']]
+        P = pr.PRESET
+        self.assertEqual((rows(0)[0], rows(0)[2], rows(0)[3], rows(0)[6]), (P['flow_temp'], P['return_temp'], P['pressure'], P['house_temp']))
+        self.assertEqual((rows(1)[0], rows(2)[0]), (P['cylinder'], P['mains_flow']))
         self.assertEqual(x['tabs'][0]['r'][0][3], pr.PRESET['flow_temp'])
 
     def test_mapping_overrides_one_role(self):

@@ -213,6 +213,19 @@ def thermocline(f):
     return round(min(92, max(8, pct)))
 
 
+def controls(f):
+    """The thermostat's buttons: radiators off or on, the preset none or eco. A button is shown only for a state the
+    thermostat has; the screen asks for a second tap before it calls the service."""
+    out = []
+    if f['mode'] in ('off', 'heat'):
+        out += [['Radiators off', 'climate.set_hvac_mode', 'hvac_mode', 'off', f['mode'] == 'off'],
+                ['Radiators on', 'climate.set_hvac_mode', 'hvac_mode', 'heat', f['mode'] == 'heat']]
+    if f['preset'] in ('none', 'eco'):
+        out += [['Preset normal', 'climate.set_preset_mode', 'preset_mode', 'none', f['preset'] == 'none'],
+                ['Preset eco', 'climate.set_preset_mode', 'preset_mode', 'eco', f['preset'] == 'eco']]
+    return out
+
+
 def payload(states: dict, mapping: dict | None = None, now: float | None = None) -> dict:
     f = facts(states, mapping, now)
     e = lambda role: entity_of(mapping, role)
@@ -250,6 +263,5 @@ def payload(states: dict, mapping: dict | None = None, now: float | None = None)
         'm': {'flow': f['flow'], 'ret': f['return'], 'cyl': f['cylinder'], 'draw': f['draw'], 'mains': f['mains'],
               'bar': f['pressure'], 'tc': thermocline(f), 'fl': int(f['firing']), 'z1': int(f['zv1']), 'z2': int(f['zv2']),
               'im': int(f['immersion']), 'hd': int(f['hot_draw']), 'ma': int(f['mains_active']), 'co': int(f['condensing'])},
-        'a': {'e': e('thermostat'), 'hv': f['mode'] if f['mode'] in ('off', 'heat') else None,
-              'pm': f['preset'] if f['preset'] in ('none', 'eco') else None},
+        'a': {'e': e('thermostat'), 'c': controls(f), 'cf': 'Tap again to confirm'},
     }
