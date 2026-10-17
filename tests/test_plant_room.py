@@ -176,3 +176,9 @@ class Layout(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PlantRoomPageDocument(unittest.TestCase):
+    def test_library_builtin_accepted(self):
+        import page_layout
+        self.assertEqual(page_layout._entity({'kind': 'builtin', 'name': 'plant_room'}, [], None), 'screen.plant_room')
