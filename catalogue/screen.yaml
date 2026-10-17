@@ -6,6 +6,8 @@ memory: {bytes: 32, extras: false}
 # with a small picture of each running dot: its own price, measured as docs/TILE_MEMORY.md says.
 cards:
   energy: {bytes: 6144, extras: true}
+  # The plant room card (firmware 0.55.0): three tabs of rows (text, colour, sensor) and the schematic's numbers.
+  plant_room: {bytes: 4096, extras: true}
   # Native PD data, selector options and persistent draw canvas; a conservative bounded allowance.
   pd_header: {bytes: 8192, extras: true}
   pd_dp3: {bytes: 8192, extras: true}

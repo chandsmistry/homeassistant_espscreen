@@ -18,7 +18,7 @@ import tile_icons
 DOMAINS = catalogue.DOMAINS
 # Built-in cards without a Home Assistant entity; firmware 0.2.14+ renders them. The names in English: a screen gets them in
 # its language and the editor in its own (builtin_name, app 0.2.90).
-BUILTIN = {'screen.clock': 'Clock', 'screen.nightstand': 'Bedside clock', 'screen.settings': 'Settings', 'screen.map': 'Map', 'screen.energy': 'Energy', 'screen.pd_header': 'PD header', 'screen.pd_dp3': 'PD Delta Pro 3', 'screen.pd_ultra': 'PD Stream Ultra X', 'screen.pd_ac': 'PD Stream AC', 'screen.pd_max': 'PD Stream MAX', 'screen.pd_batteries': 'PD Battery Allocations', **{f'screen.page_{n}': f'Go to page {n}' for n in range(1, 33)}}
+BUILTIN = {'screen.clock': 'Clock', 'screen.nightstand': 'Bedside clock', 'screen.settings': 'Settings', 'screen.map': 'Map', 'screen.energy': 'Energy', 'screen.plant_room': 'Plant room', 'screen.pd_header': 'PD header', 'screen.pd_dp3': 'PD Delta Pro 3', 'screen.pd_ultra': 'PD Stream Ultra X', 'screen.pd_ac': 'PD Stream AC', 'screen.pd_max': 'PD Stream MAX', 'screen.pd_batteries': 'PD Battery Allocations', **{f'screen.page_{n}': f'Go to page {n}' for n in range(1, 33)}}
 # A navigation tile (firmware 0.2.62+): screen.page_<n> goes to page n, up to page 32 on a board that holds that many
 # (firmware 0.34.0+); whether the screen has page n is the screen's Grid's to say. Firmware 0.2.65+ takes the same one on several
 # pages (a "Back to page 1" on every page), firmware 0.16.0+ any entity on several tiles (GitHub #83) but the bedside
@@ -48,6 +48,8 @@ def builtin_name(entity, text=screen_t):
         return text('addon.screen.builtin.map')
     if entity == ENERGY_TILE:
         return text('addon.screen.builtin.energy')
+    if entity == PLANT_ROOM_TILE:
+        return text('addon.screen.builtin.plant_room')
     if entity in BUILTIN and entity.startswith('screen.pd_'):
         return BUILTIN[entity]
     return text('screen.settings.title' if entity == 'screen.settings' else 'addon.screen.builtin.clock')
@@ -245,6 +247,10 @@ MAP_TILE_MIN_FIRMWARE = (0, 21, 0)
 # The energy card (app 0.4.77, firmware 0.47.0): the house's power now, drawn as Home Assistant's own live view and
 # power-flow-card-plus draw it, from the Energy settings (energy_flow.py). It is a diagram and nothing else.
 ENERGY_TILE = 'screen.energy'
+# The plant room card (app 0.4.88): heating, hot water and cold water in three tabs and a schematic (plant_room.py).
+# The screen's own firmware draws it; one that predates it shows a plain tile.
+PLANT_ROOM_TILE = 'screen.plant_room'
+PLANT_ROOM_MIN_FIRMWARE = (0, 55, 0)
 ENERGY_MIN_FIRMWARE = (0, 47, 0)
 # How the energy card shows power along a line (catalogue/screen.yaml `energy`): running dots, the default and never
 # stored, or calm lines with an arrow. A firmware that doesn't know the choice keeps the dots.
@@ -1269,6 +1275,7 @@ def min_firmware(layout):
         (layout.get('title') == '', NO_TITLE_MIN_FIRMWARE),
         (any(t['entity'] == MAP_TILE for t in tiles), MAP_TILE_MIN_FIRMWARE),
         (any(t['entity'] == ENERGY_TILE for t in tiles), ENERGY_MIN_FIRMWARE),
+        (any(t['entity'] == PLANT_ROOM_TILE for t in tiles), PLANT_ROOM_MIN_FIRMWARE),
         (len(tiles) > LEGACY_MAX_TILES or any(is_full(t) or page_target(t['entity']) for t in tiles), FULL_PAGE_MIN_FIRMWARE),
         (any(t['entity'] == 'screen.settings' for t in tiles), (0, 2, 44)),
         (any(o.get('background') == 'none' for o in options), (0, 2, 16)),
@@ -1313,7 +1320,9 @@ TILE_EVENT_OPTIONS = {'size': 'size', 'controls': 'controls', 'display': 'displa
                       # How the energy card shows power along a line: dots or lines.
                       'flow': 'flow',
                       # The sensors the energy card takes instead of Home Assistant's Energy settings.
-                      'energy_sources': 'energy_sources'}
+                      'energy_sources': 'energy_sources',
+                      # The sensors the plant room card reads instead of its preset.
+                      'plant_room': 'plant_room'}
 TILE_SIZES = {'full': 'full', 'fullscreen': 'full', 'full screen': 'full', 'full-screen': 'full', 'page': 'full', 'whole page': 'full',
               'wide': 'wide', 'double': 'wide', 'large': 'wide', 'big': 'wide',
               'single': 'single', 'small': 'single', 'normal': 'single', 'tall': 'tall', 'high': 'tall', 'square': 'square'}
@@ -1881,7 +1890,7 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
             continue
         if 'options' in tile:
             options = tile['options']
-            if not isinstance(options, dict) or set(options) - {'tap', 'display', 'inline', 'history_hours', 'background', 'size', 'icon', 'controls', 'action', 'pd_actions', 'refresh', 'sub', 'fit', 'overlay', 'guard', 'flow', 'energy_sources', *MAP_OWN, *FAVORITE_OWN}:
+            if not isinstance(options, dict) or set(options) - {'tap', 'display', 'inline', 'history_hours', 'background', 'size', 'icon', 'controls', 'action', 'pd_actions', 'refresh', 'sub', 'fit', 'overlay', 'guard', 'flow', 'energy_sources', 'plant_room', *MAP_OWN, *FAVORITE_OWN}:
                 raise ValueError(t('addon.errors.layout.unknown_settings'))
             # A navigation tile (screen.page_<n>, firmware 0.2.62+) has a name, an icon, a colour and a width; never the page.
             if page_target(tile['entity']):
@@ -1929,6 +1938,19 @@ def validate_layout(data, stored=False, grid=DEFAULT_GRID):
                         options['energy_sources'] = mapping
             elif 'flow' in options or 'energy_sources' in options:
                 options = {k: v for k, v in options.items() if k not in ('flow', 'energy_sources')}
+            # The plant room draws its tabs and schematic on every size it takes; its sensors are `plant_room`.
+            if tile['entity'] == PLANT_ROOM_TILE:
+                options = {k: v for k, v in options.items() if k not in ('display', 'inline', 'controls', 'history_hours', 'sub')}
+                if 'plant_room' in options:
+                    import plant_room
+                    mapping = plant_room.clean_mapping(options['plant_room'])
+                    if mapping is None:
+                        raise ValueError(t('addon.errors.layout.invalid_setting', setting='plant_room'))
+                    options = {k: v for k, v in options.items() if k != 'plant_room'}
+                    if mapping:
+                        options['plant_room'] = mapping
+            elif 'plant_room' in options:
+                options = {k: v for k, v in options.items() if k != 'plant_room'}
             # Every tile's taps and its type's own (run, an automation's alone: firmware 0.7.0+), from the catalogue.
             taps = tuple(catalogue.PD['taps']) if catalogue.is_pd(tile['entity']) else tuple(catalogue.taps(domain))
             choices = {'tap': taps, 'display': displays, 'inline': ('none', 'slider')}
@@ -2358,6 +2380,9 @@ def extras(tile, states, forecast=None, tz=None, hourly=None, now=None, device=N
         import energy_flow
         glyph = lambda icon: tile_icons.GLYPHS.get(icon[4:]) if isinstance(icon, str) and icon.startswith('mdi:') else None
         return energy_flow.payload(energy or {}, states, glyph, home_name, (tile.get('options') or {}).get('energy_sources'))
+    if tile['entity'] == PLANT_ROOM_TILE:
+        import plant_room
+        return plant_room.payload(states, (tile.get('options') or {}).get('plant_room'))
     domain = tile['entity'].split('.')[0]
     attrs = states.get(tile['entity'], {}).get('attributes', {})
     # A map card carries only its movement mark (app 0.4.33): the screen asks for a new picture when it changes, so

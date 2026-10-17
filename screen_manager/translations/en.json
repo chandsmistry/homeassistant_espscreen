@@ -1321,7 +1321,8 @@
         "nightstand": "Bedside clock",
         "page": "Go to page {page}",
         "map": "Map",
-        "energy": "Energy"
+        "energy": "Energy",
+        "plant_room": "Plant room"
       },
       "identify": {
         "title": "This is {name}",

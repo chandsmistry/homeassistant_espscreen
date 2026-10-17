@@ -32,6 +32,8 @@ APPEARANCE = {
     "energyFlow": "flow",
     # The sensors the energy card takes instead of Home Assistant's Energy settings (energy_flow.clean_mapping).
     "energySources": "energy_sources",
+    # The sensors the plant room card reads instead of its preset (plant_room.clean_mapping).
+    "plantRoom": "plant_room",
 }
 # A favourite (app 0.4.42) keeps what it plays (`play`, Home Assistant's own ids) and on which speaker (`speaker`), and
 # since app 0.4.84 its own shuffle and repeat.

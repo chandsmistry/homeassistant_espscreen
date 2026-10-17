@@ -140,5 +140,27 @@ class Payload(unittest.TestCase):
         self.assertLess(len(json.dumps(pr.payload(base(), now=NOW))), 2400)
 
 
+class Layout(unittest.TestCase):
+    def test_tile_in_a_layout(self):
+        import core
+        make = lambda options: core.validate_layout({'title': 'Plant', 'tiles': [
+            {'entity': 'screen.plant_room', 'name': '', 'options': {'size': 'square', 'display': 'standard', **options}}]})
+        layout = make({'plant_room': {'flow_temp': 'sensor.other', 'gas': pr.PRESET['gas']}})
+        self.assertEqual(layout['tiles'][0]['options'], {'size': 'square', 'plant_room': {'flow_temp': 'sensor.other'}})
+        self.assertEqual(core.min_firmware(layout), core.PLANT_ROOM_MIN_FIRMWARE)
+        self.assertEqual(core.builtin_name('screen.plant_room', core.english), 'Plant room')
+        with self.assertRaises(ValueError):
+            make({'plant_room': {'gas': 'not an entity'}})
+        other = core.validate_layout({'title': 'x', 'tiles': [{'entity': 'screen.clock', 'name': '', 'options': {'size': 'square', 'plant_room': {}}}]})
+        self.assertNotIn('plant_room', other['tiles'][0]['options'])
+
+    def test_message_carries_the_plant_room(self):
+        import core
+        tile = {'entity': 'screen.plant_room', 'name': '', 'options': {'size': 'square'}}
+        message = core.state_message(0, tile, base(), core.extras(tile, base()))
+        self.assertEqual(message['x']['b'][0], pr.BOILER_STANDBY)
+        self.assertEqual(message['name'], 'Plant room')
+
+
 if __name__ == '__main__':
     unittest.main()

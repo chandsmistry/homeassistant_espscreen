@@ -1793,6 +1793,10 @@
      "bytes": 6144,
      "extras": true
     },
+    "screen.plant_room": {
+     "bytes": 4096,
+     "extras": true
+    },
     "screen.pd_header": {
      "bytes": 8192,
      "extras": true
