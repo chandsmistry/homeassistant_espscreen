@@ -17,17 +17,17 @@
 
 namespace plant_card {
 // The colours the add-on names (plant_room.py IDLE..IMMERSION), as paints the view maps to theme roles.
-enum class Paint : uint8_t { MUTED, OK, HEAT, HOT, COLD, WARN, BAD, IMMERSION, INK, LINE, ACCENT, GAS };
+enum class Paint : uint8_t { kMuted, kOk, kHeat, kHot, kCold, kWarn, kBad, kImmersion, kInk, kLine, kAccent, kGas };
 inline Paint paint_of(int code) {
   switch (code) {
-    case 1: return Paint::OK;
-    case 2: return Paint::HEAT;
-    case 3: return Paint::HOT;
-    case 4: return Paint::COLD;
-    case 5: return Paint::WARN;
-    case 6: return Paint::BAD;
-    case 7: return Paint::IMMERSION;
-    default: return Paint::MUTED;
+    case 1: return Paint::kOk;
+    case 2: return Paint::kHeat;
+    case 3: return Paint::kHot;
+    case 4: return Paint::kCold;
+    case 5: return Paint::kWarn;
+    case 6: return Paint::kBad;
+    case 7: return Paint::kImmersion;
+    default: return Paint::kMuted;
   }
 }
 
@@ -143,7 +143,7 @@ inline Scene summary(const Data &d, const Measure &m, int w, int h, int tab, int
   const int head = m.line[BODY] + pad / 2;
   sc.discs.push_back({m.line[BODY] / 3 + 1, y + head / 2, std::max(3, m.line[BODY] / 4), paint_of(d.boiler_colour), true});
   const int text_x = m.line[BODY] * 2 / 3 + pad;
-  sc.texts.push_back({d.boiler_text, BODY, text_x, y + (head - m.line[BODY]) / 2, std::max(0, w - text_x), 0, Paint::INK});
+  sc.texts.push_back({d.boiler_text, BODY, text_x, y + (head - m.line[BODY]) / 2, std::max(0, w - text_x), 0, Paint::kInk});
   y += head + pad / 2;
   if (d.tabs.empty()) return sc;
   tab = std::clamp(tab, 0, int(d.tabs.size()) - 1);
@@ -155,9 +155,9 @@ inline Scene summary(const Data &d, const Measure &m, int w, int h, int tab, int
   for (int i = 0; i < n; ++i) {
     const int x = i * (tab_w + gap);
     const bool open = i == tab;
-    sc.boxes.push_back({x, y, tab_w, tab_h, tab_h / 3, open ? Paint::ACCENT : Paint::LINE, open ? 60 : 0, open ? Paint::ACCENT : Paint::LINE, 1});
+    sc.boxes.push_back({x, y, tab_w, tab_h, tab_h / 3, open ? Paint::kAccent : Paint::kLine, open ? 60 : 0, open ? Paint::kAccent : Paint::kLine, 1});
     const std::string name = i < 3 ? NAMES[i] : d.tabs[i].key;
-    sc.texts.push_back({name, SMALL, x, y + (tab_h - m.line[SMALL]) / 2, tab_w, 1, open ? Paint::INK : Paint::MUTED});
+    sc.texts.push_back({name, SMALL, x, y + (tab_h - m.line[SMALL]) / 2, tab_w, 1, open ? Paint::kInk : Paint::kMuted});
     sc.hits.push_back({x, y, tab_w, tab_h, HitKind::TAB, i, ""});
   }
   y += tab_h + pad;
@@ -182,10 +182,10 @@ inline Scene summary(const Data &d, const Measure &m, int w, int h, int tab, int
   for (int i = 0; i < rows; ++i) {
     const Row &r = t.rows[i];
     const int ry = y + i * row_h;
-    sc.texts.push_back({r.label, SMALL, 0, ry + pad / 2, w * 6 / 10, 0, Paint::MUTED});
+    sc.texts.push_back({r.label, SMALL, 0, ry + pad / 2, w * 6 / 10, 0, Paint::kMuted});
     sc.texts.push_back({r.value, SMALL, w * 4 / 10, ry + pad / 2, w * 6 / 10, 2, paint_of(r.colour)});
     if (!r.entity.empty()) sc.hits.push_back({0, ry, w, row_h, HitKind::ROW, i, r.entity});
-    if (i + 1 < rows) sc.segs.push_back({0, ry + row_h - 1, w, ry + row_h - 1, 1, Paint::LINE});
+    if (i + 1 < rows) sc.segs.push_back({0, ry + row_h - 1, w, ry + row_h - 1, 1, Paint::kLine});
   }
   if (controls) {
     const int c = int(d.controls.size()), cols = c <= 2 ? c : 2;
@@ -195,10 +195,10 @@ inline Scene summary(const Data &d, const Measure &m, int w, int h, int tab, int
       const Control &b = d.controls[i];
       const int bx = (i % cols) * (bw + gap), by = top + (i / cols) * (btn_h + gap);
       const bool asking = pending == i;
-      const Paint edge = asking ? Paint::WARN : b.active ? Paint::ACCENT : Paint::LINE;
+      const Paint edge = asking ? Paint::kWarn : b.active ? Paint::kAccent : Paint::kLine;
       sc.boxes.push_back({bx, by, bw, btn_h, btn_h / 4, edge, b.active || asking ? 60 : 0, edge, asking ? 2 : 1});
       sc.texts.push_back({asking ? d.confirm : b.label, SMALL, bx, by + (btn_h - m.line[SMALL]) / 2, bw, 1,
-                          asking ? Paint::WARN : b.active ? Paint::INK : Paint::MUTED});
+                          asking ? Paint::kWarn : b.active ? Paint::kInk : Paint::kMuted});
       sc.hits.push_back({bx, by, bw, btn_h, HitKind::CONTROL, i, ""});
     }
   }
@@ -215,51 +215,51 @@ inline Scene schematic(const Data &d, const Measure &m, int w, int h) {
   const int pipe = std::max(2, std::min(w, h) / 60);
   // The boiler: a box, a flame, its state and pressure.
   const int bx = X(0.04f), by = Y(0.18f), bw = X(0.22f), bh = Y(0.62f);
-  sc.boxes.push_back({bx, by, bw, bh, pad, Paint::LINE, 0, paint_of(d.boiler_colour), 2});
-  sc.texts.push_back({d.boiler_text, SMALL, bx, by + pad, bw, 1, Paint::INK});
+  sc.boxes.push_back({bx, by, bw, bh, pad, Paint::kLine, 0, paint_of(d.boiler_colour), 2});
+  sc.texts.push_back({d.boiler_text, SMALL, bx, by + pad, bw, 1, Paint::kInk});
   const int fr = std::max(4, std::min(bw, bh) / 5);
-  sc.discs.push_back({bx + bw / 2, by + bh / 2, fr, s.firing ? Paint::HEAT : Paint::LINE, s.firing});
-  if (!std::isnan(s.bar)) sc.texts.push_back({number(s.bar, 1, m.decimal) + " bar", SMALL, bx, by + bh - sm - pad, bw, 1, Paint::MUTED});
+  sc.discs.push_back({bx + bw / 2, by + bh / 2, fr, s.firing ? Paint::kHeat : Paint::kLine, s.firing});
+  if (!std::isnan(s.bar)) sc.texts.push_back({number(s.bar, 1, m.decimal) + " bar", SMALL, bx, by + bh - sm - pad, bw, 1, Paint::kMuted});
   sc.hits.push_back({bx, by, bw, bh, HitKind::PART, 0, d.entity(0, 3)});
   // Flow pipes out of the boiler through the two zone valves.
   const int y1 = Y(0.30f), y2 = Y(0.70f), vx = X(0.43f), cx = X(0.60f);
-  sc.segs.push_back({bx + bw, y1, cx, y1, pipe, s.zone1 ? Paint::HEAT : Paint::LINE});
-  sc.segs.push_back({bx + bw, y2, cx, y2, pipe, s.zone2 ? Paint::HOT : Paint::LINE});
+  sc.segs.push_back({bx + bw, y1, cx, y1, pipe, s.zone1 ? Paint::kHeat : Paint::kLine});
+  sc.segs.push_back({bx + bw, y2, cx, y2, pipe, s.zone2 ? Paint::kHot : Paint::kLine});
   const int vr = std::max(5, sm / 2);
-  sc.discs.push_back({vx, y1, vr, s.zone1 ? Paint::OK : Paint::MUTED, s.zone1});
-  sc.discs.push_back({vx, y2, vr, s.zone2 ? Paint::OK : Paint::MUTED, s.zone2});
-  sc.texts.push_back({"ZV1", SMALL, vx - X(0.06f), y1 - vr - sm - 1, X(0.12f), 1, Paint::MUTED});
-  sc.texts.push_back({"ZV2", SMALL, vx - X(0.06f), y2 - vr - sm - 1, X(0.12f), 1, Paint::MUTED});
+  sc.discs.push_back({vx, y1, vr, s.zone1 ? Paint::kOk : Paint::kMuted, s.zone1});
+  sc.discs.push_back({vx, y2, vr, s.zone2 ? Paint::kOk : Paint::kMuted, s.zone2});
+  sc.texts.push_back({"ZV1", SMALL, vx - X(0.06f), y1 - vr - sm - 1, X(0.12f), 1, Paint::kMuted});
+  sc.texts.push_back({"ZV2", SMALL, vx - X(0.06f), y2 - vr - sm - 1, X(0.12f), 1, Paint::kMuted});
   // The boiler's flow and return temperatures sit at its edge.
-  sc.texts.push_back({"▲ " + number(s.flow, 0, m.decimal) + "°", SMALL, bx + bw + pad / 2, y1 + pipe, vx - bx - bw - vr - pad, 0, Paint::HEAT});
-  sc.texts.push_back({"▼ " + number(s.ret, 0, m.decimal) + "°", SMALL, bx, by + bh + pad, bw, 1, s.condensing ? Paint::COLD : Paint::WARN});
+  sc.texts.push_back({"▲ " + number(s.flow, 0, m.decimal) + "°", SMALL, bx + bw + pad / 2, y1 + pipe, vx - bx - bw - vr - pad, 0, Paint::kHeat});
+  sc.texts.push_back({"▼ " + number(s.ret, 0, m.decimal) + "°", SMALL, bx, by + bh + pad, bw, 1, s.condensing ? Paint::kCold : Paint::kWarn});
   sc.hits.push_back({bx + bw, y1 - pad * 2, vx - bx - bw, pad * 4, HitKind::PART, 1, d.entity(0, 0)});
   sc.hits.push_back({bx, by + bh, bw, sm + pad * 2, HitKind::PART, 2, d.entity(0, 2)});
   // The radiators.
   const int rx = cx, rw = X(0.96f) - cx, ry = Y(0.08f), rh = Y(0.30f) - Y(0.08f) + Y(0.14f);
-  sc.boxes.push_back({rx, ry, rw, rh, pad, Paint::LINE, 0, s.zone1 ? Paint::HEAT : Paint::LINE, 2});
-  sc.texts.push_back({"Radiators", SMALL, rx, ry + rh / 2 - sm / 2, rw, 1, s.zone1 ? Paint::HEAT : Paint::MUTED});
+  sc.boxes.push_back({rx, ry, rw, rh, pad, Paint::kLine, 0, s.zone1 ? Paint::kHeat : Paint::kLine, 2});
+  sc.texts.push_back({"Radiators", SMALL, rx, ry + rh / 2 - sm / 2, rw, 1, s.zone1 ? Paint::kHeat : Paint::kMuted});
   const std::string house = d.entity(0, 6);
   if (!house.empty()) sc.hits.push_back({rx, ry, rw, rh, HitKind::PART, 3, house});
   // The cylinder: cold water at the bottom, hot above the thermocline.
   const int cy0 = Y(0.50f), cyh = Y(0.94f) - cy0, cw = rw;
-  sc.boxes.push_back({rx, cy0, cw, cyh, pad, Paint::LINE, 0, Paint::LINE, 2});
+  sc.boxes.push_back({rx, cy0, cw, cyh, pad, Paint::kLine, 0, Paint::kLine, 2});
   const int inner = std::max(1, cyh - 4), cold = std::lround(inner * (1.0f - std::clamp(s.thermocline, 8, 92) / 100.0f));
-  sc.boxes.push_back({rx + 2, cy0 + 2, cw - 4, inner - cold, pad / 2, Paint::HOT, 110, Paint::HOT, 0});
-  sc.boxes.push_back({rx + 2, cy0 + 2 + inner - cold, cw - 4, cold, pad / 2, Paint::COLD, 110, Paint::COLD, 0});
-  sc.texts.push_back({"Cylinder " + number(s.cylinder, 0, m.decimal) + "°", SMALL, rx, cy0 + cyh / 2 - sm / 2, cw, 1, Paint::INK});
+  sc.boxes.push_back({rx + 2, cy0 + 2, cw - 4, inner - cold, pad / 2, Paint::kHot, 110, Paint::kHot, 0});
+  sc.boxes.push_back({rx + 2, cy0 + 2 + inner - cold, cw - 4, cold, pad / 2, Paint::kCold, 110, Paint::kCold, 0});
+  sc.texts.push_back({"Cylinder " + number(s.cylinder, 0, m.decimal) + "°", SMALL, rx, cy0 + cyh / 2 - sm / 2, cw, 1, Paint::kInk});
   if (s.immersion) {
     const int ix = rx + cw / 4, iy = cy0 + cyh - cyh / 5;
-    sc.segs.push_back({ix, iy, ix + cw / 2, iy, std::max(2, pipe), Paint::IMMERSION});
-    sc.texts.push_back({"Immersion", SMALL, rx, iy - sm - 1, cw, 1, Paint::IMMERSION});
+    sc.segs.push_back({ix, iy, ix + cw / 2, iy, std::max(2, pipe), Paint::kImmersion});
+    sc.texts.push_back({"Immersion", SMALL, rx, iy - sm - 1, cw, 1, Paint::kImmersion});
   }
   sc.hits.push_back({rx, cy0, cw, cyh, HitKind::PART, 4, d.entity(1, 0)});
   // Hot water out at the top of the cylinder, mains in at the bottom.
   const int hx = X(0.96f);
-  sc.segs.push_back({hx, cy0, X(0.99f), cy0, pipe, s.hot_draw ? Paint::HOT : Paint::LINE});
+  sc.segs.push_back({hx, cy0, X(0.99f), cy0, pipe, s.hot_draw ? Paint::kHot : Paint::kLine});
   const int my = Y(0.97f) - sm / 2;
-  sc.segs.push_back({bx, my + sm / 2, rx, my + sm / 2 - pipe, pipe, s.mains_active ? Paint::COLD : Paint::LINE});
-  sc.texts.push_back({"Mains " + number(s.mains, 1, m.decimal) + " L/min", SMALL, bx, my - sm - pipe, X(0.5f), 0, s.mains_active ? Paint::COLD : Paint::MUTED});
+  sc.segs.push_back({bx, my + sm / 2, rx, my + sm / 2 - pipe, pipe, s.mains_active ? Paint::kCold : Paint::kLine});
+  sc.texts.push_back({"Mains " + number(s.mains, 1, m.decimal) + " L/min", SMALL, bx, my - sm - pipe, X(0.5f), 0, s.mains_active ? Paint::kCold : Paint::kMuted});
   sc.hits.push_back({bx, my - sm - pipe, X(0.5f), sm * 2 + pipe, HitKind::PART, 5, d.entity(2, 0)});
   return sc;
 }

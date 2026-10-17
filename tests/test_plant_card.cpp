@@ -99,7 +99,7 @@ int main() {
   }
   CHECK(number(NAN, 0, ".") == "–");
   CHECK(number(1.5f, 1, ",") == "1,5");
-  CHECK(paint_of(0) == Paint::MUTED && paint_of(7) == Paint::IMMERSION && paint_of(99) == Paint::MUTED);
+  CHECK(paint_of(0) == Paint::kMuted && paint_of(7) == Paint::kImmersion && paint_of(99) == Paint::kMuted);
   std::printf("plant card: %d checks passed\n", checks);
   return 0;
 }

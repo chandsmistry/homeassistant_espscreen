@@ -24,18 +24,18 @@ struct View {
 
 static lv_color_t color(pc::Paint p) {
   switch (p) {
-    case pc::Paint::OK: return theme::color(theme::PLANT_OK);
-    case pc::Paint::HEAT: return theme::color(theme::PLANT_HEAT);
-    case pc::Paint::HOT: return theme::color(theme::PLANT_HOT);
-    case pc::Paint::COLD: return theme::color(theme::PLANT_COLD);
-    case pc::Paint::WARN: return theme::color(theme::PLANT_WARN);
-    case pc::Paint::BAD: return theme::color(theme::PLANT_BAD);
-    case pc::Paint::IMMERSION: return theme::color(theme::PLANT_IMMERSION);
-    case pc::Paint::GAS: return theme::color(theme::PLANT_GAS);
-    case pc::Paint::LINE: return theme::color(theme::LINE);
-    case pc::Paint::ACCENT: return theme::color(theme::ACCENT);
-    case pc::Paint::INK: return theme::color(theme::INK);
-    case pc::Paint::MUTED: default: return theme::color(theme::MUTED);
+    case pc::Paint::kOk: return theme::color(theme::PLANT_OK);
+    case pc::Paint::kHeat: return theme::color(theme::PLANT_HEAT);
+    case pc::Paint::kHot: return theme::color(theme::PLANT_HOT);
+    case pc::Paint::kCold: return theme::color(theme::PLANT_COLD);
+    case pc::Paint::kWarn: return theme::color(theme::PLANT_WARN);
+    case pc::Paint::kBad: return theme::color(theme::PLANT_BAD);
+    case pc::Paint::kImmersion: return theme::color(theme::PLANT_IMMERSION);
+    case pc::Paint::kGas: return theme::color(theme::PLANT_GAS);
+    case pc::Paint::kLine: return theme::color(theme::LINE);
+    case pc::Paint::kAccent: return theme::color(theme::ACCENT);
+    case pc::Paint::kInk: return theme::color(theme::INK);
+    case pc::Paint::kMuted: default: return theme::color(theme::MUTED);
   }
 }
 
