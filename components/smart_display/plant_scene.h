@@ -30,7 +30,7 @@ enum Slot : int {
 // The entities a tap opens, in the order of `e` (plant_room.py SCENE_ENTITIES).
 enum Ent : int {
   E_RET, E_FLOW, E_DRAW, E_GAS, E_ZONE, E_SPUR, E_RATE, E_PRESSURE, E_OUTSIDE, E_CURVE, E_SIGNAL, E_INTAKE, E_CYL,
-  E_CIRCUIT, E_MANAGER, E_IMMERSION, E_HEATERS, E_THERMOSTAT, E_HOT_WATER, E_MAINS, E_COUNT
+  E_CIRCUIT, E_MANAGER, E_IMMERSION, E_HEATERS, E_THERMOSTAT, E_HOT_WATER, E_MAINS, E_SALT, E_COUNT
 };
 struct Said {
   std::string s;
@@ -206,11 +206,12 @@ inline std::vector<Sub> path(const char *d) {
 // ---- The builder.
 class Builder {
  public:
-  Builder(const Data &d, int pending) : d_(d) { sc_.pending = pending; sc_.ok = true; }
+  Builder(const Data &d, int pending, float t) : d_(d), t_(t) { sc_.pending = pending; sc_.ok = true; }
   Scene build();
 
  private:
   const Data &d_;
+  float t_;  // seconds, for the card's moving parts
   Scene sc_;
 
   bool on(Flag f) const { return d_.on(f); }
@@ -271,10 +272,11 @@ class Builder {
 
   // Dashes along a path: `on_len` drawn, `off_len` skipped, starting `phase` into the pattern. The card's marching dots are
   // 1 on and 15 off with round ends; they are held still here (the card moves them with a clock).
-  void dashes(const char *d, float on_len, float off_len, float w, Ink ink, bool round_cap, float phase = 0) {
+  void dashes(const char *d, float on_len, float off_len, float w, Ink ink, bool round_cap, float phase = 0, float speed = 0) {
     const float period = on_len + off_len;
     for (auto &sub : path(d)) {
-      float carry = std::fmod(phase, period);
+      // The pattern slides along the path `speed` units a second.
+      float carry = std::fmod(std::fmod(phase - speed * t_, period) + period, period);
       for (size_t i = 1; i < sub.p.size(); ++i) {
         const Pt a = sub.p[i - 1], b = sub.p[i];
         const float len = std::hypot(b.x - a.x, b.y - a.y);
@@ -291,7 +293,7 @@ class Builder {
       }
     }
   }
-  void march(const char *d, float on_len, float off_len, float w, Ink ink, float phase = 0) { dashes(d, on_len, off_len, w, ink, true, phase); }
+  void march(const char *d, float on_len, float off_len, float w, Ink ink, float phase = 0) { dashes(d, on_len, off_len, w, ink, true, phase, 16 / 1.5f); }
   void probe_icon(float cx, float cy, Ink ink) {
     dot(cx, cy, 10, R(BLOCK), 255, ink, 2);
     line(cx, cy - 6, cx, cy + 1.5f, 2.2f, ink, true);
@@ -351,7 +353,7 @@ inline Scene Builder::build() {
 
   // The control signals from the thermostat: dashes, with an arrow where they land.
   auto ctrl = [&](const char *dpath, bool lit) {
-    dashes(dpath, lit ? 6 : 5, lit ? 8 : 7, lit ? 1.8f : 1.25f, lit ? R(CTRL, 230) : R(CTRL, 56), true);
+    dashes(dpath, lit ? 6 : 5, lit ? 8 : 7, lit ? 1.8f : 1.25f, lit ? R(CTRL, 230) : R(CTRL, 56), true, 0, lit ? 28.0f : 0.0f);
   };
   auto arrow = [&](float x, float y, bool lit) {  // pointing up, tip at the path's end
     const float s = (lit ? 1.8f : 1.25f) * 6 / 8;
@@ -453,7 +455,8 @@ inline Scene Builder::build() {
     line(204 - 20 * 0.55f, 64 + 20 * 0.55f, 204 + 20 * 0.55f, 64 - 28 * 0.55f, 1.4f, L(0x5FB2CC), true);
   }
   if (firing) {
-    dot(204, 64, 20, L(0xF08A3C), 20, L(0xF08A3C), 0);
+    const float glow = 0.5f + 0.5f * std::sin(t_ * 6.2831853f / 4.4f);  // the card's glow, 2.2 s each way
+    dot(204, 64, 20, L(0xF08A3C), uint8_t(12 + 24 * glow), L(0xF08A3C), 0);
     dot(204, 64, 14, L(0xF08A3C), 30, L(0xF08A3C), 0);
     dot(204, 64, 9, L(0xF08A3C), 40, L(0xF08A3C), 0);
     fill(moved(path("M0 -28C12 -15 17 -6 17 5a17 17 0 0 1-34 0C-17 -5 -7 -12 0 -28z"), 204, 64, 0.55f), L(0xF08A3C));
@@ -564,7 +567,7 @@ inline Scene Builder::build() {
     // Two waves on the surface of the water.
     for (int w = 0; w < 2; ++w) {
       std::vector<Pt> p;
-      for (float x = 393; x <= 581; x += 4) p.push_back({x, mix_y - 3.85f * std::sin((x - 392) / 96 * 6.2831853f)});
+      for (float x = 393; x <= 581; x += 4) p.push_back({x, mix_y - 3.85f * std::sin((x - 392 + (w ? 96 * t_ / 8 : -96 * t_ / 5)) / 96 * 6.2831853f)});
       stroke(p, w ? 1.7f : 2.8f, L(0xFFFFFF, w ? 102 : 178), true);
     }
   }
@@ -733,6 +736,7 @@ inline Scene Builder::build() {
 
   // The thermostat.
   block(790, 204, 190, 120);
+  hit(804, 212, 162, 36, E_THERMOSTAT);
   if (heating || hot_call) outline(790, 204, 190, 120, 12, R(CTRL), 2);
   dot(866, 228, 9, R(CARD), 0, probe_ink(5), 2.5f);
   say(LBL, "Nest", 884, 233, R(TXT));
@@ -756,6 +760,8 @@ inline Scene Builder::build() {
   say(LBL, "Water Outlets", 846, 363, R(TXT));
   say(SUB, "domestic hot & cold", 846, 380, R(DIM));
   line(804, 392, 966, 392, 1, R(BORDER));
+  hit(804, 393, 162, 45, E_DRAW);
+  hit(804, 439, 162, 48, E_MAINS);
   say(TAG, "HOT WATER", 885, 405, hot_draw ? R(DHW) : R(DIM), 1);
   say(VAL_TINY, T_DRAW, 885, 422, 1);
   line(804, 438, 966, 438, 1, R(BORDER));
@@ -773,6 +779,7 @@ inline Scene Builder::build() {
   say(LBL_SM, "Aquaro", 94, 564, R(TXT));
   say(SUB, T_AQUARO, 94, 580);
   block(260, 516, 190, 90);
+  hit(270, 526, 170, 70, E_SALT);
   if (mains) outline(260, 516, 190, 90, 12, R(COLD), 2.5f);
   rect(276, 540, 22, 42, 7, R(SOFT), 0, R(SOFT), 2.5f);
   rect(304, 540, 22, 42, 7, R(SOFT, 115), 0, R(SOFT, 115), 2.5f);
@@ -797,8 +804,8 @@ inline Scene Builder::build() {
   return sc_;
 }
 
-inline Scene build(const Data &d, int pending = -1) {
-  Builder b(d, pending);
+inline Scene build(const Data &d, int pending = -1, float t = 0) {
+  Builder b(d, pending, t);
   return b.build();
 }
 

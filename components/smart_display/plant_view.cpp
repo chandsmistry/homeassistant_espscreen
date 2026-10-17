@@ -20,8 +20,8 @@ struct View {
   pc::Scene scene;
   ps::Scene pic;          // the Lovelace card's schematic, when the tile has the room for it
   bool picture = false;
-  float k = 1;            // card units to pixels, and where the card's corner sits in the tile
-  int ox = 0, oy = 0;
+  float kx = 1, ky = 1;   // card units to pixels: the card fills the tile
+  lv_timer_t *anim = nullptr;  // the card's moving parts
   int width = 0, height = 0;
   int tab = 0;
   int pending = -1;  // the button that asked for a second tap
@@ -67,10 +67,9 @@ static void rebuild(lv_obj_t *canvas) {
   const pc::Measure m = measure();
   view->picture = pc::wants_picture(*view->data, m, view->width, view->height);
   if (view->picture) {
-    view->pic = ps::build(view->data->pic, view->pending);
-    view->k = std::min(view->width / ps::W, view->height / ps::H);
-    view->ox = int(std::lround((view->width - ps::W * view->k) / 2));
-    view->oy = int(std::lround((view->height - ps::H * view->k) / 2));
+    view->pic = ps::build(view->data->pic, view->pending, float(lv_tick_get() % 1000000) / 1000.0f);
+    view->kx = view->width / ps::W;
+    view->ky = view->height / ps::H;
     view->scene = pc::Scene();
   } else {
     view->pic = ps::Scene();
@@ -129,9 +128,9 @@ struct Pen {
   lv_layer_t *layer;
   lv_area_t clip;
   int x0, y0;  // the card's corner on the display
-  float k;
-  int X(float v) const { return x0 + int(std::lround(v * k)); }
-  int Y(float v) const { return y0 + int(std::lround(v * k)); }
+  float kx, ky, k;  // card units to pixels across, down, and for sizes (the smaller)
+  int X(float v) const { return x0 + int(std::lround(v * kx)); }
+  int Y(float v) const { return y0 + int(std::lround(v * ky)); }
   bool sees(int x1, int y1, int x2, int y2) const { return meets(clip, x1, y1, x2, y2); }
 };
 
@@ -321,12 +320,12 @@ static void pic_text(const Pen &p, const ps::Txt &t) {
     total += laid[n].w + r.dx * p.k;
     ++n;
   }
-  float x = p.x0 + t.x * p.k - (t.anchor == 0 ? 0.0f : t.anchor == 1 ? total / 2 : total);
+  float x = p.x0 + t.x * p.kx - (t.anchor == 0 ? 0.0f : t.anchor == 1 ? total / 2 : total);
   for (int i = 0; i < n; ++i) {
     const ps::Run &r = *laid[i].run;
     const lv_font_t *f = laid[i].font;
     x += r.dx * p.k;
-    float base = p.y0 + t.y * p.k + r.dy * p.k;
+    float base = p.y0 + t.y * p.ky + r.dy * p.k;
     if (t.centre) base += 0.26f * r.size * p.k;
     const int top = int(std::lround(base)) - (lv_font_get_line_height(f) - f->base_line);
     if (t.halo) {
@@ -344,7 +343,7 @@ static void pic_text(const Pen &p, const ps::Txt &t) {
 }
 
 static void paint_picture(lv_layer_t *layer, const lv_area_t &a, const lv_area_t &clip, const View &view) {
-  Pen p{layer, clip, a.x1 + view.ox, a.y1 + view.oy, view.k};
+  Pen p{layer, clip, a.x1, a.y1, view.kx, view.ky, std::min(view.kx, view.ky)};
   const ps::Scene &sc = view.pic;
   for (auto &st : sc.order) {
     switch (st.kind) {
@@ -419,6 +418,13 @@ static void draw(lv_event_t *e) {
   }
 }
 
+// The card's moving parts: the picture is built again for the moment, a few times a second.
+static void animate(lv_timer_t *timer) {
+  auto *canvas = static_cast<lv_obj_t *>(lv_timer_get_user_data(timer));
+  View *view = view_of(canvas);
+  if (view && view->picture && !lv_obj_has_flag(canvas, LV_OBJ_FLAG_HIDDEN)) rebuild(canvas);
+}
+
 // A button's wait for its second tap is over: it goes back to its label.
 static void ask_over(lv_timer_t *timer) {
   auto *canvas = static_cast<lv_obj_t *>(lv_timer_get_user_data(timer));
@@ -447,7 +453,7 @@ void render(Widgets &w, const Tile &t, int width, int height) {
     lv_obj_add_event_cb(canvas, draw, LV_EVENT_DRAW_MAIN, nullptr);
     lv_obj_add_event_cb(canvas, [](lv_event_t *e) {
       auto *c = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
-      if (auto *v = view_of(c)) { if (v->timer) lv_timer_delete(v->timer); delete v; }
+      if (auto *v = view_of(c)) { if (v->timer) lv_timer_delete(v->timer); if (v->anim) lv_timer_delete(v->anim); delete v; }
     }, LV_EVENT_DELETE, nullptr);
   }
   View &view = *view_of(canvas);
@@ -458,6 +464,8 @@ void render(Widgets &w, const Tile &t, int width, int height) {
   lv_obj_set_pos(canvas, 0, 0);
   lv_obj_set_size(canvas, width, height);
   rebuild(canvas);
+  if (view.picture && !view.anim) view.anim = lv_timer_create(animate, 120, canvas);
+  if (!view.picture && view.anim) { lv_timer_delete(view.anim); view.anim = nullptr; }
 }
 
 // The reading behind a sensor as the card a tap opens shows it: the row's label and value.
@@ -476,7 +484,7 @@ static const char *reading_title(int ent) {
   static const char *const names[ps::E_COUNT] = {
       "Return", "Flow", "Draw-off", "Gas", "Zone 1", "Primary flow", "Flow rate", "Pressure", "Outside", "Heat curve",
       "Signal", "Megaflo intake", "Cylinder", "Heating circuit", "Heating manager", "Immersion", "Heaters", "Thermostat",
-      "Hot water", "Mains flow"};
+      "Hot water", "Mains flow", "Softener salt"};
   return ent >= 0 && ent < ps::E_COUNT ? names[ent] : "";
 }
 
@@ -489,7 +497,7 @@ static const Call BUTTONS[4] = {
 static bool tap_picture(lv_obj_t *canvas, View *view, const lv_point_t &point) {
   lv_area_t a;
   lv_obj_get_coords(canvas, &a);
-  const float x = (point.x - a.x1 - view->ox) / view->k, y = (point.y - a.y1 - view->oy) / view->k;
+  const float x = (point.x - a.x1) / view->kx, y = (point.y - a.y1) / view->ky;
   const ps::Hit *h = ps::hit(view->pic, x, y);
   if (!h) { if (view->pending >= 0) { stop_asking(*view); rebuild(canvas); } return false; }
   const ps::Data &d = view->data->pic;

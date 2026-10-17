@@ -235,7 +235,7 @@ F_HEAT_CALL, F_HW_CALL, F_HEAT_PATH, F_DHW_PATH, F_ANY_PRIMARY, F_ACTIVE, F_DHW_
 # The entities a tap on the scene opens, in the order of `sc.e`.
 SCENE_ENTITIES = ('return_temp', 'flow_temp', 'draw_off', 'gas', 'z1_mode', 'power', 'primary_flow', 'pressure', 'outside',
                   'heat_curve', 'signal', 'megaflo_intake', 'cylinder', 'hc_mode', 'pump', 'immersion_power', 'heaters',
-                  'thermostat', 'hot_water', 'mains_flow')
+                  'thermostat', 'hot_water', 'mains_flow', 'salt_low')
 UNAVAILABLE = ('unknown', 'unavailable', 'none', '')
 
 
