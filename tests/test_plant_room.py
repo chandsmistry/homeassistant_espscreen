@@ -149,7 +149,7 @@ class Payload(unittest.TestCase):
 
     def test_wire_is_small(self):
         import json
-        self.assertLess(len(json.dumps(pr.payload(base(), now=NOW))), 2400)
+        self.assertLess(len(json.dumps(pr.payload(base(), now=NOW), separators=(",", ":"), ensure_ascii=False).encode()), 3600)
 
 
 class Layout(unittest.TestCase):

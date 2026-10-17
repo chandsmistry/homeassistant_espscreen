@@ -2,8 +2,10 @@
 
 A tile (`screen.plant_room`) for a heating and hot-water plant room: a boiler, two zone valves, radiators, a cylinder and
 the mains water. It has two forms. On a small tile three tabs (Heating, Hot water, Cold) show a headline and rows of
-readings under the boiler's state. On a large tile (room for the picture, about 66 by 50 mm) it draws a schematic of the
-same state.
+readings under the boiler's state. On a large tile (room for the picture, about 100 by 62 mm) it draws the Lovelace card's 1000 x 620 schematic 1:1:
+same positions, words and colours, from the add-on's `sc` scene (flags, probe colours, 33 words, 20 entities) by
+`plant_scene.h` (pure geometry, tested on the PC) and `plant_view.cpp` (pixels). The glyphs come from
+`tools/generate_plant_fonts.py` (`plant_fonts.h`).
 
 ## Who works out what
 
@@ -13,8 +15,8 @@ The add-on does (`screen_manager/app/plant_room.py`); the screen only draws what
 valves, stale temperatures, the water pressure, a condensing return, mains and immersion activity and the cylinder's
 thermocline. The numbers of its rules are at the top of that file.
 
-The payload keeps the order of the heating tab's rows (flow, flow target, return, pressure, gas, outside, house), the hot
-water tab's first row (cylinder) and the cold tab's first row (mains), because the schematic opens their sensors by place.
+The scene's rules are the Lovelace card's (`_model`): online, firing, boiler active, calls, stale temperatures, condensing,
+mains deadband, immersion, probe colours and the cylinder's mix height. Entities in `sc.e` are what a tap opens.
 
 ## Taps
 

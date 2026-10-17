@@ -44,8 +44,6 @@ static Data sample() {
             {"cold", "Mains running", 4, {{"Mains flow", "2.1 L/min", "sensor.mains", 4}, {"Softener salt", "OK", "binary_sensor.salt", 1}}}};
   d.controls = {{"Radiators off", "climate.set_hvac_mode", "hvac_mode", "off", false}, {"Radiators on", "climate.set_hvac_mode", "hvac_mode", "heat", true},
                 {"Preset normal", "climate.set_preset_mode", "preset_mode", "none", true}, {"Preset eco", "climate.set_preset_mode", "preset_mode", "eco", false}};
-  d.map.flow = 45; d.map.ret = 40; d.map.cylinder = 52; d.map.mains = 2.1f; d.map.bar = 1.5f; d.map.thermocline = 70;
-  d.map.firing = d.map.zone1 = d.map.mains_active = true;
   return d;
 }
 
@@ -63,7 +61,7 @@ int main() {
     // A small tile: the tabs.
     const int w = int(b.dpi * 1.9), h = int(b.dpi * 1.7);
     Scene s = build(d, m, w, h);
-    CHECK(s.ok && !s.schematic);
+    CHECK(s.ok);
     CHECK(inside(s, w, h));
     int tabs = 0;
     for (auto &x : s.hits) if (x.kind == HitKind::TAB) ++tabs;
@@ -82,14 +80,15 @@ int main() {
     bool found = false;
     for (auto &t : ask.texts) if (t.s == d.confirm) found = true;
     CHECK(found);
-    // A big tile: the picture, with a part for each sensor.
+    // A big tile with the card's picture: the view paints it, so the summary stays empty; without the picture the tabs remain.
     const int bw = int(b.dpi * 3.2), bh = int(b.dpi * 2.4);
-    Scene pic = build(d, m, bw, bh);
-    CHECK(pic.ok && pic.schematic);
-    CHECK(inside(pic, bw, bh));
-    int parts = 0;
-    for (auto &x : pic.hits) if (x.kind == HitKind::PART && !x.entity.empty()) ++parts;
-    CHECK(parts == 6);
+    CHECK(build(d, m, bw, bh).ok);
+    CHECK(!wants_picture(d, m, bw, bh));
+    Data withpic = d;
+    withpic.pic.any = true;
+    CHECK(wants_picture(withpic, m, m.schematic_w, m.schematic_h));
+    CHECK(!wants_picture(withpic, m, m.schematic_w - 1, m.schematic_h));
+    CHECK(!build(withpic, m, m.schematic_w, m.schematic_h).ok);
     // No data: nothing drawn.
     Data none;
     CHECK(!build(none, m, w, h).ok);

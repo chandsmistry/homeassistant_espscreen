@@ -1,8 +1,7 @@
 #pragma once
 // The plant room card (firmware 0.55.0): a heating and hot-water plant room in two forms. On a small tile three tabs
 // (Heating, Hot water, Cold) with a headline and rows of readings under them, the boiler's state above; on a large one
-// (room for the picture, see Measure) a schematic of the same state: boiler, the two zone valves, radiators and the
-// cylinder with the hot water in it.
+// (room for the picture, see Measure) the Lovelace card's own schematic, plant_scene.h.
 //
 // Where everything goes. Pure arithmetic, free of LVGL and ESPHome, so tests/test_plant_card.cpp checks it on a PC;
 // plant_view.cpp measures the text and paints the Scene this builds. Every derived state comes from the add-on
@@ -14,6 +13,8 @@
 #include <functional>
 #include <string>
 #include <vector>
+
+#include "plant_scene.h"
 
 namespace plant_card {
 // The colours the add-on names (plant_room.py IDLE..IMMERSION), as paints the view maps to theme roles.
@@ -46,19 +47,14 @@ struct Control {
   std::string label, service, key, value;
   bool active = false;
 };
-struct Schematic {
-  float flow = NAN, ret = NAN, cylinder = NAN, draw = NAN, mains = NAN, bar = NAN;
-  int thermocline = 8;
-  bool firing = false, zone1 = false, zone2 = false, immersion = false, hot_draw = false, mains_active = false, condensing = false;
-};
 struct Data {
   bool any = false;
   int boiler = 0, boiler_colour = 0;
   std::string boiler_text, thermostat, confirm;
   std::vector<Tab> tabs;
   std::vector<Control> controls;
-  Schematic map;
-  // The sensors behind the schematic's parts, from the rows the tabs carry (plant_room.py keeps their order).
+  plant_scene::Data pic;  // the schematic's own data
+  // A tab row's sensor.
   std::string entity(size_t tab, size_t row) const {
     return tab < tabs.size() && row < tabs[tab].rows.size() ? tabs[tab].rows[row].entity : std::string();
   }
@@ -105,7 +101,7 @@ struct Hit {
   std::string entity;
 };
 struct Scene {
-  bool ok = false, schematic = false;
+  bool ok = false;
   std::vector<Box> boxes;
   std::vector<Seg> segs;
   std::vector<Disc> discs;
@@ -205,72 +201,14 @@ inline Scene summary(const Data &d, const Measure &m, int w, int h, int tab, int
   return sc;
 }
 
-inline Scene schematic(const Data &d, const Measure &m, int w, int h) {
-  Scene sc;
-  sc.ok = sc.schematic = true;
-  const Schematic &s = d.map;
-  const int pad = std::max(4, std::min(w, h) / 40), sm = m.line[SMALL];
-  auto X = [&](float f) { return int(std::lround(w * f)); };
-  auto Y = [&](float f) { return int(std::lround(h * f)); };
-  const int pipe = std::max(2, std::min(w, h) / 60);
-  // The boiler: a box, a flame, its state and pressure.
-  const int bx = X(0.04f), by = Y(0.18f), bw = X(0.22f), bh = Y(0.62f);
-  sc.boxes.push_back({bx, by, bw, bh, pad, Paint::kLine, 0, paint_of(d.boiler_colour), 2});
-  sc.texts.push_back({d.boiler_text, SMALL, bx, by + pad, bw, 1, Paint::kInk});
-  const int fr = std::max(4, std::min(bw, bh) / 5);
-  sc.discs.push_back({bx + bw / 2, by + bh / 2, fr, s.firing ? Paint::kHeat : Paint::kLine, s.firing});
-  if (!std::isnan(s.bar)) sc.texts.push_back({number(s.bar, 1, m.decimal) + " bar", SMALL, bx, by + bh - sm - pad, bw, 1, Paint::kMuted});
-  sc.hits.push_back({bx, by, bw, bh, HitKind::PART, 0, d.entity(0, 3)});
-  // Flow pipes out of the boiler through the two zone valves.
-  const int y1 = Y(0.30f), y2 = Y(0.70f), vx = X(0.43f), cx = X(0.60f);
-  sc.segs.push_back({bx + bw, y1, cx, y1, pipe, s.zone1 ? Paint::kHeat : Paint::kLine});
-  sc.segs.push_back({bx + bw, y2, cx, y2, pipe, s.zone2 ? Paint::kHot : Paint::kLine});
-  const int vr = std::max(5, sm / 2);
-  sc.discs.push_back({vx, y1, vr, s.zone1 ? Paint::kOk : Paint::kMuted, s.zone1});
-  sc.discs.push_back({vx, y2, vr, s.zone2 ? Paint::kOk : Paint::kMuted, s.zone2});
-  sc.texts.push_back({"ZV1", SMALL, vx - X(0.06f), y1 - vr - sm - 1, X(0.12f), 1, Paint::kMuted});
-  sc.texts.push_back({"ZV2", SMALL, vx - X(0.06f), y2 - vr - sm - 1, X(0.12f), 1, Paint::kMuted});
-  // The boiler's flow and return temperatures sit at its edge.
-  sc.texts.push_back({"▲ " + number(s.flow, 0, m.decimal) + "°", SMALL, bx + bw + pad / 2, y1 + pipe, vx - bx - bw - vr - pad, 0, Paint::kHeat});
-  sc.texts.push_back({"▼ " + number(s.ret, 0, m.decimal) + "°", SMALL, bx, by + bh + pad, bw, 1, s.condensing ? Paint::kCold : Paint::kWarn});
-  sc.hits.push_back({bx + bw, y1 - pad * 2, vx - bx - bw, pad * 4, HitKind::PART, 1, d.entity(0, 0)});
-  sc.hits.push_back({bx, by + bh, bw, sm + pad * 2, HitKind::PART, 2, d.entity(0, 2)});
-  // The radiators.
-  const int rx = cx, rw = X(0.96f) - cx, ry = Y(0.08f), rh = Y(0.30f) - Y(0.08f) + Y(0.14f);
-  sc.boxes.push_back({rx, ry, rw, rh, pad, Paint::kLine, 0, s.zone1 ? Paint::kHeat : Paint::kLine, 2});
-  sc.texts.push_back({"Radiators", SMALL, rx, ry + rh / 2 - sm / 2, rw, 1, s.zone1 ? Paint::kHeat : Paint::kMuted});
-  const std::string house = d.entity(0, 6);
-  if (!house.empty()) sc.hits.push_back({rx, ry, rw, rh, HitKind::PART, 3, house});
-  // The cylinder: cold water at the bottom, hot above the thermocline.
-  const int cy0 = Y(0.50f), cyh = Y(0.94f) - cy0, cw = rw;
-  sc.boxes.push_back({rx, cy0, cw, cyh, pad, Paint::kLine, 0, Paint::kLine, 2});
-  const int inner = std::max(1, cyh - 4), cold = std::lround(inner * (1.0f - std::clamp(s.thermocline, 8, 92) / 100.0f));
-  sc.boxes.push_back({rx + 2, cy0 + 2, cw - 4, inner - cold, pad / 2, Paint::kHot, 110, Paint::kHot, 0});
-  sc.boxes.push_back({rx + 2, cy0 + 2 + inner - cold, cw - 4, cold, pad / 2, Paint::kCold, 110, Paint::kCold, 0});
-  sc.texts.push_back({"Cylinder " + number(s.cylinder, 0, m.decimal) + "°", SMALL, rx, cy0 + cyh / 2 - sm / 2, cw, 1, Paint::kInk});
-  if (s.immersion) {
-    const int ix = rx + cw / 4, iy = cy0 + cyh - cyh / 5;
-    sc.segs.push_back({ix, iy, ix + cw / 2, iy, std::max(2, pipe), Paint::kImmersion});
-    sc.texts.push_back({"Immersion", SMALL, rx, iy - sm - 1, cw, 1, Paint::kImmersion});
-  }
-  sc.hits.push_back({rx, cy0, cw, cyh, HitKind::PART, 4, d.entity(1, 0)});
-  // Hot water out at the top of the cylinder, mains in at the bottom.
-  const int hx = X(0.96f);
-  sc.segs.push_back({hx, cy0, X(0.99f), cy0, pipe, s.hot_draw ? Paint::kHot : Paint::kLine});
-  const int my = Y(0.97f) - sm / 2;
-  sc.segs.push_back({bx, my + sm / 2, rx, my + sm / 2 - pipe, pipe, s.mains_active ? Paint::kCold : Paint::kLine});
-  sc.texts.push_back({"Mains " + number(s.mains, 1, m.decimal) + " L/min", SMALL, bx, my - sm - pipe, X(0.5f), 0, s.mains_active ? Paint::kCold : Paint::kMuted});
-  sc.hits.push_back({bx, my - sm - pipe, X(0.5f), sm * 2 + pipe, HitKind::PART, 5, d.entity(2, 0)});
-  return sc;
+// The form the room holds: the card's picture when the app sent it and the tile has the room for it, else the tabs.
+inline bool wants_picture(const Data &d, const Measure &m, int w, int h) {
+  return d.pic.any && m.schematic_w > 0 && w >= m.schematic_w && h >= m.schematic_h;
 }
-
-// The form the room holds: the picture when it has the room for it, else the tabs.
-inline bool wants_schematic(const Measure &m, int w, int h) { return m.schematic_w > 0 && w >= m.schematic_w && h >= m.schematic_h; }
 
 inline Scene build(const Data &d, const Measure &m, int w, int h, int tab = 0, int pending = -1) {
   Scene sc;
-  if (w <= 0 || h <= 0 || !d.any) return sc;
-  if (wants_schematic(m, w, h)) return schematic(d, m, w, h);
+  if (w <= 0 || h <= 0 || !d.any || wants_picture(d, m, w, h)) return sc;
   return summary(d, m, w, h, tab, pending);
 }
 }  // namespace plant_card
