@@ -1,4 +1,6 @@
 ## Unreleased
+- **Plant room hot-water parity.** Match the dashboard's confirmed hot-water call, countdown, retained top-water reading, bulk estimate and measured immersion-heating states. The native tank rows keep their labels and values aligned, and the added row uses an append-only wire slot so either half can restart first safely.
+
 - **Plant room card.** A tile for a heating and hot-water plant room: three tabs (Heating, Hot water, Cold) with a boiler status line, and from a large size a schematic of boiler, zone valves, radiators and cylinder. The add-on works every state out from a preset of the plant room's sensors (each one can be replaced in the editor); the screen only draws. A tap on a reading opens its history; the radiator and preset buttons ask for a second tap before they call the thermostat. Needs the firmware of this build.
 
 - Photos side-by-side mode pairs adjacent portraits while keeping landscapes and unmatched portraits as single full-frame slides.

@@ -113,6 +113,19 @@ def _epoch(text):
         return None
 
 
+def _countdown(end, now):
+    """The Lovelace card's compact countdown, rounded up from an absolute endpoint."""
+    end_ts = _epoch(end)
+    if end_ts is None or end_ts <= now:
+        return ''
+    seconds = end_ts - now
+    if seconds < 60:
+        return '<1m'
+    minutes = int((seconds + 59) // 60)
+    hours, part = divmod(minutes, 60)
+    return f'{hours}h {part}m' if hours and part else f'{hours}h' if hours else f'{minutes}m'
+
+
 def _stale(state, now):
     moment = _epoch((state or {}).get('last_updated') or (state or {}).get('last_changed'))
     return moment is not None and now - moment > STALE_S
@@ -172,8 +185,12 @@ def facts(states: dict, mapping: dict | None = None, now: float | None = None) -
     f['heat_call'] = _attr(s['thermostat'], 'hvac_action') == 'heating'
     hw = s['hot_water']
     schedule = bool(_attr(hw, 'hot_water_schedule_active'))
-    boost = str(_attr(hw, 'operation_mode') or (hw or {}).get('state') or '').lower() == 'boost'
-    f['dhw_call'] = f['active'] and (schedule or boost)
+    mode = str(_attr(hw, 'operation_mode') or (hw or {}).get('state') or '').lower()
+    operations = _attr(hw, 'operation_list') or []
+    boost = mode in ('boost_30m', 'boost_1h', 'boost_2h') and mode in operations
+    schedule_selected = mode == 'schedule' and mode in operations
+    boiler_active = bool(_attr(hw, 'boiler_active'))
+    f['dhw_call'] = boiler_active and ((schedule_selected and schedule) or boost)
     f['zv1'], f['zv2'] = f['heat_call'], f['dhw_call']
     f['gas'], f['primary'] = gas, primary
     f['flow'], f['return'] = _num(s['flow_temp']), _num(s['return_temp'])
@@ -189,7 +206,8 @@ def facts(states: dict, mapping: dict | None = None, now: float | None = None) -
     mains = mains_lpm(s['mains_flow'])
     f['mains'], f['mains_active'] = mains, mains is not None and mains >= MAINS_ACTIVE_LPM
     ip = _num(s['immersion_power'])
-    f['immersion'] = _is(s['immersion'], 'on') or (ip is not None and ip > IMMERSION_W)
+    f['immersion_heating'] = ip is not None and ip > IMMERSION_W
+    f['immersion_active'] = _is(s['immersion'], 'on') or f['immersion_heating']
     f['salt_low'] = _is(s['salt_low'], 'on')
     f['mode'] = (s['thermostat'] or {}).get('state')
     f['preset'] = _attr(s['thermostat'], 'preset_mode')
@@ -232,6 +250,11 @@ S_DIM, S_TXT, S_FLOW, S_COLD, S_DHW, S_ELEC, S_OK, S_CTRL, S_GAS, S_SOFT, S_PROB
 F_HEAT_CALL, F_HW_CALL, F_HEAT_PATH, F_DHW_PATH, F_ANY_PRIMARY, F_ACTIVE, F_DHW_FLOW, F_MAINS, F_TANK_COLD, \
     F_HOUSE_COLD, F_WATER, F_HOT_DRAW, F_FIRING, F_IMMERSION, F_CYL, F_STANDBY, F_CONDENSING, F_NEST_OFF, \
     F_NEST_HEAT, F_PRESET_NONE, F_PRESET_ECO, F_COIL_FLOW, F_COIL_RETURN, F_BURNING_ONLINE = range(24)
+# The text slots of `sc.x`, kept in lock-step with plant_scene.h.
+T_SPUR, T_GAS, T_FLOW, T_FLOW_TAG, T_RET, T_RET_TAG, T_DELTA, T_PRESSURE, T_OUTDOOR, T_CURVE, T_LIMITS, T_STATUS, \
+    T_COND, T_COND2, T_RET_PROBE, T_FLOW_PROBE, T_RATE, T_DRAW_PROBE, T_INTAKE, T_CYL, T_CYL_TAG, T_CIRCUIT, \
+    T_MANAGER, T_IMM_STATE, T_IMM_W, T_TARGET, T_HOME, T_SPACE, T_HOT, T_DRAW, T_MAINS, T_AQUARO, T_SALT, \
+    T_CYL_SUB, T_COUNT = range(35)
 # The entities a tap on the scene opens, in the order of `sc.e`.
 SCENE_ENTITIES = ('return_temp', 'flow_temp', 'draw_off', 'gas', 'z1_mode', 'power', 'primary_flow', 'pressure', 'outside',
                   'heat_curve', 'signal', 'megaflo_intake', 'cylinder', 'hc_mode', 'pump', 'immersion_power', 'heaters',
@@ -356,7 +379,23 @@ def _model(states, mapping, now):
     ip = _fl(s['immersion_power'])
     m['imm_ok'] = _have(s['immersion_power'])
     m['imm_w'] = ip or 0.0
-    m['immersion'] = _is(s['immersion'], 'on') or (m['imm_ok'] and m['imm_w'] > IMMERSION_W)
+    m['immersion_heating'] = m['imm_ok'] and m['imm_w'] > IMMERSION_W
+    m['immersion_active'] = _is(s['immersion'], 'on') or m['immersion_heating']
+    useful = _attr(s['cylinder'], 'usable_hot_water_temperature_c')
+    useful_age = _attr(s['cylinder'], 'usable_hot_water_age_minutes')
+    try:
+        m['useful'] = float(useful)
+    except (TypeError, ValueError):
+        m['useful'] = None
+    try:
+        m['useful_age'] = float(useful_age)
+    except (TypeError, ValueError):
+        m['useful_age'] = None
+    m['useful_confidence'] = str(_attr(s['cylinder'], 'usable_hot_water_confidence') or 'Not observed')
+    m['useful_ok'] = m['useful'] is not None
+    m['useful_recent'] = m['useful_ok'] and m['useful_age'] is not None and m['useful_age'] <= 180
+    end = _attr(hw, 'boost_timer_end') if m['boost_sel'] else _attr(hw, 'next_transition_time') if m['sched_sel'] else None
+    m['hw_countdown'] = _countdown(end, now) if m['hw_call'] else ''
     ok = not m['flow_stale'] and not m['ret_stale']
     m['heat_path'] = m['heating_call'] and m['active'] and ok
     m['dhw_path'] = m['hw_call'] and m['active'] and ok
@@ -420,7 +459,7 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
             (F_DHW_PATH, m['dhw_path']), (F_ANY_PRIMARY, m['any_primary']), (F_ACTIVE, m['active']),
             (F_DHW_FLOW, m['dhw_flow']), (F_MAINS, m['mains_active']), (F_TANK_COLD, m['tank_cold']),
             (F_HOUSE_COLD, m['house_cold']), (F_WATER, m['water']), (F_HOT_DRAW, m['hot_draw']),
-            (F_FIRING, m['firing']), (F_IMMERSION, m['immersion']), (F_CYL, m['cyl_ok']),
+            (F_FIRING, m['firing']), (F_IMMERSION, m['immersion_heating']), (F_CYL, m['cyl_ok']),
             (F_STANDBY, m['online'] and not m['firing'] and not m['trouble']), (F_CONDENSING, m['condensing']),
             (F_NEST_OFF, m['nest_state'] == 'off'), (F_NEST_HEAT, m['nest_state'] == 'heat'),
             (F_PRESET_NONE, m['preset'] == 'none'), (F_PRESET_ECO, m['preset'] == 'eco')):
@@ -439,7 +478,7 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
         flags |= 1 << F_COIL_FLOW
     nest_status = S_ELEC if m['heating_call'] and m['hw_call'] else S_FLOW if m['heating_call'] else S_DHW if m['hw_call'] else S_CTRL
     imm_colour = _probe_colour(m['cyl'], m['cyl_ok'])
-    if not m['imm_ok'] or not m['immersion']:
+    if not m['immersion_heating']:
         imm_colour = S_DIM
     probes = [_probe_colour(m['flow'], m['flow_ok']), _probe_colour(m['ret'], m['ret_ok']),
               _probe_colour(m['draw'], m['draw_ok'], True), _probe_colour(m['intake'], m['intake_ok']), imm_colour, nest_status]
@@ -472,7 +511,8 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
     if not m['hw_ok']:
         hw_text, hw_colour = 'Unavailable', S_DHW
     elif m['hw_call']:
-        hw_text, hw_colour = 'Calling', S_DHW
+        hw_text = 'Calling' + (' · ' + m['hw_countdown'] if m['hw_countdown'] else '')
+        hw_colour = S_DHW
     else:
         hw_text = ('Schedule active' if m['sched_sel'] and m['sched_active'] else 'Scheduled' if m['sched_sel'] else
                    'Boost ready' if m['boost_sel'] else 'Ready' if m['hw_enabled'] else 'Off')
@@ -488,6 +528,17 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
         target_text = _r(float(m['nest_target']), 1) + '°' if m['nest_target'] is not None else '—'
     except (TypeError, ValueError):
         target_text = '—'
+    if m['useful_recent']:
+        cylinder_value = deg(m['useful'], True, '—')
+        cylinder_tag = 'TOP · ' + ('LIVE' if m['hot_draw'] else
+                                     f"{int(round(m['useful_age']))}M AGO" if m['useful_age'] < 60 else
+                                     f"{_r(m['useful_age'] / 60, 1)}H AGO")
+        cylinder_sub = 'BULK|' + deg(m['cyl'], m['cyl_ok'], '—')
+    else:
+        cylinder_value = deg(m['cyl'], m['cyl_ok'], '—')
+        cylinder_tag = 'BULK ESTIMATE' if m['cyl_ok'] else 'ESTIMATE PENDING'
+        cylinder_sub = ('STALE TOP|' + deg(m['useful'], True, '—', '°') if m['useful_ok'] else
+                        'TOP|NOT OBSERVED' if m['cyl_ok'] else '—')
     texts = [
         [deg(m['spur'], m['spur_ok'], 'n/a', ' W'), S_TXT],
         [deg(m['gas_kw'], m['gas_ok'], 'n/a', ' kW'), S_GAS],
@@ -508,12 +559,12 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
         [(_r(m['rate'], 1) if m['rate_ok'] else '—') + ' L/min', S_DIM],
         [draw_probe, S_DHW if stale_bad(m['draw_ok'], m['draw_stale']) else S_DIM],
         [deg(m['intake'], m['intake_ok']), S_TXT if m['intake_ok'] else S_DHW],
-        [deg(m['cyl'], m['cyl_ok'], '—'), S_TXT if m['cyl_ok'] else S_DHW],
-        ['ESTIMATE' if m['cyl_ok'] else 'ESTIMATE PENDING', S_DIM],
+        [cylinder_value, S_TXT if (m['useful_recent'] or m['cyl_ok']) else S_DHW],
+        [cylinder_tag, S_DIM],
         [_title(m['circuit']) if m['circuit_ok'] else 'n/a', S_TXT],
         [_title(m['pump_state']) if m['pump_ok'] else 'n/a', S_TXT],
-        ['n/a' if not m['imm_ok'] else 'Active' if m['immersion'] else 'Off', S_ELEC if m['immersion'] else S_DIM],
-        [f"{int(round(m['imm_w']))} W" if m['imm_ok'] else '--', S_ELEC if m['immersion'] else S_DIM],
+        ['n/a' if not m['imm_ok'] else 'Active' if m['immersion_active'] else 'Off', S_ELEC if m['immersion_heating'] else S_DIM],
+        [f"{int(round(m['imm_w']))} W" if m['imm_ok'] else '--', S_ELEC if m['immersion_heating'] else S_DIM],
         [target_text, S_TXT],
         [_r(m['home'], 1) if m['home_ok'] and m['home'] is not None else 'n/a', S_TXT],
         ['Calling' if m['heating_call'] else 'No demand', S_FLOW if m['heating_call'] else S_DIM],
@@ -524,6 +575,7 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
         [(_r(m['mains'], 2) + ' L/min') if m['mains_ok'] else 'Unavailable', S_COLD if m['mains_active'] else S_DIM],
         ['Salt · unavailable' if not m['salt_ok'] else 'Salt low · top up' if m['salt_low'] else 'Salt level OK',
          S_DHW if not m['salt_ok'] else S_FLOW if m['salt_low'] else S_DIM],
+        [cylinder_sub, S_DIM],
     ]
     return {'f': flags, 'p': probes, 'rh': -1 if hue is None else hue, 'my': int(round(mix_y * 10)),
             'co': [int(round(max(0.0, off - 0.06) * 1000)), int(round(min(1.0, off + 0.06) * 1000))],
@@ -546,15 +598,15 @@ def payload(states: dict, mapping: dict | None = None, now: float | None = None)
         _row('Outside', _fmt(f['outside'], '°C'), IDLE, e('outside')),
         _row('House', _fmt(f['house'], '°C'), IDLE, e('house_temp')),
     ]}
-    busy = f['hot_draw'] or f['dhw_call'] or f['immersion']
-    hot = {'k': 'hot', 'h': 'Hot draw' if f['hot_draw'] else 'Heating cylinder' if f['dhw_call'] else 'Immersion on' if f['immersion'] else 'Standby',
+    busy = f['hot_draw'] or f['dhw_call'] or f['immersion_heating']
+    hot = {'k': 'hot', 'h': 'Hot draw' if f['hot_draw'] else 'Heating cylinder' if f['dhw_call'] else 'Immersion on' if f['immersion_active'] else 'Standby',
            'c': HOT if busy else IDLE, 'r': [
         _row('Cylinder (est.)', _fmt(f['cylinder'], '°C'), probe(f['cylinder'], True), e('cylinder')),
         _row('Megaflo intake', _fmt(f['intake'], '°C') + (' stale' if f['stale_intake'] else ''),
              IDLE if f['stale_intake'] else probe(f['intake']), e('megaflo_intake')),
         _row('Last draw-off', _fmt(f['draw'], '°C') + (' stale' if f['stale_draw'] else ''),
              IDLE if f['stale_draw'] else probe(f['draw'], True), e('draw_off')),
-        _row('Immersion', 'On' if f['immersion'] else 'Off', IMMERSION if f['immersion'] else IDLE, e('immersion')),
+        _row('Immersion', 'On' if f['immersion_active'] else 'Off', IMMERSION if f['immersion_heating'] else IDLE, e('immersion')),
         _row('Schedule', 'Active' if f['schedule'] else 'Off', HOT if f['schedule'] else IDLE, e('hot_water')),
     ]}
     cold = {'k': 'cold', 'h': 'Mains running' if f['mains_active'] else 'Mains idle', 'c': COLD if f['mains_active'] else IDLE, 'r': [

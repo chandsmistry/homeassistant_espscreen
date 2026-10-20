@@ -22,7 +22,8 @@ def base():
         P['signal']: st('on'), P['running']: st('on'), P['trouble']: st('off'),
         P['gas']: st(0, 'kW'), P['pump']: st('off'), P['primary_flow']: st(0),
         P['thermostat']: st('heat', hvac_action='idle', preset_mode='none'),
-        P['hot_water']: st('eco', hot_water_schedule_active=False, operation_mode='eco'),
+        P['hot_water']: st('off', hot_water_schedule_active=False, boiler_active=False,
+                           operation_mode='off', operation_list=['off', 'schedule', 'boost_30m', 'boost_1h', 'boost_2h']),
         P['flow_temp']: st(45), P['return_temp']: st(40), P['pressure']: st(1.5),
         P['cylinder']: st(55), P['mains_flow']: st(0, 'ml/s'), P['hot_draw']: st('off'),
     }
@@ -50,13 +51,12 @@ class Rules(unittest.TestCase):
         s[pr.PRESET['thermostat']] = st('heat', hvac_action='heating')
         self.assertTrue(pr.facts(s, now=NOW)['zv1'])
         s[pr.PRESET['pump']] = st('running')
-        s[pr.PRESET['hot_water']] = st('eco', hot_water_schedule_active=True)
+        s[pr.PRESET['hot_water']] = st('schedule', hot_water_schedule_active=True, boiler_active=True,
+                                           operation_mode='schedule', operation_list=['off', 'schedule'])
         f = pr.facts(s, now=NOW)
         self.assertTrue(f['dhw_call'] and f['zv2'])
-        s[pr.PRESET['pump']] = st('off'); s[pr.PRESET['primary_flow']] = st(0.6)
-        self.assertTrue(pr.facts(s, now=NOW)['dhw_call'])  # primary flow alone makes the boiler active
-        s[pr.PRESET['primary_flow']] = st(0.5)
-        self.assertFalse(pr.facts(s, now=NOW)['dhw_call'])
+        s[pr.PRESET['pump']] = st('off'); s[pr.PRESET['primary_flow']] = st(0)
+        self.assertTrue(pr.facts(s, now=NOW)['dhw_call'])  # the confirmed call can precede circulation
 
     def test_mains_units(self):
         self.assertAlmostEqual(pr.mains_lpm(st(25, 'ml/s')), 1.5)
@@ -96,11 +96,32 @@ class Rules(unittest.TestCase):
     def test_immersion(self):
         s = base()
         s[pr.PRESET['immersion_power']] = st(150, 'W')
-        self.assertTrue(pr.facts(s, now=NOW)['immersion'])
+        self.assertTrue(pr.facts(s, now=NOW)['immersion_heating'])
         s[pr.PRESET['immersion_power']] = st(100, 'W')
-        self.assertFalse(pr.facts(s, now=NOW)['immersion'])
+        self.assertFalse(pr.facts(s, now=NOW)['immersion_heating'])
         s[pr.PRESET['immersion']] = st('on')
-        self.assertTrue(pr.facts(s, now=NOW)['immersion'])
+        f = pr.facts(s, now=NOW)
+        self.assertFalse(f['immersion_heating'])  # switch-only is not measured heat
+        self.assertTrue(f['immersion_active'])
+        hot = pr.payload(s, now=NOW)['tabs'][1]
+        self.assertEqual(hot['h'], 'Immersion on')
+        self.assertEqual(hot['r'][3][1:3], ['On', pr.IDLE])
+
+    def test_hot_water_call_uses_selected_mode_and_boiler(self):
+        s = base(); s[pr.PRESET['pump']] = st('running')
+        common = {'operation_list': ['off', 'schedule', 'boost_30m', 'boost_1h', 'boost_2h']}
+        s[pr.PRESET['hot_water']] = st('boost_1h', operation_mode='boost_1h', boiler_active=True,
+                                           hot_water_schedule_active=False, **common)
+        self.assertTrue(pr.facts(s, now=NOW)['dhw_call'])
+        s[pr.PRESET['hot_water']]['attributes']['boiler_active'] = False
+        self.assertFalse(pr.facts(s, now=NOW)['dhw_call'])
+
+    def test_absolute_countdown(self):
+        from datetime import datetime, timezone
+        now = datetime(2027, 1, 15, 12, 0, tzinfo=timezone.utc).timestamp()
+        self.assertEqual(pr._countdown('2027-01-15T13:02:01+00:00', now), '1h 3m')
+        self.assertEqual(pr._countdown('2027-01-15T12:00:30+00:00', now), '<1m')
+        self.assertEqual(pr._countdown('2027-01-15T11:59:59+00:00', now), '')
 
     def test_thermocline(self):
         s = base()
@@ -150,6 +171,43 @@ class Payload(unittest.TestCase):
     def test_wire_is_small(self):
         import json
         self.assertLess(len(json.dumps(pr.payload(base(), now=NOW), separators=(",", ":"), ensure_ascii=False).encode()), 3600)
+
+    def test_cylinder_top_bulk_and_stale_rows(self):
+        s = base()
+        s[pr.PRESET['cylinder']] = st(38.1, usable_hot_water_temperature_c=39.3,
+                                      usable_hot_water_age_minutes=2,
+                                      usable_hot_water_confidence='Recent observation')
+        sc = pr.scene(s, now=NOW)
+        self.assertEqual(sc['x'][pr.T_CYL][0], '39.3 °C')
+        self.assertEqual(sc['x'][pr.T_CYL_TAG][0], 'TOP · 2M AGO')
+        self.assertEqual(sc['x'][pr.T_CYL_SUB][0], 'BULK|38.1 °C')
+        s[pr.PRESET['cylinder']]['attributes']['usable_hot_water_age_minutes'] = 181
+        sc = pr.scene(s, now=NOW)
+        self.assertEqual(sc['x'][pr.T_CYL][0], '38.1 °C')
+        self.assertEqual(sc['x'][pr.T_CYL_SUB][0], 'STALE TOP|39.3°')
+        s[pr.PRESET['cylinder']]['attributes'] = {}
+        self.assertEqual(pr.scene(s, now=NOW)['x'][pr.T_CYL_SUB][0], 'TOP|NOT OBSERVED')
+
+    def test_appended_wire_slot_keeps_old_firmware_indices(self):
+        self.assertEqual((pr.T_CIRCUIT, pr.T_MANAGER, pr.T_IMM_STATE, pr.T_SALT), (21, 22, 23, 32))
+        self.assertEqual((pr.T_CYL_SUB, pr.T_COUNT), (33, 34))
+        sc = pr.scene(base(), now=NOW)
+        self.assertEqual(len(sc['x']), pr.T_COUNT)
+        self.assertEqual(sc['x'][pr.T_CIRCUIT][0], 'n/a')
+        self.assertEqual(sc['x'][pr.T_CYL_SUB][0], 'TOP|NOT OBSERVED')
+
+    def test_countdown_and_switch_only_immersion(self):
+        from datetime import datetime, timezone
+        now = datetime(2027, 1, 15, 12, 0, tzinfo=timezone.utc).timestamp()
+        s = base(); s[pr.PRESET['pump']] = st('running')
+        s[pr.PRESET['hot_water']] = st('boost_2h', operation_mode='boost_2h', boiler_active=True,
+                                           hot_water_schedule_active=False, boost_timer_end='2027-01-15T13:02:01+00:00',
+                                           operation_list=['off', 'boost_2h'])
+        s[pr.PRESET['immersion']] = st('on'); s[pr.PRESET['immersion_power']] = st(0, 'W')
+        sc = pr.scene(s, now=now)
+        self.assertEqual(sc['x'][pr.T_HOT][0], 'Calling · 1h 3m')
+        self.assertFalse(sc['f'] & (1 << pr.F_IMMERSION))
+        self.assertEqual(sc['x'][pr.T_IMM_STATE], ['Active', pr.S_DIM])
 
 
 class Layout(unittest.TestCase):

@@ -25,7 +25,7 @@ enum Flag : int {
 enum Slot : int {
   T_SPUR, T_GAS, T_FLOW, T_FLOW_TAG, T_RET, T_RET_TAG, T_DELTA, T_PRESSURE, T_OUTDOOR, T_CURVE, T_LIMITS, T_STATUS,
   T_COND, T_COND2, T_RET_PROBE, T_FLOW_PROBE, T_RATE, T_DRAW_PROBE, T_INTAKE, T_CYL, T_CYL_TAG, T_CIRCUIT, T_MANAGER,
-  T_IMM_STATE, T_IMM_W, T_TARGET, T_HOME, T_SPACE, T_HOT, T_DRAW, T_MAINS, T_AQUARO, T_SALT, T_COUNT
+  T_IMM_STATE, T_IMM_W, T_TARGET, T_HOME, T_SPACE, T_HOT, T_DRAW, T_MAINS, T_AQUARO, T_SALT, T_CYL_SUB, T_COUNT
 };
 // The entities a tap opens, in the order of `e` (plant_room.py SCENE_ENTITIES).
 enum Ent : int {
@@ -667,23 +667,29 @@ inline Scene Builder::build() {
     coil("M433,252 A11,11 0 0 0 433,274 H541 A11,11 0 0 1 541,296 H433 A11,11 0 0 0 433,318 H541 A11,11 0 0 1 541,340 H433 A11,11 0 0 0 433,362 H523 A29,29 0 0 1 523,420 H422");
     if (dhw_path) march("M433,252 A11,11 0 0 0 433,274 H541 A11,11 0 0 1 541,296 H433 A11,11 0 0 0 433,318 H541 A11,11 0 0 1 541,340 H433 A11,11 0 0 0 433,362 H523 A29,29 0 0 1 523,420 H422", 1, 15, 2, L(0xFFFFFF), 5.9f);
   }
-  say(VAL_BIG, T_CYL, 487, 223, 1, true);
-  say(TAG, T_CYL_TAG, 487, 263, 1, true);
+  say(VAL_BIG, T_CYL, 487, 216, 1, true);
+  say(TAG, T_CYL_TAG, 487, 239, 1, true);
+  {
+    const std::string &row = d.text(T_CYL_SUB);
+    const size_t split = row.find('|');
+    if (split == std::string::npos) say(SUB, T_CYL_SUB, 487, 264, 1, true);
+    else {
+      say(SUB, row.substr(0, split), 438, 264, R(DIM), 0, true);
+      Txt &value = text_(536, 264, 2, true);
+      Run r = run(VAL_TINY, row.substr(split + 1), ink_of(d.ink(T_CYL_SUB)));
+      if (row.rfind("BULK|", 0) == 0) r.weight = 8;
+      value.runs.push_back(r);
+    }
+  }
   hit(430, 275, 114, 20, E_CIRCUIT);
   {
-    Txt &t = text_(487, 285, 1, true);
-    t.runs.push_back(run(TAG, "CIRCUIT ", R(DIM)));
-    Run v = run(VAL_TINY, d.text(T_CIRCUIT), ink_of(d.ink(T_CIRCUIT)));
-    v.dx = 8;
-    t.runs.push_back(v);
+    say(TAG, "CIRCUIT", 438, 285, R(DIM), 0, true);
+    say(VAL_TINY, T_CIRCUIT, 536, 285, 2, true);
   }
   hit(430, 297, 114, 20, E_MANAGER);
   {
-    Txt &t = text_(487, 307, 1, true);
-    t.runs.push_back(run(TAG, "MANAGER ", R(DIM)));
-    Run v = run(VAL_TINY, d.text(T_MANAGER), ink_of(d.ink(T_MANAGER)));
-    v.dx = 8;
-    t.runs.push_back(v);
+    say(TAG, "MANAGER", 438, 307, R(DIM), 0, true);
+    say(VAL_TINY, T_MANAGER, 536, 307, 2, true);
   }
 
   // The immersion heater.

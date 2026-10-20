@@ -18,6 +18,9 @@ static ps::Data sample(uint32_t flags) {
 static uint32_t bit(ps::Flag f) { return 1u << f; }
 
 int main() {
+  static_assert(ps::T_CIRCUIT == 21 && ps::T_MANAGER == 22 && ps::T_IMM_STATE == 23 && ps::T_SALT == 32,
+                "existing Plant Room wire slots must not move");
+  static_assert(ps::T_CYL_SUB == 33 && ps::T_COUNT == 34, "new Plant Room text belongs at the end of the wire payload");
   // Idle: the fixed furniture only.
   {
     ps::Scene s = ps::build(sample(0));
@@ -71,6 +74,22 @@ int main() {
     a.flags |= bit(ps::F_COIL_FLOW);
     ps::Scene solid = ps::build(a);
     CHECK(banded.polys.size() > solid.polys.size());
+  }
+  // The v2.5.22 tank rows keep labels left, values right, and make BULK prominent.
+  {
+    ps::Data d = sample(bit(ps::F_CYL));
+    d.said[ps::T_CYL_SUB] = {"BULK|38.1 °C", 1};
+    d.said[ps::T_CIRCUIT] = {"Auto", 1};
+    d.said[ps::T_MANAGER] = {"Running", 1};
+    ps::Scene s = ps::build(d);
+    bool bulk_label = false, bulk_value = false, circuit_label = false, circuit_value = false;
+    for (auto &t : s.txts) for (auto &r : t.runs) {
+      if (r.s == "BULK") bulk_label = t.x == 438 && t.anchor == 0;
+      if (r.s == "38.1 °C") bulk_value = t.x == 536 && t.anchor == 2 && r.weight >= 7;
+      if (r.s == "CIRCUIT") circuit_label = t.x == 438 && t.anchor == 0;
+      if (r.s == "Auto") circuit_value = t.x == 536 && t.anchor == 2;
+    }
+    CHECK(bulk_label && bulk_value && circuit_label && circuit_value);
   }
   // The path reader: arcs end where they say, semicircles bulge the right way.
   {

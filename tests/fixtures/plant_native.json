@@ -1,0 +1,326 @@
+{
+  "b": [
+    2,
+    "Firing",
+    2
+  ],
+  "tabs": [
+    {
+      "k": "heat",
+      "h": "No heat call",
+      "c": 0,
+      "r": [
+        [
+          "Flow",
+          "68 °C",
+          2,
+          "sensor.ebusd_bai_status01_temp"
+        ],
+        [
+          "Flow target",
+          "70 °C",
+          0,
+          "sensor.ebusd_bai_setmode_flowtempdesired"
+        ],
+        [
+          "Return",
+          "65.4 °C",
+          5,
+          "sensor.ebusd_bai_returntemp_temp"
+        ],
+        [
+          "Pressure",
+          "1.6 bar",
+          1,
+          "sensor.ebusd_bai_waterpressure_press"
+        ],
+        [
+          "Gas",
+          "8.4 kW",
+          2,
+          "sensor.ebusd_bai_boiler_live_gas"
+        ],
+        [
+          "Outside",
+          "12 °C",
+          0,
+          "sensor.ebusd_broadcast_outsidetemp"
+        ],
+        [
+          "House",
+          "21.2 °C",
+          0,
+          "sensor.whole_home_average_temperature"
+        ]
+      ]
+    },
+    {
+      "k": "hot",
+      "h": "Heating cylinder",
+      "c": 3,
+      "r": [
+        [
+          "Cylinder (est.)",
+          "38.1 °C",
+          3,
+          "sensor.estimated_hot_water_cylinder_temperature"
+        ],
+        [
+          "Megaflo intake",
+          "68 °C",
+          2,
+          "sensor.salus_ps600_megaflo_primary_intake_temperature"
+        ],
+        [
+          "Last draw-off",
+          "39.4 °C",
+          3,
+          "sensor.ps600_dhw_draw_off_temperature_last_known"
+        ],
+        [
+          "Immersion",
+          "Off",
+          0,
+          "switch.water_tank_spur"
+        ],
+        [
+          "Schedule",
+          "Active",
+          3,
+          "water_heater.hallway_hot_water"
+        ]
+      ]
+    },
+    {
+      "k": "cold",
+      "h": "Mains idle",
+      "c": 0,
+      "r": [
+        [
+          "Mains flow",
+          "0 L/min",
+          0,
+          "sensor.aquaro_sensor_82464185790730_water_flow"
+        ],
+        [
+          "Softener salt",
+          "OK",
+          1,
+          "binary_sensor.water_softener_moisture"
+        ]
+      ]
+    }
+  ],
+  "a": {
+    "e": "climate.hallway_thermostat",
+    "c": [
+      [
+        "Radiators off",
+        "climate.set_hvac_mode",
+        "hvac_mode",
+        "off",
+        true
+      ],
+      [
+        "Radiators on",
+        "climate.set_hvac_mode",
+        "hvac_mode",
+        "heat",
+        false
+      ],
+      [
+        "Preset normal",
+        "climate.set_preset_mode",
+        "preset_mode",
+        "none",
+        true
+      ],
+      [
+        "Preset eco",
+        "climate.set_preset_mode",
+        "preset_mode",
+        "eco",
+        false
+      ]
+    ],
+    "cf": "Tap again to confirm"
+  },
+  "sc": {
+    "f": 675898,
+    "p": [
+      2,
+      2,
+      4,
+      2,
+      0,
+      4
+    ],
+    "rh": -1,
+    "my": 2691,
+    "co": [
+      272,
+      392
+    ],
+    "x": [
+      [
+        "30.0 W",
+        1
+      ],
+      [
+        "8.4 kW",
+        8
+      ],
+      [
+        "68.0 °C",
+        2
+      ],
+      [
+        "FLOW · TARGET 70.0",
+        0
+      ],
+      [
+        "65.4 °C",
+        3
+      ],
+      [
+        "BOILER RETURN",
+        0
+      ],
+      [
+        "Δ 2.6 K",
+        1
+      ],
+      [
+        "1.6 bar",
+        6
+      ],
+      [
+        "Outdoor · 12.0 °C",
+        0
+      ],
+      [
+        "Curve · 0.8",
+        0
+      ],
+      [
+        "Flow limits · 20–70 °C",
+        0
+      ],
+      [
+        "Master differs",
+        2
+      ],
+      [
+        "RETURN TOO WARM",
+        2
+      ],
+      [
+        "RETURN 65.4 °C",
+        0
+      ],
+      [
+        "65.4 °C",
+        0
+      ],
+      [
+        "68.0 °C",
+        0
+      ],
+      [
+        "15.6 L/min",
+        0
+      ],
+      [
+        "39.4 °C",
+        0
+      ],
+      [
+        "68.0 °C",
+        1
+      ],
+      [
+        "39.3 °C",
+        1
+      ],
+      [
+        "TOP · 2M AGO",
+        0
+      ],
+      [
+        "Auto",
+        1
+      ],
+      [
+        "Running",
+        1
+      ],
+      [
+        "Off",
+        0
+      ],
+      [
+        "0 W",
+        0
+      ],
+      [
+        "20.0°",
+        1
+      ],
+      [
+        "21.2",
+        1
+      ],
+      [
+        "No demand",
+        0
+      ],
+      [
+        "Calling · 1h 4m",
+        4
+      ],
+      [
+        "39.4 °C · No draw",
+        0
+      ],
+      [
+        "0.0 L/min · No draw",
+        0
+      ],
+      [
+        "0.0 L/min",
+        0
+      ],
+      [
+        "Salt level OK",
+        0
+      ],
+      [
+        "BULK|38.1 °C",
+        0
+      ]
+    ],
+    "e": [
+      "sensor.ebusd_bai_returntemp_temp",
+      "sensor.ebusd_bai_status01_temp",
+      "sensor.ps600_dhw_draw_off_temperature_last_known",
+      "sensor.ebusd_bai_boiler_live_gas",
+      "select.ebusd_ctlx0_z1opmode",
+      "sensor.boiler_3a_spur_current_power",
+      "sensor.ebusd_bai_primarycircuitflowrate",
+      "sensor.ebusd_bai_waterpressure_press",
+      "sensor.ebusd_broadcast_outsidetemp",
+      "number.ebusd_ctlx0_hc1heatcurve",
+      "binary_sensor.ebusd_global_signal",
+      "sensor.salus_ps600_megaflo_primary_intake_temperature",
+      "sensor.estimated_hot_water_cylinder_temperature",
+      "sensor.ebusd_bai_setmode_hcmode",
+      "sensor.ebusd_bai_status01_pumpstate",
+      "sensor.water_tank_spur_power",
+      "group.all_heaters",
+      "climate.hallway_thermostat",
+      "water_heater.hallway_hot_water",
+      "sensor.aquaro_sensor_82464185790730_water_flow",
+      "binary_sensor.water_softener_moisture"
+    ]
+  }
+}
