@@ -297,6 +297,10 @@
       [
         "BULK|38.1 °C",
         0
+      ],
+      [
+        "About 22 days remaining",
+        0
       ]
     ],
     "e": [
@@ -320,7 +324,9 @@
       "climate.hallway_thermostat",
       "water_heater.hallway_hot_water",
       "sensor.aquaro_sensor_82464185790730_water_flow",
-      "binary_sensor.water_softener_moisture"
+      "binary_sensor.water_softener_moisture",
+      "binary_sensor.salt_block_sensor_moisture",
+      "input_button.kinetico_salt_replaced"
     ]
   }
 }

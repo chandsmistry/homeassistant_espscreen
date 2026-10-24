@@ -46,6 +46,9 @@ PRESET = {
     'immersion_power': 'sensor.water_tank_spur_power',
     'mains_flow': 'sensor.aquaro_sensor_82464185790730_water_flow',
     'salt_low': 'binary_sensor.water_softener_moisture',
+    'salt_low_2': 'binary_sensor.salt_block_sensor_moisture',
+    'salt_days': 'sensor.kinetico_salt_days_remaining',
+    'salt_replaced': 'input_button.kinetico_salt_replaced',
 }
 ROLES = tuple(PRESET)
 ENTITY = re.compile(r'^[a-z_]+\.[a-z0-9_]+$')
@@ -208,7 +211,12 @@ def facts(states: dict, mapping: dict | None = None, now: float | None = None) -
     ip = _num(s['immersion_power'])
     f['immersion_heating'] = ip is not None and ip > IMMERSION_W
     f['immersion_active'] = _is(s['immersion'], 'on') or f['immersion_heating']
-    f['salt_low'] = _is(s['salt_low'], 'on')
+    f['salt_known'] = _have(s['salt_low']) and _have(s['salt_low_2'])
+    f['salt_block_1'] = _is(s['salt_low'], 'on')
+    f['salt_block_2'] = _is(s['salt_low_2'], 'on')
+    f['salt_low'] = f['salt_block_1'] or f['salt_block_2']
+    f['salt_empty'] = f['salt_block_1'] and f['salt_block_2']
+    f['salt_days'] = _num(s['salt_days'])
     f['mode'] = (s['thermostat'] or {}).get('state')
     f['preset'] = _attr(s['thermostat'], 'preset_mode')
     f['schedule'], f['boost'] = schedule, boost
@@ -249,16 +257,17 @@ S_DIM, S_TXT, S_FLOW, S_COLD, S_DHW, S_ELEC, S_OK, S_CTRL, S_GAS, S_SOFT, S_PROB
 # Flag bits of `sc.f`.
 F_HEAT_CALL, F_HW_CALL, F_HEAT_PATH, F_DHW_PATH, F_ANY_PRIMARY, F_ACTIVE, F_DHW_FLOW, F_MAINS, F_TANK_COLD, \
     F_HOUSE_COLD, F_WATER, F_HOT_DRAW, F_FIRING, F_IMMERSION, F_CYL, F_STANDBY, F_CONDENSING, F_NEST_OFF, \
-    F_NEST_HEAT, F_PRESET_NONE, F_PRESET_ECO, F_COIL_FLOW, F_COIL_RETURN, F_BURNING_ONLINE = range(24)
+    F_NEST_HEAT, F_PRESET_NONE, F_PRESET_ECO, F_COIL_FLOW, F_COIL_RETURN, F_BURNING_ONLINE, F_SALT_1, F_SALT_2, \
+    F_SALT_EMPTY, F_SALT_UNKNOWN = range(28)
 # The text slots of `sc.x`, kept in lock-step with plant_scene.h.
 T_SPUR, T_GAS, T_FLOW, T_FLOW_TAG, T_RET, T_RET_TAG, T_DELTA, T_PRESSURE, T_OUTDOOR, T_CURVE, T_LIMITS, T_STATUS, \
     T_COND, T_COND2, T_RET_PROBE, T_FLOW_PROBE, T_RATE, T_DRAW_PROBE, T_INTAKE, T_CYL, T_CYL_TAG, T_CIRCUIT, \
     T_MANAGER, T_IMM_STATE, T_IMM_W, T_TARGET, T_HOME, T_SPACE, T_HOT, T_DRAW, T_MAINS, T_AQUARO, T_SALT, \
-    T_CYL_SUB, T_COUNT = range(35)
+    T_CYL_SUB, T_SALT_DAYS, T_COUNT = range(36)
 # The entities a tap on the scene opens, in the order of `sc.e`.
 SCENE_ENTITIES = ('return_temp', 'flow_temp', 'draw_off', 'gas', 'z1_mode', 'power', 'primary_flow', 'pressure', 'outside',
                   'heat_curve', 'signal', 'megaflo_intake', 'cylinder', 'hc_mode', 'pump', 'immersion_power', 'heaters',
-                  'thermostat', 'hot_water', 'mains_flow', 'salt_low')
+                  'thermostat', 'hot_water', 'mains_flow', 'salt_low', 'salt_low_2', 'salt_replaced')
 UNAVAILABLE = ('unknown', 'unavailable', 'none', '')
 
 
@@ -374,8 +383,13 @@ def _model(states, mapping, now):
     m['tank_cold'] = m['mains_active'] and m['hot_draw']
     m['house_cold'] = m['mains_active']
     m['water'] = m['mains_active'] or m['hot_draw']
-    m['salt_ok'] = _have(s['salt_low'])
-    m['salt_low'] = m['salt_ok'] and _raw(s['salt_low']).lower() == 'on'
+    m['salt_1_ok'], m['salt_2_ok'] = _have(s['salt_low']), _have(s['salt_low_2'])
+    m['salt_ok'] = m['salt_1_ok'] and m['salt_2_ok']
+    m['salt_1'] = m['salt_1_ok'] and _raw(s['salt_low']).lower() == 'on'
+    m['salt_2'] = m['salt_2_ok'] and _raw(s['salt_low_2']).lower() == 'on'
+    m['salt_low'] = m['salt_1'] or m['salt_2']
+    m['salt_empty'] = m['salt_1'] and m['salt_2']
+    m['salt_days'] = _fl(s['salt_days']) if _have(s['salt_days']) else None
     ip = _fl(s['immersion_power'])
     m['imm_ok'] = _have(s['immersion_power'])
     m['imm_w'] = ip or 0.0
@@ -463,6 +477,10 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
             (F_STANDBY, m['online'] and not m['firing'] and not m['trouble']), (F_CONDENSING, m['condensing']),
             (F_NEST_OFF, m['nest_state'] == 'off'), (F_NEST_HEAT, m['nest_state'] == 'heat'),
             (F_PRESET_NONE, m['preset'] == 'none'), (F_PRESET_ECO, m['preset'] == 'eco')):
+        if on:
+            flags |= 1 << bit
+    for bit, on in ((F_SALT_1, m['salt_1']), (F_SALT_2, m['salt_2']),
+                    (F_SALT_EMPTY, m['salt_empty']), (F_SALT_UNKNOWN, not m['salt_ok'])):
         if on:
             flags |= 1 << bit
     # The cylinder's mix level and the coil's colour stops.
@@ -573,9 +591,12 @@ def scene(states: dict, mapping: dict | None = None, now: float | None = None) -
         [(_r(m['mains'], 2) + ' L/min · ' + ('Drawing' if m['mains_active'] else 'No draw')) if m['mains_ok'] else 'n/a',
          S_COLD if m['mains_active'] else S_DIM],
         [(_r(m['mains'], 2) + ' L/min') if m['mains_ok'] else 'Unavailable', S_COLD if m['mains_active'] else S_DIM],
-        ['Salt · unavailable' if not m['salt_ok'] else 'Salt low · top up' if m['salt_low'] else 'Salt level OK',
-         S_DHW if not m['salt_ok'] else S_FLOW if m['salt_low'] else S_DIM],
+        ['Salt unknown · check sensors' if not m['salt_ok'] else 'Salt empty · replace' if m['salt_empty'] else
+         'Salt low · top up' if m['salt_low'] else 'Salt level OK',
+         S_DHW if (not m['salt_ok'] or m['salt_empty']) else S_FLOW if m['salt_low'] else S_DIM],
         [cylinder_sub, S_DIM],
+        [('Replacement estimate unavailable' if m['salt_days'] is None else
+          f"About {max(0, int(round(m['salt_days'])))} days remaining"), S_DIM],
     ]
     return {'f': flags, 'p': probes, 'rh': -1 if hue is None else hue, 'my': int(round(mix_y * 10)),
             'co': [int(round(max(0.0, off - 0.06) * 1000)), int(round(min(1.0, off + 0.06) * 1000))],
@@ -611,7 +632,9 @@ def payload(states: dict, mapping: dict | None = None, now: float | None = None)
     ]}
     cold = {'k': 'cold', 'h': 'Mains running' if f['mains_active'] else 'Mains idle', 'c': COLD if f['mains_active'] else IDLE, 'r': [
         _row('Mains flow', _fmt(f['mains'], 'L/min'), COLD if f['mains_active'] else IDLE, e('mains_flow')),
-        _row('Softener salt', 'Low' if f['salt_low'] else 'OK', WARN if f['salt_low'] else OK, e('salt_low')),
+        _row('Kinetico 2020c', 'Unknown' if not f['salt_known'] else 'Empty' if f['salt_empty'] else
+             'Low' if f['salt_low'] else 'OK', BAD if f['salt_empty'] else WARN if f['salt_low'] else
+             OK if f['salt_known'] else IDLE, e('salt_low')),
     ]}
     return {
         'b': [f['boiler'], boiler_text, boiler_colour],

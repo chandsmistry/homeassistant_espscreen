@@ -30,5 +30,8 @@ export const PLANT_PRESET: Record<string, string> = {
   immersion_power: "sensor.water_tank_spur_power",
   mains_flow: "sensor.aquaro_sensor_82464185790730_water_flow",
   salt_low: "binary_sensor.water_softener_moisture",
+  salt_low_2: "binary_sensor.salt_block_sensor_moisture",
+  salt_days: "sensor.kinetico_salt_days_remaining",
+  salt_replaced: "input_button.kinetico_salt_replaced",
 };
 export const PLANT_ROLES = Object.keys(PLANT_PRESET);

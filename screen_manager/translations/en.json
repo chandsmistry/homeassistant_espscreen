@@ -2080,7 +2080,10 @@
           "immersion": "Immersion switch",
           "immersion_power": "Immersion power",
           "mains_flow": "Mains water flow",
-          "salt_low": "Softener salt low"
+          "salt_low": "Salt block 1 low",
+          "salt_low_2": "Salt block 2 low",
+          "salt_days": "Estimated replacement days",
+          "salt_replaced": "Salt replaced button"
         }
       },
       "energy": {

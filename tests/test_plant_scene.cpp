@@ -20,7 +20,10 @@ static uint32_t bit(ps::Flag f) { return 1u << f; }
 int main() {
   static_assert(ps::T_CIRCUIT == 21 && ps::T_MANAGER == 22 && ps::T_IMM_STATE == 23 && ps::T_SALT == 32,
                 "existing Plant Room wire slots must not move");
-  static_assert(ps::T_CYL_SUB == 33 && ps::T_COUNT == 34, "new Plant Room text belongs at the end of the wire payload");
+  static_assert(ps::T_CYL_SUB == 33 && ps::T_SALT_DAYS == 34 && ps::T_COUNT == 35,
+                "new Plant Room text belongs at the end of the wire payload");
+  static_assert(ps::E_SALT == 20 && ps::E_SALT_2 == 21 && ps::E_SALT_REPLACED == 22,
+                "salt entities append without moving existing wire positions");
   // Idle: the fixed furniture only.
   {
     ps::Scene s = ps::build(sample(0));
@@ -65,6 +68,26 @@ int main() {
     bool sure = false;
     for (auto &t : asking.txts) for (auto &r : t.runs) if (r.s == "SURE?") sure = true;
     CHECK(sure);
+  }
+  // The Kinetico section has three left-aligned lines and a guarded replacement hit.
+  {
+    ps::Data d = sample(bit(ps::F_SALT_1));
+    d.said[ps::T_SALT_DAYS] = {"About 22 days remaining", 0};
+    d.said[ps::T_SALT] = {"Salt low · top up", 2};
+    ps::Scene s = ps::build(d);
+    const ps::Hit *salt = ps::hit(s, 380, 580);
+    CHECK(salt && salt->kind == 2 && salt->index == ps::E_SALT_REPLACED);
+    bool title = false, days = false, status = false;
+    for (auto &t : s.txts) for (auto &r : t.runs) {
+      if (r.s == "Kinetico 2020c") title = t.x == 338 && t.anchor == 0;
+      if (r.s == "About 22 days remaining") days = t.x == 338 && t.anchor == 0;
+      if (r.s == "Salt low · top up") status = t.x == 338 && t.anchor == 0;
+    }
+    CHECK(title && days && status);
+    ps::Scene asking = ps::build(d, 4);
+    bool confirm = false;
+    for (auto &t : asking.txts) for (auto &r : t.runs) if (r.s == "Tap again to mark replaced") confirm = true;
+    CHECK(confirm);
   }
   // The coil's gradient: solid when the flags say so, banded otherwise.
   {

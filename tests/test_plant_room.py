@@ -26,6 +26,8 @@ def base():
                            operation_mode='off', operation_list=['off', 'schedule', 'boost_30m', 'boost_1h', 'boost_2h']),
         P['flow_temp']: st(45), P['return_temp']: st(40), P['pressure']: st(1.5),
         P['cylinder']: st(55), P['mains_flow']: st(0, 'ml/s'), P['hot_draw']: st('off'),
+        P['salt_low']: st('off'), P['salt_low_2']: st('off'), P['salt_days']: st(22),
+        P['salt_replaced']: st('2026-10-24T13:31:34.909153+00:00'),
     }
 
 
@@ -106,6 +108,22 @@ class Rules(unittest.TestCase):
         hot = pr.payload(s, now=NOW)['tabs'][1]
         self.assertEqual(hot['h'], 'Immersion on')
         self.assertEqual(hot['r'][3][1:3], ['On', pr.IDLE])
+
+    def test_salt_physical_alarms_override_countdown(self):
+        s = base()
+        f = pr.facts(s, now=NOW)
+        self.assertTrue(f['salt_known'])
+        self.assertFalse(f['salt_low'] or f['salt_empty'])
+        self.assertEqual(f['salt_days'], 22)
+        s[pr.PRESET['salt_low']] = st('on')
+        f = pr.facts(s, now=NOW)
+        self.assertTrue(f['salt_low'])
+        self.assertFalse(f['salt_empty'])
+        s[pr.PRESET['salt_low_2']] = st('on')
+        f = pr.facts(s, now=NOW)
+        self.assertTrue(f['salt_empty'])
+        s[pr.PRESET['salt_low']] = st('unavailable')
+        self.assertFalse(pr.facts(s, now=NOW)['salt_known'])
 
     def test_hot_water_call_uses_selected_mode_and_boiler(self):
         s = base(); s[pr.PRESET['pump']] = st('running')
@@ -190,11 +208,28 @@ class Payload(unittest.TestCase):
 
     def test_appended_wire_slot_keeps_old_firmware_indices(self):
         self.assertEqual((pr.T_CIRCUIT, pr.T_MANAGER, pr.T_IMM_STATE, pr.T_SALT), (21, 22, 23, 32))
-        self.assertEqual((pr.T_CYL_SUB, pr.T_COUNT), (33, 34))
+        self.assertEqual((pr.T_CYL_SUB, pr.T_SALT_DAYS, pr.T_COUNT), (33, 34, 35))
         sc = pr.scene(base(), now=NOW)
         self.assertEqual(len(sc['x']), pr.T_COUNT)
         self.assertEqual(sc['x'][pr.T_CIRCUIT][0], 'n/a')
         self.assertEqual(sc['x'][pr.T_CYL_SUB][0], 'TOP|NOT OBSERVED')
+
+    def test_kinetico_scene_states_and_guard_target(self):
+        s = base()
+        sc = pr.scene(s, now=NOW)
+        self.assertEqual(sc['x'][pr.T_SALT_DAYS][0], 'About 22 days remaining')
+        self.assertEqual(sc['x'][pr.T_SALT][0], 'Salt level OK')
+        self.assertEqual(sc['e'][-3:], [pr.PRESET['salt_low'], pr.PRESET['salt_low_2'], pr.PRESET['salt_replaced']])
+        s[pr.PRESET['salt_low']] = st('on')
+        self.assertEqual(pr.scene(s, now=NOW)['x'][pr.T_SALT][0], 'Salt low · top up')
+        s[pr.PRESET['salt_low_2']] = st('on')
+        empty = pr.scene(s, now=NOW)
+        self.assertEqual(empty['x'][pr.T_SALT][0], 'Salt empty · replace')
+        self.assertTrue(empty['f'] & (1 << pr.F_SALT_EMPTY))
+        s[pr.PRESET['salt_low']] = st('unknown')
+        unknown = pr.scene(s, now=NOW)
+        self.assertEqual(unknown['x'][pr.T_SALT][0], 'Salt unknown · check sensors')
+        self.assertTrue(unknown['f'] & (1 << pr.F_SALT_UNKNOWN))
 
     def test_countdown_and_switch_only_immersion(self):
         from datetime import datetime, timezone

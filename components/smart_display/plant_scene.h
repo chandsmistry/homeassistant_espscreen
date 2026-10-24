@@ -19,18 +19,21 @@ constexpr float W = 1000.0f, H = 620.0f;
 enum Flag : int {
   F_HEAT_CALL, F_HW_CALL, F_HEAT_PATH, F_DHW_PATH, F_ANY_PRIMARY, F_ACTIVE, F_DHW_FLOW, F_MAINS, F_TANK_COLD,
   F_HOUSE_COLD, F_WATER, F_HOT_DRAW, F_FIRING, F_IMMERSION, F_CYL, F_STANDBY, F_CONDENSING, F_NEST_OFF,
-  F_NEST_HEAT, F_PRESET_NONE, F_PRESET_ECO, F_COIL_FLOW, F_COIL_RETURN
+  F_NEST_HEAT, F_PRESET_NONE, F_PRESET_ECO, F_COIL_FLOW, F_COIL_RETURN, F_BURNING_ONLINE,
+  F_SALT_1, F_SALT_2, F_SALT_EMPTY, F_SALT_UNKNOWN
 };
 // The texts of `x`, in the order plant_room.py builds them.
 enum Slot : int {
   T_SPUR, T_GAS, T_FLOW, T_FLOW_TAG, T_RET, T_RET_TAG, T_DELTA, T_PRESSURE, T_OUTDOOR, T_CURVE, T_LIMITS, T_STATUS,
   T_COND, T_COND2, T_RET_PROBE, T_FLOW_PROBE, T_RATE, T_DRAW_PROBE, T_INTAKE, T_CYL, T_CYL_TAG, T_CIRCUIT, T_MANAGER,
-  T_IMM_STATE, T_IMM_W, T_TARGET, T_HOME, T_SPACE, T_HOT, T_DRAW, T_MAINS, T_AQUARO, T_SALT, T_CYL_SUB, T_COUNT
+  T_IMM_STATE, T_IMM_W, T_TARGET, T_HOME, T_SPACE, T_HOT, T_DRAW, T_MAINS, T_AQUARO, T_SALT, T_CYL_SUB,
+  T_SALT_DAYS, T_COUNT
 };
 // The entities a tap opens, in the order of `e` (plant_room.py SCENE_ENTITIES).
 enum Ent : int {
   E_RET, E_FLOW, E_DRAW, E_GAS, E_ZONE, E_SPUR, E_RATE, E_PRESSURE, E_OUTSIDE, E_CURVE, E_SIGNAL, E_INTAKE, E_CYL,
-  E_CIRCUIT, E_MANAGER, E_IMMERSION, E_HEATERS, E_THERMOSTAT, E_HOT_WATER, E_MAINS, E_SALT, E_COUNT
+  E_CIRCUIT, E_MANAGER, E_IMMERSION, E_HEATERS, E_THERMOSTAT, E_HOT_WATER, E_MAINS, E_SALT,
+  E_SALT_2, E_SALT_REPLACED, E_COUNT
 };
 struct Said {
   std::string s;
@@ -58,7 +61,7 @@ struct Data {
 };
 
 // ---- Colours: the card's own roles. `under` is what a translucent colour sits over; mix 255 is the colour itself.
-enum Role : uint8_t { CARD, SURFACE, BLOCK, BORDER, TXT, DIM, FLOW, COLD, DHW, ELEC, SOFT, PROBE, CTRL, GAS, OK, RGB };
+enum Role : uint8_t { CARD, SURFACE, BLOCK, BORDER, TXT, DIM, FLOW, COLD, DHW, ELEC, SOFT, PROBE, CTRL, GAS, OK, RGB, WARN };
 struct Ink {
   Role role = TXT;
   uint8_t mix = 255;      // how much of the colour shows over `under`
@@ -95,7 +98,7 @@ struct Txt {
 };
 enum class Kind : uint8_t { RECT, POLY, BLOB, DOT, TXT };
 struct Step { Kind kind; uint16_t index; };
-struct Hit { float x, y, w, h; uint8_t kind; int8_t index; };  // kind 0 reading (index = Ent), 1 button (index 0..3)
+struct Hit { float x, y, w, h; uint8_t kind; int8_t index; };  // kind 0 reading, 1 thermostat button, 2 guarded action
 struct Scene {
   bool ok = false;
   std::vector<Rect> rects;
@@ -269,6 +272,7 @@ class Builder {
   }
   void hit(float x, float y, float w, float h, int ent) { sc_.hits.push_back({x, y, w, h, 0, int8_t(ent)}); }
   void button(float x, float y, float w, float h, int index) { sc_.hits.push_back({x, y, w, h, 1, int8_t(index)}); }
+  void action(float x, float y, float w, float h, int ent) { sc_.hits.push_back({x, y, w, h, 2, int8_t(ent)}); }
 
   // Dashes along a path: `on_len` drawn, `off_len` skipped, starting `phase` into the pattern. The card's marching dots are
   // 1 on and 15 off with round ends; they are held still here (the card moves them with a clock).
@@ -816,13 +820,20 @@ inline Scene Builder::build() {
   say(LBL_SM, "Aquaro", 94, 564, R(TXT));
   say(SUB, T_AQUARO, 94, 580);
   block(260, 516, 190, 90);
-  hit(270, 526, 170, 70, E_SALT);
-  if (mains) outline(260, 516, 190, 90, 12, R(COLD), 2.5f);
-  rect(276, 540, 22, 42, 7, R(SOFT), 0, R(SOFT), 2.5f);
-  rect(304, 540, 22, 42, 7, R(SOFT, 115), 0, R(SOFT, 115), 2.5f);
-  say(LBL_SM, "Kinetico", 338, 546, R(TXT));
-  say(SUB, "2020c · block salt", 338, 564, R(DIM));
-  say(SUB, T_SALT, 338, 580);
+  action(332, 568, 108, 27, E_SALT_REPLACED);
+  const bool salt1 = on(F_SALT_1), salt2 = on(F_SALT_2), salt_empty = on(F_SALT_EMPTY), salt_unknown = on(F_SALT_UNKNOWN);
+  const uint8_t salt_alpha = salt_empty ? uint8_t(150 + 105 * swing(0.75f)) : 255;
+  if (salt_empty) outline(260, 516, 190, 90, 12, R(FLOW, salt_alpha, SURFACE), 3.0f);
+  else if (salt1 || salt2 || salt_unknown) outline(260, 516, 190, 90, 12, R(WARN), 2.5f);
+  else if (mains) outline(260, 516, 190, 90, 12, R(COLD), 2.5f);
+  const Ink salt1_ink = salt_empty ? R(FLOW, salt_alpha, SURFACE) : salt1 ? R(WARN) : R(SOFT);
+  const Ink salt2_ink = salt_empty ? R(FLOW, salt_alpha, SURFACE) : salt2 ? R(WARN) : R(SOFT, 115);
+  rect(276, 540, 22, 42, 7, salt1_ink, 0, salt1_ink, salt1 ? 3.0f : 2.5f);
+  rect(304, 540, 22, 42, 7, salt2_ink, 0, salt2_ink, salt2 ? 3.0f : 2.5f);
+  say(LBL_SM, "Kinetico 2020c", 338, 542, R(TXT));
+  say(SUB, T_SALT_DAYS, 338, 561);
+  if (sc_.pending == 4) say(SUB, "Tap again to mark replaced", 338, 581, R(WARN));
+  else say(SUB, T_SALT, 338, 581);
 
   // The key.
   block(610, 516, 370, 90);

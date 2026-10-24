@@ -103,6 +103,7 @@ static lv_color_t role(ps::Role r) {
     case ps::CTRL: return theme::color(theme::PLANT_CTRL);
     case ps::GAS: return theme::color(theme::PLANT_GAS);
     case ps::OK: return theme::color(theme::PLANT_OK);
+    case ps::WARN: return theme::color(theme::PLANT_WARN);
     default: return ink;
   }
 }
@@ -460,7 +461,7 @@ void render(Widgets &w, const Tile &t, int width, int height) {
   view.data = t.extra().plant;
   view.width = width; view.height = height;
   // A new moment may no longer have the button that asked.
-  if (!view.data || (!view.picture && view.pending >= int(view.data->controls.size())) || view.pending >= 4) stop_asking(view);
+  if (!view.data || (!view.picture && view.pending >= int(view.data->controls.size())) || view.pending >= 5) stop_asking(view);
   lv_obj_set_pos(canvas, 0, 0);
   lv_obj_set_size(canvas, width, height);
   rebuild(canvas);
@@ -484,7 +485,7 @@ static const char *reading_title(int ent) {
   static const char *const names[ps::E_COUNT] = {
       "Return", "Flow", "Draw-off", "Gas", "Zone 1", "Primary flow", "Flow rate", "Pressure", "Outside", "Heat curve",
       "Signal", "Megaflo intake", "Cylinder", "Heating circuit", "Heating manager", "Immersion", "Heaters", "Thermostat",
-      "Hot water", "Mains flow", "Softener salt"};
+      "Hot water", "Mains flow", "Salt block 1", "Salt block 2", "Salt replaced"};
   return ent >= 0 && ent < ps::E_COUNT ? names[ent] : "";
 }
 
@@ -507,6 +508,29 @@ static bool tap_picture(lv_obj_t *canvas, View *view, const lv_point_t &point) {
     const std::string &entity = d.ent(h->index);
     if (entity.empty()) return false;
     rt::open_sensor_detail(entity, reading_title(h->index), "", "");
+    return true;
+  }
+  if (h->kind == 2) {
+    if (h->index != ps::E_SALT_REPLACED) return false;
+    if (view->pending != 4) {
+      stop_asking(*view);
+      view->pending = 4;
+      view->timer = lv_timer_create(ask_over, ASK_MS, canvas);
+      lv_timer_set_repeat_count(view->timer, 1);
+      rebuild(canvas);
+      return true;
+    }
+    const std::string &entity = d.ent(ps::E_SALT_REPLACED);
+    stop_asking(*view);
+    rebuild(canvas);
+    if (entity.empty()) return false;
+    Tile target;
+    target.entity = entity;
+    target.received = true;
+    rt::Extra extra;
+    extra.action = "input_button.press";
+    target.set_extra(std::move(extra), true);
+    rt::perform(target);
     return true;
   }
   if (h->index < 0 || h->index > 3) return false;
